@@ -13,7 +13,7 @@ from token_tree import TTNode
 
 def sm_token(text: bytes) -> SMToken:
   """Make a token with `text`.  The other attributes are irrelevant here."""
-  return SMToken(text, 0, 0, False)
+  return SMToken(text, 0, 0, False, False)
 
 
 def tok(text: bytes) -> TTNode:

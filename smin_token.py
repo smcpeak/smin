@@ -42,5 +42,10 @@ class SMToken:
   # line if it contains a newline.
   first_on_line: bool
 
+  # True if there are no non-whitespace characters after the token on
+  # the same line as its last character.  A token that is entirely
+  # whitespace is never last on its line.
+  last_on_line: bool
+
 
 # EOF

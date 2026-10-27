@@ -142,7 +142,8 @@ def tokenize_cpp(data: bytes) -> list[SMToken]:
     if pos == n:
       # Whitespace at the end of the input.
       tokens.append(SMToken(
-        data[start:], 0, line_indent, data.find(b"\n", start) >= 0))
+        data[start:], 0, line_indent, data.find(b"\n", start) >= 0,
+        False))
       break
 
     tok_start = pos
@@ -150,11 +151,28 @@ def tokenize_cpp(data: bytes) -> list[SMToken]:
     kind = (_DELIMITER_KINDS.get(data[tok_start], 0)
             if pos == tok_start + 1
             else 0)
-    tokens.append(
-      SMToken(data[start:pos], kind, line_indent, first_on_line))
+    tokens.append(SMToken(
+      data[start:pos], kind, line_indent, first_on_line,
+      _is_last_on_line(data, pos)))
     at_line_start = False
 
   return tokens
+
+
+def _is_last_on_line(data: bytes, end: int) -> bool:
+  """
+  Return True if the token ending at `end` is last on its line, meaning
+  only whitespace follows it before the end of that physical line.  A
+  line splice counts as whitespace that ends the line.
+  """
+  if data[end-1] == _NEWLINE:
+    # The token's last character ends its line.
+    return True
+
+  n = len(data)
+  while end < n and data[end] in _HSPACE:
+    end += 1
+  return end == n or data[end] == _NEWLINE or _splice_len(data, end) > 0
 
 
 def _measure_indentation(data: bytes, line_start: int) -> tuple[int, int]:

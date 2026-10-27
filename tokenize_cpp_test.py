@@ -353,6 +353,55 @@ class LineAttributesTest(unittest.TestCase):
     self.assertEqual(self.attrs(b"\n  "), [(b"\n  ", 2, True)])
 
 
+class LastOnLineTest(unittest.TestCase):
+  def last(self, data: bytes) -> list[tuple[bytes, bool]]:
+    """Return the text and last-on-line flag of each token of `data`."""
+    return [(t.text, t.last_on_line) for t in tokenize_cpp(data)]
+
+  def test_single_token(self) -> None:
+    self.assertEqual(self.last(b"a"), [(b"a", True)])
+
+  def test_same_line(self) -> None:
+    self.assertEqual(self.last(b"a b;\nc"), [
+      (b"a", False), (b" b", False), (b";", True), (b"\nc", True)])
+
+  def test_trailing_whitespace(self) -> None:
+    self.assertEqual(self.last(b"a \t\r\nb"), [
+      (b"a", True), (b" \t\r\nb", True)])
+
+  def test_followed_by_comment(self) -> None:
+    self.assertEqual(self.last(b"a; // c\nb"), [
+      (b"a", False), (b";", False), (b" // c", True), (b"\nb", True)])
+
+  def test_multi_line_token(self) -> None:
+    # The relevant line is the one containing the token's last character.
+    self.assertEqual(self.last(b"/* a\nb */\nc /* d\ne */ f"), [
+      (b"/* a\nb */", True), (b"\nc", False), (b" /* d\ne */", False),
+      (b" f", True)])
+
+  def test_token_ending_with_newline(self) -> None:
+    # A directive can end with a line splice.  Its last character is the
+    # newline, so nothing follows it on its line.
+    self.assertEqual(self.last(b"#define X \\\n\nx"), [
+      (b"#define X \\\n", True), (b"\nx", True)])
+
+  def test_followed_by_line_splice(self) -> None:
+    # A line splice is whitespace, and its newline ends the line.
+    self.assertEqual(self.last(b"a \\\n  b"), [
+      (b"a", True), (b" \\\n  b", True)])
+    self.assertEqual(self.last(b"a\\\r\nb"), [
+      (b"a", True), (b"\\\r\nb", True)])
+
+  def test_backslash_not_splice(self) -> None:
+    self.assertEqual(self.last(b"a \\ b"), [
+      (b"a", False), (b" \\", False), (b" b", True)])
+
+  def test_eof_whitespace(self) -> None:
+    self.assertEqual(self.last(b"a\n"), [(b"a", True), (b"\n", False)])
+    self.assertEqual(self.last(b"a  "), [(b"a", True), (b"  ", False)])
+    self.assertEqual(self.last(b"  "), [(b"  ", False)])
+
+
 class CPPTokenizerTest(unittest.TestCase):
   def test_via_protocol(self) -> None:
     # The annotation makes mypy check that CPPTokenizer conforms.
