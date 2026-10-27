@@ -29,6 +29,7 @@ PYTHON_SRCS += smin_token.py
 PYTHON_SRCS += string_util.py
 PYTHON_SRCS += token_tree.py
 PYTHON_SRCS += tokenize_cpp.py
+PYTHON_SRCS += tokenizer.py
 
 PYTHON_TESTS :=
 PYTHON_TESTS += string_util_test.py

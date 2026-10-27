@@ -144,6 +144,16 @@ def delimiter_kind(token: SMToken) -> int:
   return 0
 
 
+class CPPTokenizer:
+  """Implementation of the `Tokenizer` protocol for C and C++."""
+
+  def tokenize(self, data: bytes) -> list[SMToken]:
+    return tokenize_cpp(data)
+
+  def delimiter_kind(self, token: SMToken) -> int:
+    return delimiter_kind(token)
+
+
 def _splice_len(data: bytes, i: int) -> int:
   """
   Return the length of the line splice (backslash, newline) at `i`, or 0

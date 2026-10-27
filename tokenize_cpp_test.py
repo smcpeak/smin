@@ -9,7 +9,8 @@ import random
 import unittest
 
 from smin_token import SMToken
-from tokenize_cpp import delimiter_kind, tokenize_cpp
+from tokenize_cpp import CPPTokenizer, delimiter_kind, tokenize_cpp
+from tokenizer import Tokenizer
 
 
 class TokenizeCppTest(unittest.TestCase):
@@ -308,6 +309,16 @@ class DelimiterKindTest(unittest.TestCase):
       -3, 0, -1, 1, 0, 3,          # {\n  g();\n}
       0,                           # \n
     ])
+
+
+class CPPTokenizerTest(unittest.TestCase):
+  def test_via_protocol(self) -> None:
+    # The annotation makes mypy check that CPPTokenizer conforms.
+    tokenizer: Tokenizer = CPPTokenizer()
+    tokens = tokenizer.tokenize(b"f(x);")
+    self.assertEqual([t.text for t in tokens], [b"f", b"(", b"x", b")", b";"])
+    self.assertEqual([tokenizer.delimiter_kind(t) for t in tokens],
+                     [0, -1, 0, 1, 0])
 
 
 if __name__ == "__main__":
