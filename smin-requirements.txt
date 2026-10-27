@@ -1,0 +1,73 @@
+Structural Minimizer Requirements
+---------------------------------
+
+The primary goal of the structural minimizer is to minimize an input,
+which is presumed to have some exploitable hierarchical structure, such
+that it satisfies a condition expressed as a boolean test program.
+
+One example of an application is minimizing a C++ program that causes a
+compiler to crash.
+
+The main requirement is the exploitation of hierarchical structure.  In
+the case of a C++ program, that structure can be extracted from the text
+through a fairly simple process of first tokenizing the input (so
+comments and string literals do not cause problems) and then balancing
+delimiters (parens, brackets, and braces).  A balanced pair of
+delimiters is treated as the parent node of all of the text contained
+between them.
+
+The tokenization and delimiter balancing procedures are parameters to
+the main structure deduction algorithm so it can work on multiple input
+languages.
+
+The indentation of the input also informs the presumed structure.  For
+example, in C++, we'd like to see an entire function definition as one
+node.  If the input is Python, indentation is the primary indicator of
+grammatical structure.
+
+The structure deduction algorithm should be robust in the face of input
+that does not precisely conform to a given language specification, both
+to tolerate minor deviations and to ensure it can be used with a wide
+range of inputs.
+
+The minimization algorithm exploits that structure by, working from the
+end of the file backwards, throwing away (or possibly replacing with a
+placeholder like ";") iteratively smaller groups nodes, then at
+iteratively lower levels in the tree, such that an early pass throws
+away large amounts of the input and later passes throw away smaller
+amounts.  The ultimate goal is to arrive at a 1-minimal input (that is,
+one where throwing away any *single* node causes the test to fail) in
+the minimum amount of time.
+
+For the goal of minimum time, note that we care both about the number of
+times that the test is invoked and the size of the input to each
+invocation, since the cost of invoking each test is expected to be
+approximately proportional to the input size.  That is, we want to
+successfully throw away large chunks as quickly as possible, which
+requires striking a balance between how much progress is made with each
+attempt when successful and how likely each attempt is.
+
+The minimizer is a command line tool accepting two primary inputs: the
+name of the input file to minimize, and the name of the test program.
+Its output is the minimized input file.
+
+When the minimizer starts, it automatically creates a backup of the
+input.  It then modifies it in place before each invocation of the
+test program.  If the minimization process is interrupted with Ctrl-C,
+the minimizer recognizes that, writes to the input file the most recent
+version that passed the test, then halts.
+
+While running, the minimizer writes one line of output to stdout for each
+invocation of the test program.  The line indicates:
+
+* The test program invocation sequence number, starting with 1.
+* The size of the input being tested in bytes.
+* The current granularity of chunk removal, and where that is in
+  relation to the starting and ending granularities.
+* Where the algorithm is within the current granularity.
+* After the test program terminates, whether that input was accepted or
+  rejected.
+
+
+
+EOF
