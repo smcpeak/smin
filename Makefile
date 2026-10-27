@@ -38,15 +38,14 @@ PYTHON_TESTS += tokenize_cpp_test.py
 
 ALL_PYTHON_FILES = $(PYTHON_SRCS) $(PYTHON_TESTS)
 
+
 all: out/mypy.ok
 
-out/mypy/%.py.ok: %.py
-	@$(CREATE_OUTPUT_DIRECTORY)
-	$(MYPY) $(MYPY_OPTS) $<
-	touch $@
-
-out/mypy.ok: $(patsubst %,out/mypy/%.ok,$(ALL_PYTHON_FILES))
+# Run $(MYPY) on all files whenever any one of them changes to ensure
+# that a change in one file that breaks another will be caught.
+out/mypy.ok: $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
+	$(MYPY) $(MYPY_OPTS) $(ALL_PYTHON_FILES)
 	touch $@
 
 
