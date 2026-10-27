@@ -28,7 +28,7 @@ grammatical structure.
 The structure deduction algorithm should be robust in the face of input
 that does not precisely conform to a given language specification, both
 to tolerate minor deviations and to ensure it can be used with a wide
-range of inputs.
+range of inputs.  It should never outright reject an input.
 
 The minimization algorithm exploits that structure by, working from the
 end of the file backwards, throwing away (or possibly replacing with a
