@@ -5,28 +5,12 @@ Unit tests for group_delimiters.
 
 from __future__ import annotations
 
-import textwrap
 import unittest
 
 from group_delimiters import group_delimiters
+from test_util import all_groups, dedent
 from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
-
-
-def dedent(s: str) -> str:
-  """Dedent `s` and remove one leading newline, if present."""
-  s = textwrap.dedent(s)
-  return s[1:] if s.startswith("\n") else s
-
-
-def all_groups(node: TTNode) -> list[TTNode]:
-  """Return all group nodes under (and including) `node`, in preorder."""
-  if node.is_token():
-    return []
-  groups = [node]
-  for child in node.children:
-    groups.extend(all_groups(child))
-  return groups
 
 
 class GroupDelimitersTest(unittest.TestCase):
