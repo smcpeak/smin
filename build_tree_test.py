@@ -393,6 +393,54 @@ class GroupDelimitersTest(unittest.TestCase):
     self.assertEqual(body.children[4].text(), b" {")
 
 
+  def test_cpp_hello_world(self) -> None:
+    """Example input 1, C++ Hello World, from the spec."""
+
+    # Note: This test only exercises Pass 2 (delimiters), so the output
+    # here is not the same as what the spec shows the as the final tree.
+    self.check(r"""
+      #include <iostream>        // std::cout
+
+      int main(int argc, char **argv)
+      {
+        std::cout << "Hello\n";
+        return 0;
+      }
+      """, r"""
+      [
+        "#include <iostream>"
+        "        // std::cout"
+        "\n\nint"
+        " main"
+        [
+          "("
+          "int"
+          " argc"
+          ","
+          " char"
+          " *"
+          "*"
+          "argv"
+          ")"
+        ]
+        [
+          "\n{"
+          "\n  std"
+          "::"
+          "cout"
+          " <<"
+          " \"Hello\\n\""
+          ";"
+          "\n  return"
+          " 0"
+          ";"
+          "\n}"
+        ]
+        "\n"
+      ]
+      """)
+
+
 if __name__ == "__main__":
   unittest.main()
 
