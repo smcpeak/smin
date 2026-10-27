@@ -41,13 +41,19 @@ non-whitespace token, except at the end of the file, which may have a
 token containing only whitespace.
 
 Definition: For every token, its "line indentation" is the number of
-leading spaces or tabs (for now, we treat them as equivalent for
-simplicity) on its line (the line with the first non-whitespace
-character).  Consequently, all tokens that begin on a given line have
-the same line indentation.  The line indentation of a group is the line
-indentation of its leftmost token.  If a token is entirely whitespace,
-then its line indentation is computed as if it had a non-whitespace
-character appended.
+leading spaces or tabs or other non-newline whitespace (for now, we
+treat them all as equivalent for simplicity) on its line (the line with
+the first non-whitespace character).  Consequently, all tokens that
+begin on a given line have the same line indentation.  The line
+indentation of a group is the line indentation of its leftmost token.
+If a token is entirely whitespace, then its line indentation is computed
+as if it had a non-whitespace character appended.
+
+Rationale detail: The form feed character (0xC) is sometimes used in the
+GNU coding style, but is (per that style) supposed to always be followed
+by a newline, so counting it as "indentation" shouldn't cause any
+problems (even after the much larger issue of proper treatment of tabs
+has been resolved).
 
 Definition: A token is "first on its line" if there are no
 non-whitespace characters before the token, on the same line.

@@ -27,10 +27,14 @@ class SMToken:
   # Opener -n pairs with closer +n.
   delimiter_kind: int
 
-  # Number of leading spaces and tabs on the line containing the token's
-  # first non-whitespace character.  If the token is entirely
-  # whitespace, this is computed as if a non-whitespace character were
-  # appended to it.
+  # Number of leading spaces and tabs (and other non-newline whitespace)
+  # on the line containing the token's first non-whitespace character.
+  # If the token is entirely whitespace, this is computed as if a
+  # non-whitespace character were appended to it.
+  #
+  # TODO: Handle tabs better, presuably including a configurable tab
+  # stop size.
+  #
   indentation: int
 
   # True if there are no non-whitespace characters before the token on

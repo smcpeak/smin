@@ -324,8 +324,8 @@ class LineAttributesTest(unittest.TestCase):
   def test_tabs_count_as_one(self) -> None:
     self.assertEqual(self.attrs(b"\t\ta"), [(b"\t\ta", 2, True)])
 
-  def test_other_whitespace_not_counted(self) -> None:
-    self.assertEqual(self.attrs(b"\f a"), [(b"\f a", 1, True)])
+  def test_other_whitespace_counted(self) -> None:
+    self.assertEqual(self.attrs(b"\f\v a"), [(b"\f\v a", 3, True)])
 
   def test_multi_line_token(self) -> None:
     # A token that begins on the last line of a multi-line token is not

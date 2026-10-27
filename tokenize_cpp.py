@@ -104,9 +104,6 @@ _DELIMITER_KINDS: dict[int, int] = {
   ord("{"): -3, ord("}"): 3,
 }
 
-# Bytes that count toward line indentation.
-_INDENT_CHARS: frozenset[int] = frozenset(b" \t")
-
 
 def tokenize_cpp(data: bytes) -> list[SMToken]:
   """Partition C/C++ source `data` into tokens."""
@@ -167,13 +164,10 @@ def _measure_indentation(data: bytes, line_start: int) -> tuple[int, int]:
   end of input if there is none).
   """
   n = len(data)
-  indent = 0
   pos = line_start
-  while pos < n and (c := data[pos]) in _HSPACE:
-    if c in _INDENT_CHARS:
-      indent += 1
+  while pos < n and data[pos] in _HSPACE:
     pos += 1
-  return indent, pos
+  return pos - line_start, pos
 
 
 class CPPTokenizer:
