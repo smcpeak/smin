@@ -8,10 +8,9 @@ from __future__ import annotations
 import textwrap
 import unittest
 
-from build_tree import LineInfo, compute_line_info, group_delimiters
-from smin_token import SMToken
+from build_tree import group_delimiters
 from token_tree import TTNode
-from tokenize_cpp import CPPTokenizer
+from tokenize_cpp import tokenize_cpp
 
 
 def dedent(s: str) -> str:
@@ -30,53 +29,6 @@ def all_groups(node: TTNode) -> list[TTNode]:
   return groups
 
 
-class ComputeLineInfoTest(unittest.TestCase):
-  def info(self, texts: list[bytes]) -> list[tuple[int, bool]]:
-    """Return the result of running `compute_line_info` on `texts`."""
-    infos = compute_line_info([SMToken(t) for t in texts])
-    return [(i.indentation, i.first_on_line) for i in infos]
-
-  def test_empty(self) -> None:
-    self.assertEqual(self.info([]), [])
-
-  def test_first_token(self) -> None:
-    self.assertEqual(self.info([b"a"]), [(0, True)])
-    self.assertEqual(self.info([b"  a"]), [(2, True)])
-
-  def test_same_line(self) -> None:
-    self.assertEqual(self.info([b"  a", b" b", b"c"]),
-                     [(2, True), (2, False), (2, False)])
-
-  def test_new_lines(self) -> None:
-    self.assertEqual(self.info([b"a", b"\n\t b", b" c", b"\n\nd"]),
-                     [(0, True), (2, True), (2, False), (0, True)])
-
-  def test_tabs_count_as_one(self) -> None:
-    self.assertEqual(self.info([b"\t\ta"]), [(2, True)])
-
-  def test_multi_line_token(self) -> None:
-    # A token that begins on the last line of a multi-line token is not
-    # first on its line, and has that line's indentation.
-    self.assertEqual(self.info([b"  /* a\n    b */", b" c", b"\nd"]),
-                     [(2, True), (4, False), (0, True)])
-
-  def test_multi_line_token_ending_with_newline(self) -> None:
-    self.assertEqual(self.info([b"#define X \\\n", b"   y"]),
-                     [(0, True), (3, True)])
-
-  def test_whitespace_only_token(self) -> None:
-    self.assertEqual(self.info([b"a", b"\n  "]), [(0, True), (2, True)])
-    self.assertEqual(self.info([b"  a", b"  "]), [(2, True), (2, False)])
-
-  def test_line_info_is_frozen(self) -> None:
-    info = LineInfo(1, True)
-    with self.assertRaises(AttributeError):
-      # The type annotation here suppresses mypy's complaint that the
-      # class is frozen.  The point of this test is to confirm that
-      # there is run-time enforcement of that fact.
-      info.indentation = 2  # type: ignore[misc]
-
-
 class GroupDelimitersTest(unittest.TestCase):
   def check(self, src: str, expect: str) -> TTNode:
     """
@@ -84,8 +36,7 @@ class GroupDelimitersTest(unittest.TestCase):
     whose debug string is `expect` (dedented).  Return the tree.
     """
     data = dedent(src).encode("utf-8")
-    tokenizer = CPPTokenizer()
-    tree = group_delimiters(tokenizer.tokenize(data), tokenizer)
+    tree = group_delimiters(tokenize_cpp(data))
 
     self.assertEqual(tree.to_debug_string(), dedent(expect))
     self.assertEqual(tree.text(), data)

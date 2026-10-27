@@ -11,9 +11,14 @@ from smin_token import SMToken
 from token_tree import TTNode
 
 
+def sm_token(text: bytes) -> SMToken:
+  """Make a token with `text`.  The other attributes are irrelevant here."""
+  return SMToken(text, 0, 0, False)
+
+
 def tok(text: bytes) -> TTNode:
   """Make a token node with `text`."""
-  return TTNode.make_token(SMToken(text))
+  return TTNode.make_token(sm_token(text))
 
 
 def delim(open: bytes, children: list[TTNode], close: bytes) -> TTNode:
@@ -40,7 +45,7 @@ def sample_tree() -> TTNode:
 
 class TTNodeTest(unittest.TestCase):
   def test_make_token(self) -> None:
-    t = SMToken(b"abc")
+    t = sm_token(b"abc")
     n = TTNode.make_token(t)
     self.assertTrue(n.is_token())
     self.assertFalse(n.is_group())
@@ -110,12 +115,12 @@ class TTNodeTest(unittest.TestCase):
     TTNode.make_group([]).self_check()
 
   def test_self_check_token_with_children(self) -> None:
-    n = TTNode(token=SMToken(b"a"), children=[tok(b"b")])
+    n = TTNode(token=sm_token(b"a"), children=[tok(b"b")])
     with self.assertRaises(AssertionError):
       n.self_check()
 
   def test_self_check_token_marked_delim_group(self) -> None:
-    n = TTNode(token=SMToken(b"a"), delim_group=True)
+    n = TTNode(token=sm_token(b"a"), delim_group=True)
     with self.assertRaises(AssertionError):
       n.self_check()
 
@@ -139,7 +144,7 @@ class TTNodeTest(unittest.TestCase):
       n.self_check()
 
   def test_self_check_recurses(self) -> None:
-    bad = TTNode(token=SMToken(b"a"), delim_group=True)
+    bad = TTNode(token=sm_token(b"a"), delim_group=True)
     n = TTNode.make_group([tok(b"x"), TTNode.make_group([tok(b"y"), bad])])
     with self.assertRaises(AssertionError):
       n.self_check()

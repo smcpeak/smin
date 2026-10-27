@@ -33,6 +33,9 @@ The tokenizer never rejects its input.  For robustness, an unterminated
 string or character literal ends at the end of its line, so that stray
 apostrophes (e.g., in "#if 0" text) do not swallow subsequent lines.  An
 unterminated comment or raw string extends to the end of the input.
+
+Line indentation and "first on its line" are computed with respect to
+physical lines, so a line splice begins a new line for that purpose.
 """
 
 from __future__ import annotations
@@ -93,12 +96,16 @@ _DQUOTE = ord("\"")
 _SQUOTE = ord("'")
 _LPAREN = ord("(")
 
-# Map from delimiter byte to its classification; see `delimiter_kind`.
+# Map from delimiter byte to its classification, as stored in
+# `SMToken.delimiter_kind`.
 _DELIMITER_KINDS: dict[int, int] = {
   ord("("): -1, ord(")"): 1,
   ord("["): -2, ord("]"): 2,
   ord("{"): -3, ord("}"): 3,
 }
+
+# Bytes that count toward line indentation.
+_INDENT_CHARS: frozenset[int] = frozenset(b" \t")
 
 
 def tokenize_cpp(data: bytes) -> list[SMToken]:
@@ -107,41 +114,66 @@ def tokenize_cpp(data: bytes) -> list[SMToken]:
   n = len(data)
   pos = 0
 
-  # True if no token has been seen on the current line.
+  # True if no token has been seen on the current line, for the purpose
+  # of recognizing preprocessor directives.
   at_line_start = True
+
+  # Position after which we have not yet looked for newlines.
+  line_search_start = 0
+
+  # Line indentation of the current physical line, and the position of
+  # its first non-whitespace character (or of the first token start, if
+  # there is no non-whitespace character).
+  line_indent = 0
+  line_content_start = -1
 
   while pos < n:
     start = pos
     pos, saw_newline = _skip_whitespace(data, pos)
     if saw_newline:
       at_line_start = True
+
+    # Update the line state if a newline (including one in a line splice
+    # or a multi-line token) precedes the token start `pos`.  The search
+    # is limited to bytes not yet searched, so the total cost is linear.
+    last_nl = data.rfind(b"\n", line_search_start, pos)
+    if last_nl >= 0 or line_content_start < 0:
+      line_indent, line_content_start = _measure_indentation(data, last_nl + 1)
+    line_search_start = pos
+    first_on_line = (line_content_start == pos)
+
     if pos == n:
       # Whitespace at the end of the input.
-      tokens.append(SMToken(data[start:]))
+      tokens.append(SMToken(
+        data[start:], 0, line_indent, data.find(b"\n", start) >= 0))
       break
 
+    tok_start = pos
     pos = _scan_token(data, pos, at_line_start)
-    tokens.append(SMToken(data[start:pos]))
+    kind = (_DELIMITER_KINDS.get(data[tok_start], 0)
+            if pos == tok_start + 1
+            else 0)
+    tokens.append(
+      SMToken(data[start:pos], kind, line_indent, first_on_line))
     at_line_start = False
 
   return tokens
 
 
-def delimiter_kind(token: SMToken) -> int:
+def _measure_indentation(data: bytes, line_start: int) -> tuple[int, int]:
   """
-  Classify `token` as a delimiter.  Return a number in [-3,3] that is
-  negative for an opening delimiter, positive for a closing delimiter,
-  and zero for a non-delimiter.  Opener -n pairs with closer +n.
-
-  A delimiter token consists of whitespace followed by one delimiter
-  byte.  Other tokens that end with a delimiter byte, like "#if (" or
-  "// )", are not delimiters.
+  For the line starting at `line_start`, return its indentation and the
+  position of its first non-whitespace character (or of the newline or
+  end of input if there is none).
   """
-  text = token.text
-  pos, _ = _skip_whitespace(text, 0)
-  if pos == len(text) - 1:
-    return _DELIMITER_KINDS.get(text[pos], 0)
-  return 0
+  n = len(data)
+  indent = 0
+  pos = line_start
+  while pos < n and (c := data[pos]) in _HSPACE:
+    if c in _INDENT_CHARS:
+      indent += 1
+    pos += 1
+  return indent, pos
 
 
 class CPPTokenizer:
@@ -149,9 +181,6 @@ class CPPTokenizer:
 
   def tokenize(self, data: bytes) -> list[SMToken]:
     return tokenize_cpp(data)
-
-  def delimiter_kind(self, token: SMToken) -> int:
-    return delimiter_kind(token)
 
 
 def _splice_len(data: bytes, i: int) -> int:

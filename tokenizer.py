@@ -12,21 +12,14 @@ from smin_token import SMToken
 
 
 class Tokenizer(Protocol):
-  """Language-specific tokenization and delimiter classification."""
+  """Language-specific functions used by structure deduction."""
 
   def tokenize(self, data: bytes) -> list[SMToken]:
     """
     Partition `data` into tokens.  Whitespace is included with the
     following non-whitespace token, except that whitespace at the end of
-    the input may be a token of its own.
-    """
-    ...
-
-  def delimiter_kind(self, token: SMToken) -> int:
-    """
-    Classify `token` as a delimiter.  Return a negative number for an
-    opening delimiter, a positive number for a closing delimiter, and
-    zero for a non-delimiter.  Opener -n pairs with closer +n.
+    the input may be a token of its own.  Every attribute of each token
+    is computed, including its delimiter classification.
     """
     ...
 

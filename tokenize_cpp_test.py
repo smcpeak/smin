@@ -8,8 +8,7 @@ from __future__ import annotations
 import random
 import unittest
 
-from smin_token import SMToken
-from tokenize_cpp import CPPTokenizer, delimiter_kind, tokenize_cpp
+from tokenize_cpp import CPPTokenizer, tokenize_cpp
 from tokenizer import Tokenizer
 
 
@@ -260,55 +259,98 @@ class TokenizeCppTest(unittest.TestCase):
 
 
 class DelimiterKindTest(unittest.TestCase):
-  def kind(self, text: bytes) -> int:
-    return delimiter_kind(SMToken(text))
+  def kinds(self, data: bytes) -> list[int]:
+    """Return the delimiter kinds of the tokens of `data`."""
+    return [t.delimiter_kind for t in tokenize_cpp(data)]
 
   def test_openers(self) -> None:
-    self.assertEqual(self.kind(b"("), -1)
-    self.assertEqual(self.kind(b"["), -2)
-    self.assertEqual(self.kind(b"{"), -3)
+    self.assertEqual(self.kinds(b"( [ {"), [-1, -2, -3])
 
   def test_closers(self) -> None:
-    self.assertEqual(self.kind(b")"), 1)
-    self.assertEqual(self.kind(b"]"), 2)
-    self.assertEqual(self.kind(b"}"), 3)
+    self.assertEqual(self.kinds(b") ] }"), [1, 2, 3])
 
   def test_leading_whitespace(self) -> None:
-    self.assertEqual(self.kind(b"\n  {"), -3)
-    self.assertEqual(self.kind(b" \t\r\f\v\n)"), 1)
+    self.assertEqual(self.kinds(b"\n  { \t\r\f\v\n)"), [-3, 1])
 
   def test_leading_line_splice(self) -> None:
-    self.assertEqual(self.kind(b"\\\n]"), 2)
-    self.assertEqual(self.kind(b" \\\r\n ["), -2)
+    self.assertEqual(self.kinds(b"\\\n] \\\r\n ["), [2, -2])
 
   def test_non_delimiters(self) -> None:
-    for text in [b"a", b" x", b"<", b">", b">>", b";", b"::", b"0",
-                 b'"a"', b"'('", b"\n"]:
-      with self.subTest(text=text):
-        self.assertEqual(self.kind(text), 0)
+    self.assertEqual(
+      self.kinds(b"a < > >> ; :: 0 \"a\" '('"),
+      [0] * 9)
 
-  def test_empty(self) -> None:
-    self.assertEqual(self.kind(b""), 0)
+  def test_eof_whitespace(self) -> None:
+    self.assertEqual(self.kinds(b"(\n"), [-1, 0])
 
   def test_ends_with_delimiter_byte(self) -> None:
-    # Tokens that end with a delimiter byte but are not delimiters.
-    for text in [b"#if (", b"#define F(a)", b"// {", b"/* } */",
-                 b'R"(x)"', b"((", b"a)"]:
-      with self.subTest(text=text):
-        self.assertEqual(self.kind(text), 0)
-
-  def test_trailing_whitespace(self) -> None:
-    # The tokenizer never makes such a token, but it is not a delimiter.
-    self.assertEqual(self.kind(b"( "), 0)
+    # Tokens that contain or end with a delimiter byte but are not
+    # delimiters.
+    for data in [b"#if (", b"#define F(a)", b"// {", b"/* } */",
+                 b'R"(x)"', b'")"']:
+      with self.subTest(data=data):
+        self.assertEqual(self.kinds(data), [0])
 
   def test_tokenized_input(self) -> None:
-    kinds = [delimiter_kind(t)
-             for t in tokenize_cpp(b"f(a[i]) {\n  g();\n}\n")]
-    self.assertEqual(kinds, [
+    self.assertEqual(self.kinds(b"f(a[i]) {\n  g();\n}\n"), [
       0, -1, 0, -2, 0, 2, 1,       # f(a[i])
       -3, 0, -1, 1, 0, 3,          # {\n  g();\n}
       0,                           # \n
     ])
+
+
+class LineAttributesTest(unittest.TestCase):
+  def attrs(self, data: bytes) -> list[tuple[bytes, int, bool]]:
+    """
+    Return the text, indentation, and first-on-line flag of each token
+    of `data`.
+    """
+    return [(t.text, t.indentation, t.first_on_line)
+            for t in tokenize_cpp(data)]
+
+  def test_first_token(self) -> None:
+    self.assertEqual(self.attrs(b"a"), [(b"a", 0, True)])
+    self.assertEqual(self.attrs(b"  a"), [(b"  a", 2, True)])
+
+  def test_same_line(self) -> None:
+    self.assertEqual(self.attrs(b"  a b;"), [
+      (b"  a", 2, True), (b" b", 2, False), (b";", 2, False)])
+
+  def test_new_lines(self) -> None:
+    self.assertEqual(self.attrs(b"a\n\t b c\n\nd"), [
+      (b"a", 0, True), (b"\n\t b", 2, True), (b" c", 2, False),
+      (b"\n\nd", 0, True)])
+
+  def test_tabs_count_as_one(self) -> None:
+    self.assertEqual(self.attrs(b"\t\ta"), [(b"\t\ta", 2, True)])
+
+  def test_other_whitespace_not_counted(self) -> None:
+    self.assertEqual(self.attrs(b"\f a"), [(b"\f a", 1, True)])
+
+  def test_multi_line_token(self) -> None:
+    # A token that begins on the last line of a multi-line token is not
+    # first on its line, and has that line's indentation.
+    self.assertEqual(self.attrs(b"  /* a\n    b */ c\nd"), [
+      (b"  /* a\n    b */", 2, True), (b" c", 4, False),
+      (b"\nd", 0, True)])
+
+  def test_multi_line_directive(self) -> None:
+    self.assertEqual(self.attrs(b"#define X \\\n  1\n x"), [
+      (b"#define X \\\n  1", 0, True), (b"\n x", 1, True)])
+
+  def test_line_splice_starts_physical_line(self) -> None:
+    self.assertEqual(self.attrs(b"a \\\n  b"), [
+      (b"a", 0, True), (b" \\\n  b", 2, True)])
+
+  def test_eof_whitespace(self) -> None:
+    self.assertEqual(self.attrs(b"a\n  "), [
+      (b"a", 0, True), (b"\n  ", 2, True)])
+    self.assertEqual(self.attrs(b"  a  "), [
+      (b"  a", 2, True), (b"  ", 2, False)])
+
+  def test_only_whitespace(self) -> None:
+    self.assertEqual(self.attrs(b"  "), [(b"  ", 2, False)])
+    self.assertEqual(self.attrs(b"\n  "), [(b"\n  ", 2, True)])
 
 
 class CPPTokenizerTest(unittest.TestCase):
@@ -317,8 +359,7 @@ class CPPTokenizerTest(unittest.TestCase):
     tokenizer: Tokenizer = CPPTokenizer()
     tokens = tokenizer.tokenize(b"f(x);")
     self.assertEqual([t.text for t in tokens], [b"f", b"(", b"x", b")", b";"])
-    self.assertEqual([tokenizer.delimiter_kind(t) for t in tokens],
-                     [0, -1, 0, 1, 0])
+    self.assertEqual([t.delimiter_kind for t in tokens], [0, -1, 0, 1, 0])
 
 
 if __name__ == "__main__":
