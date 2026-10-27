@@ -94,7 +94,8 @@ Phase 5: Grouping paragraphs
 
 A "paragraph" is a sequence of nodes that are all first on their line,
 have the same line indentation, and do not have any intervening blank
-lines.  Group all paragraphs.
+lines.  (Per this definition, blank lines *inside* a group node do not
+break a paragraph.)  Group all paragraphs.
 
 
 Phase 6: Collapsing redundant groups
@@ -102,7 +103,9 @@ Phase 6: Collapsing redundant groups
 
 Any group that only has one child is replaced by that child.
 Consequently, afterward, every group will have at least two children.
-(Empty groups are never created.)
+(Empty groups are never created, except possibly in the case of an input
+file that is completely empty, depending on what the tokenizer does with
+that.)
 
 
 
