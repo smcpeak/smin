@@ -36,18 +36,26 @@ as these are treated specially by the deduction algorithm.
 Other tokens may include string literals, comments, preprocessor
 directives, other kinds of literals, identifiers, etc.
 
-For now at least, the tacit expectation is that linguistically
-insignificant whitespace is included with its following non-whitespace
-token.  However, the algorithm is intended to be somewhat tolerant of
-different tokenizer behavior.  (And note that whitespace at the end of
-the file cannot be included with the "next" token since there is none.)
+Linguistically insignificant whitespace is included with its following
+non-whitespace token, except at the end of the file, which may have a
+token containing only whitespace.
 
 Definition: For every token, its "line indentation" is the number of
 leading spaces or tabs (for now, we treat them as equivalent for
 simplicity) on its line (the line with the first non-whitespace
-character).  Consequently, all tokens on a given line have the same line
-indentation.  The line indentation of a group is the line indentation of
-its leftmost token.
+character).  Consequently, all tokens that begin on a given line have
+the same line indentation.  The line indentation of a group is the line
+indentation of its leftmost token.  If a token is entirely whitespace,
+then its line indentation is computed as if it had a non-whitespace
+character appended.
+
+Definition: A token is "first on its line" if there are no
+non-whitespace characters before the token, on the same line.
+Similarly, a token is "last on its line" if no non-whitespace characters
+follow, on the same line as its last character.
+
+The EOF WS token, if present, is considered "first on its line" if it
+has a newline character, but not "last on its line" in any case.
 
 
 Phase 2: Grouping by delimiters
@@ -62,12 +70,12 @@ created that has the delimiter tokens at either end and the nodes
 text between them.
 
 If the top of the stack does not correspond, then we search the stack
-(in top down order) for an opening delimiter whose line indentation is
-the same as that of the closing delimiter.  If one is found, then we pop
-all intervening opening delimiters (hence, they will not be the start of
-any group) and form a new group with the found opening delimiter.
-Otherwise, the closing delimiter is skipped, hence treated as a
-non-delimiter token.
+(in top down order) for a corresponding opening delimiter whose line
+indentation is the same as that of the closing delimiter.  If one is
+found, then we pop all intervening opening delimiters (hence, they will
+not be the start of any group) and form a new group with the found
+opening delimiter.  Otherwise, the closing delimiter is skipped, hence
+treated as a non-delimiter token.
 
 For a closing delimiter that *is* first on its line, pair it with the
 closest opening delimiter of the appropriate kind whose line indentation
@@ -108,9 +116,9 @@ one exists.  This will group ordinary one-line statements together.
 
 It will also group multi-line function definitions if the body is
 enclosed by a delimiter and the opening delimiter is on the same line as
-the header.  (If not, head and body still get grouped in phase 5, and if
-not, I accept the waste caused by fruitlessly trying to separate them,
-in exchange for deduction algorithm simplicity.)
+the header.  (If not, head and body may still get grouped in phase 5,
+and if not, I accept the waste caused by fruitlessly trying to separate
+them, in exchange for deduction algorithm simplicity.)
 
 
 Phase 4: Grouping by indentation
@@ -118,10 +126,9 @@ Phase 4: Grouping by indentation
 
 For every node (excluding delimiter tokens) that is the first on its
 line, group it with all following siblings up to but not including the
-next sibling that is first on its line and has equal or less line
-indentation.  When looking for the end (one past the end) sibling,
-ignore (accumulate into the group) tokens corresponding to blank lines
-(if such are created by tokenization).
+next sibling that is either (1) first on its line and has equal or less
+line indentation, or (2) is the closing delimiter for the group the node
+is (directly) in.
 
 Discussion: This rule has potential problems with preprocessor
 directives and comments that do not respect the indentation of the
@@ -314,19 +321,33 @@ Output 3:
 
   [
     [
-      "def topo_sort_sccs"
       [
-        "("
-        "\n  graph: Dict"
+        "def topo_sort_sccs"
         [
-          "["
-          "str, List"
+          "("
           [
-            "[str]"
+            "\n  graph: Dict"
+            [
+              "["
+              "str, List"
+              [
+                "[str]"
+              ]
+              "]"
+            ]
+            ", sccs: List"
+            [
+              "["
+              "List"
+              [
+                "[str]"
+              ]
+              "]"
+            ]
           ]
-          "]"
+          ")"
         ]
-        ", sccs: List"
+        " -> List"
         [
           "["
           "List"
@@ -335,24 +356,12 @@ Output 3:
           ]
           "]"
         ]
-        ")"
+        ":"
       ]
-      " -> List"
+      "\n  \"\"\"Topologically sort SCCs.\"\"\""
       [
-        "["
-        "List"
-        [
-          "[str]"
-        ]
-        "]"
-      ]
-      ":"
-    ]
-    "\n  \"\"\"Topologically sort SCCs.\"\"\""
-    [
-      "\n\n  # Map from a node to the index in `sccs` where that node is found."
-      "\n  # Assumes that each node appears in exactly one SCC."
-      [
+        "\n\n  # Map from a node to the index in `sccs` where that node is found."
+        "\n  # Assumes that each node appears in exactly one SCC."
         [
           "\n  node_to_scc: Dict"
           [
