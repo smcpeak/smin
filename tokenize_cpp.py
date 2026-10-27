@@ -93,6 +93,13 @@ _DQUOTE = ord("\"")
 _SQUOTE = ord("'")
 _LPAREN = ord("(")
 
+# Map from delimiter byte to its classification; see `delimiter_kind`.
+_DELIMITER_KINDS: dict[int, int] = {
+  ord("("): -1, ord(")"): 1,
+  ord("["): -2, ord("]"): 2,
+  ord("{"): -3, ord("}"): 3,
+}
+
 
 def tokenize_cpp(data: bytes) -> list[SMToken]:
   """Partition C/C++ source `data` into tokens."""
@@ -118,6 +125,23 @@ def tokenize_cpp(data: bytes) -> list[SMToken]:
     at_line_start = False
 
   return tokens
+
+
+def delimiter_kind(token: SMToken) -> int:
+  """
+  Classify `token` as a delimiter.  Return a number in [-3,3] that is
+  negative for an opening delimiter, positive for a closing delimiter,
+  and zero for a non-delimiter.  Opener -n pairs with closer +n.
+
+  A delimiter token consists of whitespace followed by one delimiter
+  byte.  Other tokens that end with a delimiter byte, like "#if (" or
+  "// )", are not delimiters.
+  """
+  text = token.text
+  pos, _ = _skip_whitespace(text, 0)
+  if pos == len(text) - 1:
+    return _DELIMITER_KINDS.get(text[pos], 0)
+  return 0
 
 
 def _splice_len(data: bytes, i: int) -> int:

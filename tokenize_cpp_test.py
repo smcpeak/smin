@@ -8,7 +8,8 @@ from __future__ import annotations
 import random
 import unittest
 
-from tokenize_cpp import tokenize_cpp
+from smin_token import SMToken
+from tokenize_cpp import delimiter_kind, tokenize_cpp
 
 
 class TokenizeCppTest(unittest.TestCase):
@@ -255,6 +256,58 @@ class TokenizeCppTest(unittest.TestCase):
       texts = [t.text for t in tokenize_cpp(data)]
       self.assertEqual(b"".join(texts), data)
       self.assertTrue(all(texts), data)
+
+
+class DelimiterKindTest(unittest.TestCase):
+  def kind(self, text: bytes) -> int:
+    return delimiter_kind(SMToken(text))
+
+  def test_openers(self) -> None:
+    self.assertEqual(self.kind(b"("), -1)
+    self.assertEqual(self.kind(b"["), -2)
+    self.assertEqual(self.kind(b"{"), -3)
+
+  def test_closers(self) -> None:
+    self.assertEqual(self.kind(b")"), 1)
+    self.assertEqual(self.kind(b"]"), 2)
+    self.assertEqual(self.kind(b"}"), 3)
+
+  def test_leading_whitespace(self) -> None:
+    self.assertEqual(self.kind(b"\n  {"), -3)
+    self.assertEqual(self.kind(b" \t\r\f\v\n)"), 1)
+
+  def test_leading_line_splice(self) -> None:
+    self.assertEqual(self.kind(b"\\\n]"), 2)
+    self.assertEqual(self.kind(b" \\\r\n ["), -2)
+
+  def test_non_delimiters(self) -> None:
+    for text in [b"a", b" x", b"<", b">", b">>", b";", b"::", b"0",
+                 b'"a"', b"'('", b"\n"]:
+      with self.subTest(text=text):
+        self.assertEqual(self.kind(text), 0)
+
+  def test_empty(self) -> None:
+    self.assertEqual(self.kind(b""), 0)
+
+  def test_ends_with_delimiter_byte(self) -> None:
+    # Tokens that end with a delimiter byte but are not delimiters.
+    for text in [b"#if (", b"#define F(a)", b"// {", b"/* } */",
+                 b'R"(x)"', b"((", b"a)"]:
+      with self.subTest(text=text):
+        self.assertEqual(self.kind(text), 0)
+
+  def test_trailing_whitespace(self) -> None:
+    # The tokenizer never makes such a token, but it is not a delimiter.
+    self.assertEqual(self.kind(b"( "), 0)
+
+  def test_tokenized_input(self) -> None:
+    kinds = [delimiter_kind(t)
+             for t in tokenize_cpp(b"f(a[i]) {\n  g();\n}\n")]
+    self.assertEqual(kinds, [
+      0, -1, 0, -2, 0, 2, 1,       # f(a[i])
+      -3, 0, -1, 1, 0, 3,          # {\n  g();\n}
+      0,                           # \n
+    ])
 
 
 if __name__ == "__main__":
