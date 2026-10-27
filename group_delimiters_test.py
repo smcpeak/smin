@@ -1,6 +1,6 @@
-# build_tree_test.py
+# group_delimiters_test.py
 """
-Unit tests for build_tree.
+Unit tests for group_delimiters.
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ from __future__ import annotations
 import textwrap
 import unittest
 
-from build_tree import group_delimiters
+from group_delimiters import group_delimiters
 from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
 

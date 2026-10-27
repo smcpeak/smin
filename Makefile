@@ -25,7 +25,7 @@ MYPY_OPTS = --strict
 
 
 PYTHON_SRCS :=
-PYTHON_SRCS += build_tree.py
+PYTHON_SRCS += group_delimiters.py
 PYTHON_SRCS += smin_token.py
 PYTHON_SRCS += string_util.py
 PYTHON_SRCS += token_tree.py
@@ -33,7 +33,7 @@ PYTHON_SRCS += tokenize_cpp.py
 PYTHON_SRCS += tokenizer.py
 
 PYTHON_TESTS :=
-PYTHON_TESTS += build_tree_test.py
+PYTHON_TESTS += group_delimiters_test.py
 PYTHON_TESTS += string_util_test.py
 PYTHON_TESTS += token_tree_test.py
 PYTHON_TESTS += tokenize_cpp_test.py

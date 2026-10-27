@@ -1,8 +1,8 @@
-# build_tree.py
+# group_delimiters.py
 """
-Structure deduction: build a token tree from a token sequence.
+Build a token tree from a token sequence by grouping delimiter tokens.
 
-See structure-deduction-algorithm.txt.
+See structure-deduction-algorithm.txt, phase 2.
 """
 
 from __future__ import annotations
