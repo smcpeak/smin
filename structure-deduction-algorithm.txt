@@ -3,8 +3,7 @@ Structure deduction algorithm
 
 Input:
 
-* The input file, treated as a sequence of characters (Unicode code
-  points).
+* The input file, treated as a sequence of bytes.
 
 * A language-specific tokenization procedure.
 
@@ -15,9 +14,9 @@ Output:
 * A token tree that heuristically describes the hierarchical structure
   of the input.
 
-    A token is a contiguous sequence of characters.  The tokens
-    partition the input file, such that their concatenation yields the
-    original input file.
+    A token is a contiguous sequence of bytes.  The tokens partition the
+    input file, such that their concatenation yields the original input
+    file.
 
     A token tree node is either a token or a group.  A group is a
     sequence of child nodes.  Left-to-right traversal of the tree yields
@@ -39,13 +38,16 @@ directives, other kinds of literals, identifiers, etc.
 
 For now at least, the tacit expectation is that linguistically
 insignificant whitespace is included with its following non-whitespace
-token.
+token.  However, the algorithm is intended to be somewhat tolerant of
+different tokenizer behavior.  (And note that whitespace at the end of
+the file cannot be included with the "next" token since there is none.)
 
 Definition: For every token, its "line indentation" is the number of
 leading spaces or tabs (for now, we treat them as equivalent for
-simplicity) on its line.  Consequently, all tokens on a given line have
-the same line indentation.  The line indentation of a group is the line
-indentation of its leftmost token.
+simplicity) on its line (the line with the first non-whitespace
+character).  Consequently, all tokens on a given line have the same line
+indentation.  The line indentation of a group is the line indentation of
+its leftmost token.
 
 
 Phase 2: Grouping by delimiters
@@ -53,10 +55,11 @@ Phase 2: Grouping by delimiters
 
 The delimiter phase walks the token sequence, maintaining a stack of
 unmatched opening delimiter tokens.  When a closing delimiter is
-encountered, if the top of the stack is the corresponding opening
-delimiter, then a new group node is created that has the delimiter
-tokens at either end and the nodes (including previously created
-delimiter groups) describing the enclosed text between them.
+encountered that is not the first token on its line, if the top of the
+stack is the corresponding opening delimiter, then a new group node is
+created that has the delimiter tokens at either end and the nodes
+(including previously created delimiter groups) describing the enclosed
+text between them.
 
 If the top of the stack does not correspond, then we search the stack
 (in top down order) for an opening delimiter whose line indentation is
@@ -66,36 +69,78 @@ any group) and form a new group with the found opening delimiter.
 Otherwise, the closing delimiter is skipped, hence treated as a
 non-delimiter token.
 
+For a closing delimiter that *is* first on its line, pair it with the
+closest opening delimiter of the appropriate kind whose line indentation
+matches that of the closer, if one exists.  Otherwise use the same
+procedure as for closing delimiters that are not first on their line.
+
+Rationale: The special rule for line-first closing delimiters is meant
+to handle a case like:
+
+  void f() {
+  #if A
+    if (a) {
+  #else
+    if (b) {
+  #endif
+      x();
+    }
+  }
+
+where we want to ensure the final '}' goes with the initial '{', not the
+one in the middle.
+
+If the delimiter stack is not empty when the end of file is reached, the
+unpaired openers become ordinary tokens.
+
+In subsequent phases, the delimiter tokens at either end of a delimiter
+group are excluded from being placed into smaller groups.
+
 
 Phase 3: Grouping lines
 -----------------------
 
-Every node that is the first on its line (its leftmost token is the
-first on its line) is grouped with the next sibling node that is last on
-its line (its rightmost token is the last on its line) and all
-intervening nodes, if one exists.  This will group ordinary one-line
-statements together, as well as multi-line function definitions (if the
-body is enclosed by a delimiter).
+Every node (excluding delimiter tokens) that is the first on its line
+(its leftmost token is the first on its line) is grouped with the next
+sibling node (excluding delimiter tokens) that is last on its line (its
+rightmost token is the last on its line) and all intervening nodes, if
+one exists.  This will group ordinary one-line statements together.
+
+It will also group multi-line function definitions if the body is
+enclosed by a delimiter and the opening delimiter is on the same line as
+the header.  (If not, head and body still get grouped in phase 5, and if
+not, I accept the waste caused by fruitlessly trying to separate them,
+in exchange for deduction algorithm simplicity.)
 
 
 Phase 4: Grouping by indentation
 --------------------------------
 
-For every node that is the first on its line, group it with all
-following siblings up to but not including the next sibling that is
-first on its line and has equal or less line indentation.  When looking
-for the end (one past the end) sibling, ignore (accumulate into the
-group) tokens corresponding to blank lines (if such are created by
-tokenization).
+For every node (excluding delimiter tokens) that is the first on its
+line, group it with all following siblings up to but not including the
+next sibling that is first on its line and has equal or less line
+indentation.  When looking for the end (one past the end) sibling,
+ignore (accumulate into the group) tokens corresponding to blank lines
+(if such are created by tokenization).
+
+Discussion: This rule has potential problems with preprocessor
+directives and comments that do not respect the indentation of the
+surrounding code.  For now, I accept this potential deficiency.
 
 
 Phase 5: Grouping paragraphs
 ----------------------------
 
-A "paragraph" is a sequence of nodes that are all first on their line,
-have the same line indentation, and do not have any intervening blank
-lines.  (Per this definition, blank lines *inside* a group node do not
-break a paragraph.)  Group all paragraphs.
+A "paragraph" is a contiguous sequence of nodes (excluding delimiter
+tokens) that are all first on their line, have the same line
+indentation, and do not have any intervening blank lines.  (Per this
+definition, blank lines *inside* a group node do not break a paragraph.)
+Group all paragraphs.
+
+Assuming all whitespace is associated with the next token (except at
+EOF), intervening blank lines can be recognized by observing a node
+whose first token has multiple newline characters in its leading
+whitespace.
 
 
 Phase 6: Collapsing redundant groups
@@ -146,7 +191,12 @@ Output 1:
       [
         "\n{"
         [
-          "\n  std::cout << \"Hello\\n\";"
+          [
+            "\n  std::cout << \"Hello\\n\";"
+          ]
+          [
+            "\n  return 0;"
+          ]
         ]
         "\n}"
       ]
@@ -187,22 +237,24 @@ Output 2:
     ]
     [
       "\n{"
-      "\n  // Must be a named declaration."
       [
-        "\n  if "
+        "\n  // Must be a named declaration."
         [
-          "(!isa<clang::NamedDecl>"
+          "\n  if "
           [
-            "(dn.m_decl)"
+            "(!isa<clang::NamedDecl>"
+            [
+              "(dn.m_decl)"
+            ]
+            ")"
           ]
-          ")"
-        ]
-        [
-          " {"
           [
-            "\n    return false;"
+            " {"
+            [
+              "\n    return false;"
+            ]
+            "\n  }"
           ]
-          "\n  }"
         ]
       ]
       [
@@ -226,9 +278,11 @@ Output 2:
           ]
           [
             " {"
-            "\n    // The parent is the TU."
             [
-              "\n    return true;"
+              "\n    // The parent is the TU."
+              [
+                "\n    return true;"
+              ]
             ]
             "\n  }"
           ]
@@ -295,42 +349,45 @@ Output 3:
       ":"
     ]
     "\n  \"\"\"Topologically sort SCCs.\"\"\""
-    "\n\n  # Map from a node to the index in `sccs` where that node is found."
-    "\n  # Assumes that each node appears in exactly one SCC."
     [
-      [
-        "  node_to_scc: Dict"
-        [
-          "[str, int]"
-        ]
-        " = "
-        [
-          "{}"
-        ]
-      ]
+      "\n\n  # Map from a node to the index in `sccs` where that node is found."
+      "\n  # Assumes that each node appears in exactly one SCC."
       [
         [
-          "\n  for i, comp in enumerate"
+          "\n  node_to_scc: Dict"
           [
-            "(sccs)"
+            "[str, int]"
           ]
-          ":"
+          " = "
+          [
+            "{}"
+          ]
         ]
         [
           [
-            "\n    for n in comp:"
-          ]
-          [
-            "\n      node_to_scc"
+            "\n  for i, comp in enumerate"
             [
-              "[n]"
+              "(sccs)"
             ]
-            " = i"
+            ":"
+          ]
+          [
+            [
+              "\n    for n in comp:"
+            ]
+            [
+              "\n      node_to_scc"
+              [
+                "[n]"
+              ]
+              " = i"
+            ]
           ]
         ]
       ]
     ]
-
+    "\n"
+  ]
 
 
 EOF
