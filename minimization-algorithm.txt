@@ -7,9 +7,12 @@ Input:
   structure-deduction-algorithm.txt).
 
 * A deterministic, language-dependent function that takes as input a
-  node in the token tree and yields a non-empty sequence of candidate
-  replacements that (notionally) make the input smaller.  Each
-  replacement is a (possibly empty) byte sequence.
+  node in the token tree and yields a possibly-empty sequence of
+  non-trivial candidate replacements that (notionally) make the input
+  smaller.  Each replacement is a (possibly empty) byte sequence.
+  Implicitly, every node has the empty string as a trivial candidate
+  replacement; the non-trivial alternatives are only tried after the
+  empty string fails.
 
 * A deterministic acceptance test that takes as input a byte sequence
   and returns a boolean saying if that sequence is accepted.  The
@@ -28,17 +31,512 @@ Output:
 
   - The test program invocation sequence number, starting with 1.
   - The size of the input being tested in bytes.
-  - Some measure of progress, with details to be determined.  (The
-    requirements sketch something speculative.)
+  - A measure of progress, described in detail below.
 
   and a sequence of acceptance test result reports, each indicating
   whether the corresponding input was accepted.
 
 
-Algorithm
+Simplifying assumptions
+-----------------------
+
+All nodes have the trivial candidate replacement of the empty string,
+which is what gets tried first.  Some (in practice, just brace pairs,
+with the candidate ";") have non-trivial candidates.
+
+
+Definitions
+-----------
+
+The "level" of a node is its distance from the root.  The root node is
+level 0, its children are level 1, etc.
+
+
+Data structures
+---------------
+
+TTNode is augmented with a new mutable `replacement` attribute of type
+`Optional[str]`.  None means the node is "alive", while a string means
+it is "dead", having been replaced with that string.  Initially all
+nodes are marked as live.
+
+`memoized_accept` is a global memoization table that maps an md5sum of a
+candidate byte sequence to either true (accepted) or false (rejected).
+(In practice, it will be at most very rare to get a hit for a previously
+accepted input, since it means a subsequent "smaller" candidate was
+textually identical, but acceptance is tracked for symmetry and possible
+occasional utility.)
+
+
+Algorithm loops
+---------------
+
+The core algorithm consists of these functions, which form a series of
+nested loops:
+
+minimize_tree (the outermost) iterates `level_limit`, starting at 1 and
+counting upward with each iteration.  It does not have an upper limit.
+Instead, minimize_tree terminates when an iteration fails to make any
+progress (no smaller input is found that is accepted).
+
+minimize_limited_tree iterates `level`, starting at 1 and going up to
+and including `level_limit`.
+
+minimize_at_level iterates `parent` over all tree nodes whose level
+equals `level-1`, working from the end of the tree.  That is, it
+iterates over the parents of the nodes that exist at `level`.  For
+progress reporting purposes, it first counts the number of parent nodes,
+and identifies `parent` by its index in that sequence.
+
+minimize_node operates on the `parent` node, trying to discard some of
+its `N` surviving children.  It first iterates `exponent` from 0 up to
+and including `max_exp = ceil(log_2(N))`.  During each iteration, it
+partitions the surviving children into `num_chunks = min(2**exponent,N)`
+approximately equal-sized chunks and calls minimize_chunked_node.  It
+then calls minimize_alt_children.
+
+minimize_chunked_node iterates `chunk_index` from 0 to `num_chunks-1`.
+During each iteration, it tests a candidate input consisting of the
+surviving text outside `parent`, and the surviving children of `parent`
+except for those in the indicated chunk, which are replaced with the
+empty string.
+
+minimize_alt_children is called by minimize_node.  It iterates over
+every surviving `child` node of `parent` that has at least one
+non-trivial alternative.
+
+minimize_alts_of_child iterates `alternative` over the non-trivial
+alternatives of `child`.  During an iteration, it tests the candidate
+formed by replacing `child` with `alternative`.  If that succeeds,
+`child` is marked as dead, permanently replaced by `alternative`;
+further alternatives for the same `child` are not considered.
+
+Summarizing, the call structure is:
+
+  name                               iter var      num iterations
+  --------------------------------   --------      --------------
+  minimize_tree                      level_limit   unlimited (by default)
+    minimize_limited_tree            level         `level_limit`
+      minimize_at_level              parent index  num nodes at `level-1`
+        minimize_node                exponent      max_exp+1
+          minimize_chunked_node      chunk_index   num_chunks
+          minimize_alt_children      child         num children
+            minimize_alts_of_child   alternative   num alternatives
+
+Each function returns a boolean, with true meaning it was able to kill
+at least one node.  The outer minimize_tree loop halts when
+minimize_limited_tree returns false.
+
+
+Progress report
+---------------
+
+Prior to testing a candidate in minimize_chunked_node, issue a progress
+report object with attributes:
+
+  M:  level_limit
+  L:  level
+  P:  parent index + 1
+  Pm: num nodes at level
+  E:  exponent + 1
+  Em: max_exp + 2
+  C:  chunk_index + 1
+  Cm: num_chunks
+
+This is rendered as a string as:
+
+  M=$M L=($L/$M) P=($P/$Pm) E=($E/$Em) C=($C/$Cm)
+
+Each of the numerators is printed with enough leading zeroes to ensure
+it has the same number of digits as the corresponding denominator.
+
+As the minimizer runs, it prints status lines to the console.  Prior to
+testing a candidate, it prints:
+
+  N=$N S=$S <status> ...
+
+without printing a trailing newline.  $N is the sequence number of the
+candidate being tested, and is padded with leading zeroes so it has at
+least 6 digits.  $S is the size of the candidate in bytes, padded with
+zeroes so it has the same number of digits as the original input file
+size.
+
+When the test completes, print either "rejected" or "ACCEPTED", then
+a newline.
+
+
+Candidate testing
+-----------------
+
+In minimize_chunked_node and minimize_alts_of_child, candidate inputs
+are tested for acceptance by calling a `test_candidate` function.  This
+function first calls `render_candidate`, which takes the tree root node
+as input along with a node reference and the text to substitute for that
+node.  It renders the complete candidate by walking the tree from the
+root, using the substituted text for the specified node, and otherwise
+rendering the nodes according to their `replacement` status.
+
+Then the md5 hash of the rendered text is checked with the memoization
+table, short-circuiting the actual test on a hit.  On a miss, the
+candidate is written to disk, overwriting the file that originally
+contained the initial input (which was backed up before the main
+algorithm began).  Then the acceptance test program is run, its
+result stored in the memoization table, and that result returned to
+the invoking routine.
+
+
+Candidate rendering
+-------------------
+
+The rendering procedure takes as input the root TTNode, a node to
+replace, and that node's replacement byte sequence.  The tree is then
+rendered recursively.
+
+To render a node, concatenate the rendering of its live children and the
+replacement text of dead children.  Whenever two non-empty subtree
+renderings are joined, and there is no whitespace adjacent to the join
+spot on either side, and at least one side's adjacent character has been
+affected by replacement, insert one extra space between them (to ensure
+that adjacent tokens do not inadvertently coalesce when fed to the
+acceptance test).
+
+The condition "affected by replacement" means that the adjacent
+character on that side is different from what it would have been if all
+nodes were live.  For example, on the left side, it means the subtree
+has a replaced node somewhere on its rightmost edge.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Claude's proposal
+=================
+
+Overview
+--------
+
+The algorithm has two stages:
+
+* Stage 1, the descent, makes a single pass over the tree at each of a
+  decreasing sequence of granularities.  At each granularity it tries
+  replacing individual nodes and runs of sibling nodes whose size is
+  roughly that granularity.  It works from the end of the input
+  backwards.  Its purpose is to throw away large amounts of the input
+  quickly, using few tests on inputs that shrink fast.
+
+* Stage 2, the cleanup, repeatedly tries replacing every remaining node
+  individually, until a complete pass replaces nothing.  Its purpose is
+  to guarantee that the result is 1-minimal.
+
+Stage 1 is a heuristic for speed; only Stage 2 is needed for
+correctness.  Without Stage 1 the result would be the same kind of
+thing, but reaching it would take many tests on large inputs.
+
+
+State
+-----
+
+The token tree itself is never modified.  Instead, the algorithm keeps a
+record of which nodes have been replaced, and by which of their
+candidate replacements:
+
+Definition: Each node is either "original" or "replaced by candidate
+i", where i indexes the node's sequence of candidate replacements.
+Initially every node is original.
+
+Definition: A node is "live" if neither it nor any ancestor is
+replaced.  Only live nodes are considered for replacement, except as
+described under "Retrying earlier candidates" below.
+
+Definition: The "current input" is the rendering (see below) of the tree
+with its current replacements.  It is always an input that has been
+accepted: initially the original input, and thereafter the input of the
+most recent accepted test.
+
+Definition: The "size" of a node is the number of bytes in its current
+rendering, that is, in the portion of the current input that it
+produces.  Sizes change as nodes are replaced.
+
+To "try" a set of replacements means:
+
+1. Render the tree with the current replacements plus the proposed
+   ones, yielding a "trial input".
+
+2. If the trial input is not strictly smaller than the current input,
+   discard it without testing.
+
+3. If the trial input has been tested before, discard it without
+   testing.  (Since the test is deterministic, it would be rejected
+   again.  Accepted inputs never recur, since each one is smaller than
+   all those before it, so only rejected inputs need to be remembered.
+   A cryptographic hash of each rejected input suffices.)
+
+4. Otherwise, run the acceptance test on the trial input, and report
+   the invocation and its result.  If it is accepted, the proposed
+   replacements become permanent, and the trial input becomes the
+   current input.
+
+The result of trying is "accepted" only in the last case when the test
+accepts.  Since every acceptance strictly shrinks the current input,
+there can be at most as many acceptances as there are bytes in the
+original input, which (together with the termination rule of Stage 2)
+ensures that the algorithm terminates.
+
+The candidate replacements of a node are tried in the order the
+language-dependent function yields them.  That order should put the
+most aggressive candidate, usually the empty sequence, first, since
+Stage 1 uses only the first candidate when replacing runs of nodes.
+
+Delimiter tokens: The opening and closing delimiter tokens at the ends
+of a delimiter group are never replaced on their own, as that would
+almost always unbalance the delimiters and be rejected.  They are only
+ever removed along with their group.  (The language-dependent function
+can provide a candidate that keeps the delimiters but empties the
+interior, such as "{}" for a brace group, when that is useful.)
+
+
+Rendering
 ---------
 
-TODO: Design and specify.
+Rendering produces the trial input from the tree.  Nodes that are not
+replaced contribute their original text.  A replaced node contributes
+its candidate replacement, but some care is needed with the whitespace
+that preceded it, since the tokenizer attaches whitespace to the
+following token.
+
+Definition: The "leading whitespace" of a node is the whitespace at the
+start of the text of its first token.  Its "trailing line" is the
+portion starting at its last newline, if it has one, and otherwise the
+whole of it.
+
+The hazard is that the newline that ends a line comment or preprocessor
+directive belongs to the token that follows it.  Naively deleting that
+token, or replacing it with something like ";", would join the
+following text onto the comment or directive line.  The same problem,
+in a milder form, arises with tokens that must be separated by a space.
+Python has the further problem that a replacement such as "pass" must
+keep its line's indentation.
+
+So rendering proceeds left to right over the tokens of live nodes and
+the replacements of replaced nodes, maintaining a "pending separator",
+which is initially absent:
+
+* A replaced node whose replacement is empty does not emit anything
+  itself.  Instead, if the node's leading whitespace is not empty, the
+  pending separator becomes the trailing line of that whitespace,
+  unless the pending separator already contains a newline and the
+  trailing line does not.
+
+* A replaced node whose replacement is non-empty emits the trailing line
+  of its leading whitespace followed by the replacement.
+
+* Before any text is emitted, the pending separator is checked against
+  the whitespace at the start of the text to be emitted.  If the pending
+  separator contains a newline but that whitespace does not, or the
+  pending separator is not empty but that whitespace is, then the
+  pending separator is emitted first.  In any case, the pending
+  separator then becomes absent.
+
+* If nothing has been emitted yet, the pending separator is discarded
+  rather than emitted, and likewise at the end of the input.  That is,
+  a separator is only needed between two pieces of text.
+
+For example, with tokens "#define A", "\nfoo", " bar", deleting "\nfoo"
+renders "#define A\n bar" rather than "#define A bar".  But deleting a
+whole line "\nfoo;" between two other lines leaves no trace, since the
+following line begins with its own newline.
+
+Discussion: Because the separator can add bytes, a replacement can
+fail to shrink the input; such trials are discarded by step 2 of
+trying.  Rendering otherwise makes no attempt to keep the trial input
+lexically faithful to the tree.  For example, deleting the "+" in "a+b"
+renders "ab", a single identifier.  That is acceptable: the tree is only
+a guide to which pieces to try removing, and the acceptance test is the
+sole judge of the result.
+
+
+Stage 1: Descent
+----------------
+
+Let S be the size of the original input.  If S is 0, there is nothing
+to do.  Otherwise, perform one pass at each granularity
+
+  G = S, S/2, S/4, ...
+
+stopping after the pass whose granularity is less than 2.  (G is a real
+number, not rounded.)  The ranges (G/2, G] for successive passes then
+cover every possible node size, from 1 to S.
+
+A pass at granularity G is the procedure ProcessSequence applied to the
+sequence containing only the root.
+
+ProcessSequence, applied to a sequence of sibling nodes, scans the
+sequence from its last node to its first.  It skips over nodes that are
+not live, and over the delimiter tokens at the ends of a delimiter
+group.  For each remaining node N, with size s, it does the first of
+the following that applies:
+
+1. If s > G, then N is too large to try at this granularity.  If N is a
+   group, apply ProcessSequence to its children.  If N is a token, skip
+   it.
+
+2. If s > G/2, then N is "the right size": try each of its candidate
+   replacements in order until one is accepted or they are exhausted.
+
+3. Otherwise, N is small, and is the last node of a "run": the
+   longest sequence of consecutive live siblings, ending with N and
+   going backwards, in which every node is small and the total size is
+   at most G.  (Replaced siblings in between are not part of the run but
+   do not end it either; delimiter tokens do end it.)  If the run is
+   just N, treat N as in step 2.  Otherwise, try replacing every node in
+   the run with its first candidate.  Either way, continue the scan
+   before the start of the run.
+
+Note that sizes are evaluated as the scan reaches each node, so they
+reflect replacements made earlier in the same pass.
+
+Discussion: Rule 2 ensures that, as long as its size does not change,
+every node gets one individual trial, at the granularity matching its
+size, before the descent goes into its children.  This matters because
+a node such as a function definition can often be removed as a whole
+but not piecemeal.  Rule 3 deals with long sequences of small siblings,
+such as the elements of a large array initializer, or a function body
+with many short statements.  Trying them in runs of about size G means
+that if most of them can be removed, they go away in a number of tests
+proportional to their total size divided by G, rather than one test
+each.  A run that is rejected is not split up immediately.  Instead,
+the next pass, at half the granularity, will try runs half as long.
+This is like the halving in delta debugging, but organized by size
+rather than count, because the test cost is proportional to size.
+
+Discussion: Processing from the end backwards takes advantage of the
+fact that in many languages, including C++, later parts of a program
+depend on earlier parts but not vice versa.  Removing a use first lets
+the declaration it uses be removed later in the same pass, whereas the
+opposite order would need another pass.
+
+Discussion: The cost of a pass at granularity G is roughly the number
+of trials times the current input size.  The number of trials is about
+(current size / G), plus the number of large nodes descended through
+and the number of right-size nodes, so the coarse passes are cheap
+and quickly shrink the input that the finer passes work on.
+
+
+Stage 2: Cleanup
+----------------
+
+Perform cleanup passes until a pass accepts no trials.
+
+A cleanup pass visits the live nodes in reverse preorder: starting at
+the root, visit a node, then (if it is still live, and a group) visit
+its children from last to first.  Delimiter tokens at the ends of a
+delimiter group are not visited.  At each visited node, try each of its
+candidate replacements in order until one is accepted or they are
+exhausted.
+
+Retrying earlier candidates: A cleanup pass also visits each node that
+is replaced by candidate i, for i > 0, and is not itself inside a
+replaced node.  At such a node it tries candidates 0 through i-1 in
+order.  For example, if a statement could only be replaced by ";"
+earlier, it may be possible to remove it entirely once something else
+has been removed.
+
+When the final pass ends, no trial in it was accepted, so the current
+input did not change during it, and every live node had all of its
+candidate replacements tried against that same input.  Every such
+trial was either rejected by the test, rejected earlier (hence found in
+the set of rejected inputs), or did not make the input smaller.  So the
+current input is 1-minimal.
+
+Discussion: Every trial of the final pass is either a test of the final
+input, or a hit in the set of rejected inputs.  The latter is common
+for the nodes that the next-to-last pass visited after its last
+acceptance, so remembering rejected inputs makes the final pass
+substantially cheaper.
+
+Discussion: Stage 2 alone would produce a 1-minimal result.  It would
+just be slow, because its passes over a large input would mostly fail
+and would remove things one node at a time.  By the time Stage 1
+finishes, the input is usually much smaller, and most of the nodes in
+it are needed.
+
+
+Progress reporting
+------------------
+
+Each test invocation is reported with:
+
+* The invocation sequence number, starting with 1.
+
+* The size in bytes of the trial input.
+
+* The stage.  For Stage 1, the index of the current granularity among
+  all of the granularities (for example, "pass 5 of 17") and the
+  granularity itself.  For Stage 2, the pass number, starting with 1.
+  (The number of Stage 2 passes is not known in advance.)
+
+* The position within the pass, as the percentage of the current input
+  that the backwards scan has already passed.  That is, if the text
+  replaced by the trial ends at byte offset e of the current input,
+  whose size is n, the position is (n - e) / n.  (Using the end rather
+  than the start means a trial that replaces the root, which comes
+  first in both stages, is reported at 0%.)
+
+Then, once the test returns, whether the trial input was accepted.
+
+Trials that are discarded without testing are not reported, since they
+do not invoke the test.
+
+
+Possible refinements
+--------------------
+
+These are not part of the algorithm as specified, but might be worth
+trying if experience shows a need:
+
+* If Stage 2 removes a large fraction of the input, repeat Stage 1
+  starting at a granularity equal to the current size, then Stage 2
+  again.  This might help when removing one thing unlocks a cascade of
+  large removals.
+
+* Adapt the run length in Stage 1 to the observed success rate, instead
+  of strictly halving: lengthen runs while they keep being accepted,
+  shorten them when they keep being rejected.
+
+* Run several trials in parallel, for example the next few runs in the
+  backwards scan, and commit the first acceptance in scan order.
 
 
 EOF
