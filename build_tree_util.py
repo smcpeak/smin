@@ -52,6 +52,7 @@ def recursively_group_sequences(
       [children[0]] +
       group_sequence(children[1:-1]) +
       [children[-1]])
+
   else:
     children = group_sequence(children)
 
@@ -63,6 +64,12 @@ def recursively_group_sequences(
     #
     # This does not apply to the interior of a delimiter group, since a
     # group there excludes the delimiters, and hence is not redundant.
+    #
+    # With this check in place, none of the grouping algorithms ever
+    # create redundant (single-child) groups (except possibly at the
+    # root in denegerate cases).  Consequently, Phase 6 from the spec is
+    # effectively handled here rather than with a separate pass.
+    #
     if len(children) == 1 and len(node.children) > 1:
       children = children[0].children
 
