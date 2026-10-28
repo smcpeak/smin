@@ -7,6 +7,7 @@ See structure-deduction-algorithm.txt, phase 3.
 
 from __future__ import annotations
 
+from build_tree_util import recursively_group_sequences
 from token_tree import TTNode
 
 
@@ -16,32 +17,7 @@ def group_lines(node: TTNode) -> TTNode:
   the root of a new tree; the input tree is not modified, although the
   new tree shares its `SMToken` objects.
   """
-
-  # Recursion base case: grouping of a leaf token is simply that token.
-  if node.token is not None:
-    return TTNode.make_token(node.token)
-
-  # Recursively group lines within children.
-  #
-  # NOTE: The default Python recursion limit is ~1000, which could quite
-  # plausibly be hit here.  Within the larger context of input
-  # minimization, creating a tree that deep is unlikely to be helpful,
-  # so probably we want to impose our own depth limit (of, say, 100).
-  # But I'll wait on doing that since it's unlikely to be an issue in
-  # practice.
-  #
-  children: list[TTNode] = [group_lines(child) for child in node.children]
-
-  if node.delim_group:
-    # The delimiters at either end are not placed into line groups.
-    children = (
-      [children[0]] +
-      _group_line_sequence(children[1:-1]) +
-      [children[-1]])
-  else:
-    children = _group_line_sequence(children)
-
-  return TTNode.make_group(children, node.delim_group)
+  return recursively_group_sequences(node, _group_line_sequence)
 
 
 def _group_line_sequence(nodes: list[TTNode]) -> list[TTNode]:

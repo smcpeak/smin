@@ -256,11 +256,15 @@ class GroupIndentationTest(unittest.TestCase):
     # Within a line group from Phase 3, the first node is first on its
     # line, so the whole line would form an indentation group, which
     # would be redundant.
-    tree = self.check("a b;", r"""
+    tree = self.check("a b;\nc;", r"""
       [
         [
           "a"
           " b"
+          ";"
+        ]
+        [
+          "\nc"
           ";"
         ]
       ]

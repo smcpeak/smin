@@ -57,13 +57,24 @@ class GroupLinesTest(unittest.TestCase):
       """)
 
   def test_one_line(self) -> None:
-    tree = self.check("a b;", r"""
+    # The line would span the whole root, so it is not made into a group.
+    self.check("a b;", r"""
+      [
+        "a"
+        " b"
+        ";"
+      ]
+      """)
+
+  def test_one_line_then_newline(self) -> None:
+    tree = self.check("a b;\n", r"""
       [
         [
           "a"
           " b"
           ";"
         ]
+        "\n"
       ]
       """)
     self.assertFalse(tree.children[0].delim_group)
@@ -88,7 +99,7 @@ class GroupLinesTest(unittest.TestCase):
       """)
 
   def test_several_statements_on_one_line(self) -> None:
-    self.check("a; b;", r"""
+    self.check("a; b;\n", r"""
       [
         [
           "a"
@@ -96,6 +107,7 @@ class GroupLinesTest(unittest.TestCase):
           " b"
           ";"
         ]
+        "\n"
       ]
       """)
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from build_tree_util import recursively_group_sequences
 from token_tree import TTNode
 
 
@@ -17,35 +18,12 @@ def group_indentation(node: TTNode) -> TTNode:
   Perform Phase 4, grouping by indentation, on the tree rooted at
   `node`.  Return the root of a new tree; the input tree is not modified,
   although the new tree shares its `SMToken` objects.
+
+  The delimiters at either end of a delimiter group are not placed into
+  indentation groups.  In particular, excluding the closer implements
+  the rule that a group ends before the closing delimiter of its parent.
   """
-
-  # Recursion base case: grouping of a leaf token is simply that token.
-  if node.token is not None:
-    return TTNode.make_token(node.token)
-
-  # Recursively group within children.  (See the note in `group_lines`
-  # about recursion depth.)
-  children: list[TTNode] = [group_indentation(c) for c in node.children]
-
-  if node.delim_group:
-    # The delimiters at either end are not placed into indentation
-    # groups.  In particular, excluding the closer implements the rule
-    # that a group ends before the closing delimiter of its parent.
-    children = (
-      [children[0]] +
-      _group_indentation_sequence(children[1:-1]) +
-      [children[-1]])
-  else:
-    children = _group_indentation_sequence(children)
-
-    # If all the children were put into one new group, then that group
-    # would be the only child of this one, which is redundant.  This
-    # happens for every line group made by Phase 3, since its first node
-    # is first on its line and the rest follow.
-    if len(children) == 1 and len(node.children) > 1:
-      children = children[0].children
-
-  return TTNode.make_group(children, node.delim_group)
+  return recursively_group_sequences(node, _group_indentation_sequence)
 
 
 @dataclass

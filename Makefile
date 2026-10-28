@@ -25,6 +25,7 @@ MYPY_OPTS = --strict
 
 
 PYTHON_SRCS :=
+PYTHON_SRCS += build_tree_util.py
 PYTHON_SRCS += group_delimiters.py
 PYTHON_SRCS += group_indentation.py
 PYTHON_SRCS += group_lines.py
