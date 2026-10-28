@@ -26,6 +26,7 @@ MYPY_OPTS = --strict
 
 PYTHON_SRCS :=
 PYTHON_SRCS += group_delimiters.py
+PYTHON_SRCS += group_indentation.py
 PYTHON_SRCS += group_lines.py
 PYTHON_SRCS += smin_token.py
 PYTHON_SRCS += string_util.py
@@ -36,6 +37,7 @@ PYTHON_SRCS += tokenizer.py
 
 PYTHON_TESTS :=
 PYTHON_TESTS += group_delimiters_test.py
+PYTHON_TESTS += group_indentation_test.py
 PYTHON_TESTS += group_lines_test.py
 PYTHON_TESTS += string_util_test.py
 PYTHON_TESTS += test_util_test.py
