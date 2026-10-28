@@ -11,8 +11,8 @@ from token_tree import TTNode
 
 
 # This function does not have its own direct unit test.  Instead, the
-# tests in `group_lines_test` and `group_indentation_test` thoroughly
-# exercise it.
+# tests in `group_lines_test`, `group_indentation_test`, and
+# `group_paragraphs_test` thoroughly exercise it.
 def recursively_group_sequences(
   node: TTNode,
   group_sequence: Callable[[list[TTNode]], list[TTNode]],
