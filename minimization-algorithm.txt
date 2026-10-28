@@ -1,0 +1,44 @@
+Minimization algorithm
+======================
+
+Input:
+
+* The input to minimize, expressed as a token tree (see
+  structure-deduction-algorithm.txt).
+
+* A deterministic, language-dependent function that takes as input a
+  node in the token tree and yields a non-empty sequence of candidate
+  replacements that (notionally) make the input smaller.  Each
+  replacement is a (possibly empty) byte sequence.
+
+* A deterministic acceptance test that takes as input a byte sequence
+  and returns a boolean saying if that sequence is accepted.  The
+  acceptance test must return true when passed the entire original input
+  (halt with error otherwise).
+
+Output:
+
+* A minimized input byte sequence that passes the acceptance test and is
+  1-minimal, meaning that for every node in the tree that has not been
+  replaced (or had an ancestor node replaced), using any of its
+  replacements results in an input that is not accepted.
+
+* While running, a sequence of acceptance test invocation reports, where
+  each report has:
+
+  - The test program invocation sequence number, starting with 1.
+  - The size of the input being tested in bytes.
+  - Some measure of progress, with details to be determined.  (The
+    requirements sketch something speculative.)
+
+  and a sequence of acceptance test result reports, each indicating
+  whether the corresponding input was accepted.
+
+
+Algorithm
+---------
+
+TODO: Design and specify.
+
+
+EOF
