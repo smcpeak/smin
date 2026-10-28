@@ -25,6 +25,7 @@ MYPY_OPTS = --strict
 
 
 PYTHON_SRCS :=
+PYTHON_SRCS += build_tree.py
 PYTHON_SRCS += build_tree_util.py
 PYTHON_SRCS += group_delimiters.py
 PYTHON_SRCS += group_indentation.py
@@ -38,6 +39,7 @@ PYTHON_SRCS += tokenize_cpp.py
 PYTHON_SRCS += tokenizer.py
 
 PYTHON_TESTS :=
+PYTHON_TESTS += build_tree_test.py
 PYTHON_TESTS += group_delimiters_test.py
 PYTHON_TESTS += group_indentation_test.py
 PYTHON_TESTS += group_lines_test.py

@@ -274,10 +274,10 @@ Output 2:
         "\n\n  // What is its syntactic parent?"
         [
           [
-            "\n    clang::NamedDecl const *parent ="
+            "\n  clang::NamedDecl const *parent ="
           ]
           [
-            "\n      getNamedParentDeclOpt_templateAdjustment"
+            "\n    getNamedParentDeclOpt_templateAdjustment"
             [
               "(dn.m_decl)"
             ]
@@ -306,6 +306,7 @@ Output 2:
       ]
       "\n}"
     ]
+    "\n"
   ]
 
 

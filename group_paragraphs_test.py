@@ -374,64 +374,6 @@ class GroupParagraphsTest(unittest.TestCase):
       ]
       """)
 
-  def test_cpp_hello_world(self) -> None:
-    # Example input 1 from the spec.  This matches example output 1,
-    # whose quoted strings combine some tokens (as notational
-    # convenience).
-    self.check(r"""
-      #include <iostream>        // std::cout
-
-      int main(int argc, char **argv)
-      {
-        std::cout << "Hello\n";
-        return 0;
-      }
-      """, r"""
-      [
-        [
-          "#include <iostream>"
-          "        // std::cout"
-        ]
-        [
-          [
-            "\n\nint"
-            " main"
-            [
-              "("
-              "int"
-              " argc"
-              ","
-              " char"
-              " *"
-              "*"
-              "argv"
-              ")"
-            ]
-          ]
-          [
-            "\n{"
-            [
-              [
-                "\n  std"
-                "::"
-                "cout"
-                " <<"
-                " \"Hello\\n\""
-                ";"
-              ]
-              [
-                "\n  return"
-                " 0"
-                ";"
-              ]
-            ]
-            "\n}"
-          ]
-          "\n"
-        ]
-      ]
-      """)
-
 
 if __name__ == "__main__":
   unittest.main()
