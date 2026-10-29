@@ -330,41 +330,59 @@ This is needed to separate the indentation that was present in a deleted
 token from possible later newlines in that same token (which are not
 relevant due to the deletion).
 
-Let DD[n,m] be the concatenation of Dn through Dm (inclusive).
+Let DD[x,y] be the concatenation of Dx through Dy (inclusive).
 
-We'll start with the non-trivial Ri.  Let Rj be the first Ri that is not
-empty.  Rather than emitting Rj alone, emit:
+Partition the sequence D1, D2, ..., Dn, B into "pieces", where each
+piece ends with either a dead token with a non-trivial replacement, or B
+itself, and every other element in the piece is a dead token with a
+trivial replacement.  Each piece corresponds to some non-whitespace to
+emit, for which we need to decide what whitespace precedes it.
 
-  trail_indent(DD[1,j-1] + leading_ws(Dj)) + Rj
+For each piece Di, Di+1, ..., Dj containing only dead tokens, emit:
 
-Note that Dj itself potentially contributes indentation to its own
-replacement Rj, which we want because the indentation in Dj preceded its
-non-whitespace.  But (due to using leading_ws) we do not get fooled by
-a newline that might appear later inside Dj (say, in a block comment)
-and hence should not be considered as part of its indentation.
+  trail_indent(DD[i,j-1] + leading_ws(Dj)) + Rj
 
-Continue in the same way for each non-trivial Ri, preceding it with the
-trail_indent of the concatenation of Dj for contiguous trivial preceding
-Rj, and of Di itself.
+This ensures that Rj will be emitted with the same indentation that Dj
+had if it is emitted onto a new line.  But (due to using leading_ws) we
+do not get fooled by a newline that might appear later inside Dj (say,
+in a block comment) and hence should not be considered as part of its
+indentation.
 
-Finally:
+For the last piece Di, Di+1, ..., Dj-1, B:
 
 * If leading_ws(B) contains a newline, then emit it in the obvious way.
   (It already contains its own indentation.)
 
-* Otherwise, precede B with the trail_indent of the concatenation of Dj
-  for contiguous trivial preceding Rj.
+* Otherwise, if trail_indent(DD[i,j-1]) is not empty, emit:
 
-As a final consideration, if B does not have any leading whitespace,
-and all Ri are trivial, then the above rules would emit A+B, but that
-risks allowing their tokens to inadvertently coalesce.  Therefore, in
-this situation, emit A+" "+B instead (RULE: don't coalesce tokens).
+    trail_indent(DD[i,j-1]) + without_leading_ws(B)
 
-Rationale / limitation: The don't-coalesce rule assumes that a
-non-trivial replacement text is always inherently non-coalescing, as is
-the case for ";" in C++, which is the only non-trivial replacement I
-plan to use, at least in the short term.  For ";", I'd rather not
-surround it with unnecessary spaces since that looks a bit ugly.  This
+  where without_leading_ws(s: str) -> str returns s without the portion
+  that leading_ws would return.
+
+  This preserves the indentation leading up to B, and then removes any
+  leading horizontal whitespace it might have, so that indentation is
+  not disrupted.
+
+* Otherwise, if B does not have any leading whitespace, emit:
+
+    " " + B
+
+  in order to ensure that it does not coalesce with A (RULE: don't
+  coalesce tokens).
+
+* Otherwise, simply emit:
+
+    B
+
+  This is the case where A and B were originally on the same line, and
+  will remain so, and B already has whitepsace to keep them separate.
+
+Rationale / limitation: The anti-coalescence rule above is only applied
+to the final piece, not to non-trivial replacement texts, even though in
+general those could coalesce too.  Currently, the only replacement text
+I'm planning to use is ";", which will never coalesce (in C++), and I'd
+rather not add an extra space before it for aesthetic reasons.  This
 rule will need to revisited if/when other replacements become possible.
 
 Now let's consider token gaps at the ends.  In practice, we only expect
