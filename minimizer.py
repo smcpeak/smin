@@ -102,7 +102,7 @@ class Minimizer:
   # will start a child process.
   test_acceptance: AcceptanceTestFunc
 
-  # ---- Progress ----
+  # ---- Progress callbacks ----
   # Called before starting a test.
   report_test_starting: TestStartReportFunc
 
@@ -147,7 +147,7 @@ class Minimizer:
   # check that that function is only invoked once.
   minimizer_invoked: bool
 
-  # ---- Progress ----
+  # ---- Progress data ----
   # Number of acceptance test invocations so far.
   sequence_num: int
 
@@ -349,18 +349,28 @@ class Minimizer:
       j = i - 1
       while j >= lo:
         prev = children[j]
+
+        # Skip dead nodes.
         if id(prev) not in self.cur_replacement:
           prev_size = self.node_size(prev)
+
+          # Stop accumulating if `prev` is big enough that we want to
+          # try removing it in isolation, or if adding it to the run
+          # would make that run larger than the current granularity.
           if (self._exceeds_half_granularity(prev_size) or
               self._exceeds_granularity(run_size + prev_size)):
             break
+
           run.append(prev)
           run_size += prev_size
+
         j -= 1
 
       if len(run) == 1:
         self._try_replace_single(node)
       else:
+        # When we try removing a run, we only try the trivial
+        # replacement of an empty byte sequence.
         self._try_candidate({id(n): b"" for n in run}, run)
 
       # Continue with the node that stopped the run, if any.
@@ -383,17 +393,20 @@ class Minimizer:
     return False
 
 
-  def _try_candidate(self, extra: dict[int, bytes],
-                     nodes: list[TTNode]) -> bool:
+  def _try_candidate(
+    self,
+    extra: dict[int, bytes],
+    nodes: list[TTNode],
+  ) -> bool:
     """
     Test the candidate formed by adding the replacements in `extra`,
     which replace `nodes`, to the current ones.  If it is accepted, make
     them current and return True.
     """
-    text = self.render_candidate(extra)
-    digest = _digest(text)
+    text: bytes = self.render_candidate(extra)
+    digest: bytes = _digest(text)
 
-    result = self.memoized_accept.get(digest)
+    result: Optional[AcceptanceTestResult] = self.memoized_accept.get(digest)
     if result is None:
       self.sequence_num += 1
       self.report_test_starting(self._make_report(nodes))
@@ -429,12 +442,13 @@ class Minimizer:
   def _make_report(self, nodes: list[TTNode]) -> TestStartReport:
     """Make the report for a test of the candidate replacing `nodes`."""
 
-    # E is the 1-based index, among the live tokens, of the last live
-    # token in the candidate, or of the live token to its left if it
-    # has none.  Either way, it is the number of live tokens before the
-    # end of the rightmost node.
+    # `e` (called "E" in the spec) is the 1-based index, among the live
+    # tokens, of the last live token in the candidate, or of the live
+    # token to its left if it has none.  Either way, it is the number of
+    # live tokens before the end of the rightmost node.
     end = max(self.node_span[id(n)][1] for n in nodes)
     e = sum(self.token_live[:end])
+
     num_live = self.live_tok_count
 
     return TestStartReport(

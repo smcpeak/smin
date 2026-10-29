@@ -10,7 +10,11 @@ from typing import Callable
 
 from build_tree import build_tree
 from minimizer import (
-  AcceptanceTestResult, Minimizer, NTReplacementFunc, TestStartReport)
+  AcceptanceTestResult,
+  Minimizer,
+  NTReplacementFunc,
+  TestStartReport,
+)
 from test_util import all_nodes
 from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
@@ -43,8 +47,12 @@ class Recorder:
   what happened.
   """
 
-  def __init__(self, accept: Callable[[bytes], bool],
-               interrupt_at: int | None = None) -> None:
+  def __init__(
+    self,
+    accept: Callable[[bytes], bool],
+    interrupt_at: int | None = None,
+  ) -> None:
+
     # Predicate deciding acceptance.
     self.accept = accept
 
@@ -66,8 +74,10 @@ class Recorder:
     return ACCEPT if self.accept(data) else REJECT
 
   def make_minimizer(
-      self, root: TTNode,
-      nt: NTReplacementFunc = no_replacement) -> Minimizer:
+    self,
+    root: TTNode,
+    nt: NTReplacementFunc = no_replacement,
+  ) -> Minimizer:
     return Minimizer(root, nt, self.test, self.starts.append,
                      self.finishes.append)
 
