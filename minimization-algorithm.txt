@@ -120,15 +120,16 @@ minimize_node(leaf) should only ever happen if the input contains just
 one token.  This case is not important; just return without doing
 anything.
 
-Rationale: One might be tempted, in case 2, to skip the case 1 test
+Rationale: When s > G, one might be tempted to skip the case 1 test
 since we will have already attempted to replace N on a previous pass
 with a larger G.  But if we made progress in the meantime, we might have
 deleted something that was blocking N from being removed, so trying
 again could work.  (And if there was literally no progress in the
-meantime, then memoization means this costs basically nothing.)  Trying
-to remove entire nodes is important because some constructs, such as C++
-function definitions, can be difficult or impossible to hollow out, even
-in cases where deleting the entire thing would work.
+meantime, then memoization means this costs basically nothing.)
+Persistently trying to remove entire nodes is important because some
+constructs, such as C++ function definitions, can be difficult or
+impossible to hollow out, even in cases where deleting the entire thing
+would work.
 
 Rationale: The reason for going backwards is that we expect the input to
 be something like a C++ program, which mostly contains declarations
@@ -145,6 +146,13 @@ the final G until quiescence, but full 1-minimality is more of an
 aspirational goal than a hard requirement, and omitting iteration to
 quiescence allows for a more meaningful progress report.
 
+Note: The first pass, with G=S, only tests one candidate, that formed by
+deleting the entire file, since we can't get into case 2 since s=S=G.
+It should always by accepted at the memoization test phase (even if it
+has a non-trivial replacement, since we try replacing with the empty
+string first).  The cost is insignificant; this behavior is retained for
+uniformity.
+
 
 Progress report
 ---------------
@@ -156,14 +164,14 @@ there are L live tokens, and we are testing a candidate that tries
 removing a sequence that ends with (1-based) live token E, then the
 completion fraction is (L - E) / L.
 
-Rationale: On each pass, the first thing we try is removing
-approximately the second half of the entire file.  In that case, E=L, so
-the first completion fraction is 0.  Typically, the fraction reaches a
-maximum (but not exactly 1) when we try to remove only the very first
-token of the file.  It increases monotonically (but not strictly) as the
-algorithm runs; see proof below.  It's a bit crude as a measure due to
-the way the algorithm interleaves testing removal of chunks of various
-sizes, but also relatively simple, so should suffice as a first attempt.
+Rationale: On each pass, the first thing we try is removing a suffix the
+remaining live file.  In that case, E=L, so the first completion
+fraction is 0.  Typically, the fraction reaches a maximum (but not
+exactly 1) when we try to remove only the very first token of the file.
+It increases monotonically (but not strictly) as the algorithm runs; see
+proof below.  It's a bit crude as a measure due to the way the algorithm
+interleaves testing removal of chunks of various sizes, but also
+relatively simple, so should suffice as a first attempt.
 
 There is a corner case to consider though: it is possible for a
 candidate to be formed by trying to delete a node, or a run of nodes,
