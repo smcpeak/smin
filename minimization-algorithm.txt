@@ -20,9 +20,9 @@ Input:
 Output:
 
 * A minimized input byte sequence that passes the acceptance test and is
-  close to 1-minimal, meaning that for every live node in the tree,
-  replacing it (with any candidate replacement) results in an input that
-  is not accepted.
+  approximately 1-minimal.  Exact 1-minimality would mean that for every
+  live node in the tree, replacing it (with any candidate replacement)
+  results in an input that is not accepted.
 
 * While running, a sequence of acceptance test invocation reports, where
   each report has:
