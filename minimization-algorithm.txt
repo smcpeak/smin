@@ -148,12 +148,14 @@ there are L live tokens, and we are testing a candidate that tries
 removing a sequence that ends with (1-based) live token E, then the
 completion fraction is (L - E) / L.
 
-Rationale: On each pass, the first thing we try is removing the entire
-file.  In that case, E=L, so the completion fraction is 0.  The fraction
-reaches a maximum (but never exactly 1) when we try to remove the only
-very first token of the file.  It's a bit crude as a measure due to the
-way the algorithm interleaves testing removal of chunks of various
-sizes, but also relatively simple, so should suffice as a first attempt.
+Rationale: On each pass, the first thing we try is removing
+approximately the second half of the entire file.  In that case, E=L, so
+the first completion fraction is 0.  The fraction reaches a maximum (but
+never exactly 1) when we try to remove the only very first token of the
+file.  It increases monotonically (but not strictly) as the algorithm
+runs; see proof below.  It's a bit crude as a measure due to the way the
+algorithm interleaves testing removal of chunks of various sizes, but
+also relatively simple, so should suffice as a first attempt.
 
 Prior to testing a candidate, issue a progress report object with
 attributes:
@@ -193,6 +195,51 @@ rapid.  As the minimizer runs, N will be increasing, and S decreases
 whenever progress is made.  P provides the outer loop progress and F the
 inner loop progress, with G and s providing a bit more insight into the
 operation of each loop.
+
+
+Proof that completion fraction increases monotonically
+------------------------------------------------------
+
+When a candidate chunk is not removed, the number of live tokens L does
+not change, and due to the way the algorithm is structured, the next E
+will either be the same or less, so (L - E) / L will be nondecreasing.
+
+When a candidate chunk *is* removed, L decreases by s (the chunk size),
+and the next E will be at most (E - s).
+
+Thus, we must prove the claim:
+
+  (L - E) / L   <=   ((L - s) - (E - s)) / (L - s)
+
+when 0 < E <= L and 0 < s < L, for integers L, E, and s.
+
+Proof:
+
+  Multiply both sides by both denominators (which are positive):
+
+    (L - E) (L - s)    <=    ((L - s) - (E - s)) L
+
+  Simplify the RHS by canceling -s:
+
+    (L - E) (L - s)    <=    (L - E) L
+
+  Multiply out both sides:
+
+    L**2 - Ls - LE + Es    <=    L**2 - LE
+
+  Cancel like terms:
+
+    -Ls + Es   <=   0
+
+  Divide both sides by (positive) s:
+
+    -L + E  <=  0
+
+  Add L to both sides:
+
+    E  <=  L
+
+  Which is true by the assumption 0 < E <= L.  QED.
 
 
 Candidate testing
