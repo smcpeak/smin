@@ -122,6 +122,10 @@ minimize_node(leaf) should only ever happen if the input contains just
 one token.  This case is not important; just return without doing
 anything.
 
+If at some point there are no live tokens (which would happen if the
+acceptance test just accepted unconditionally, leading to all children
+of the root being deleted), terminate the minimization effort early.
+
 Rationale: When s > G, one might be tempted to skip the case 1 test
 since we will have already attempted to replace N on a previous pass
 with a larger G.  But if we made progress in the meantime, we might have
@@ -239,17 +243,27 @@ operation of each loop.
 Proof that completion fraction increases monotonically
 ------------------------------------------------------
 
+During a single pass, the completion fraction increases monotonically
+(but not strictly) after each attempt.  (It resets to 0 when a new pass
+begins.)
+
 When a candidate chunk (node or run of nodes) is not removed, the number
 of live tokens L does not change, and due to the way the algorithm is
 structured, the next E will either be the same or less, so (L - E) / L
 will be nondecreasing.
 
 When a candidate chunk *is* removed, L decreases by s (the chunk size),
-and the next E will be at most (E - s).  (There is the corner case where
-s=0; in that case the fraction does not change; that case is ignored
-hereafter.)
+and the next E will be at most (E - s).
 
-Thus, we must prove the claim:
+There are two degenerate cases:
+
+* If s=0 (the case of deleting a node that had no live tokens), the
+  fraction does not change.
+
+* If s=L, meaning we deleted the whole file, the minimization loop will
+  terminate early, so no more progress reports will be issued.
+
+Setting aside those two cases, we must prove the claim:
 
   (L - E) / L   <=   ((L - s) - (E - s)) / (L - s)
 
