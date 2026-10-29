@@ -281,27 +281,33 @@ Candidate rendering
 
 The input to render_candidate is a token tree with its already
 established replacements on TTNode (which describe the most recently
-accepted state), along with a map from TTNode to bytes of additional
-candidate node replacements to test.  The output is a byte sequence.
+accepted state), along with a map from TTNode to byte sequence of
+additional candidate node replacements to test.  The output is a byte
+sequence.
 
 Conceptually, every candidate can be expressed as a candidate token map
 CTM from original token (identified by its index, for example) to either
-None (meaning the token is live) or a replacement text.  For the purpose
-of rendering a token tree, the complication is that replacement is
-expressed on TTNode, which includes interior nodes.  Consequently, when
-an interior node N has a replacement, that is expressed in CTM by saying
-that the first token T in its original span is associated with N's
-replacement text, and all others in the span have *empty* replacement
-text.  (In general, the replacements in the CTM will be different from
-the leaf node replacements in the token tree.)
+None (meaning the token is live) or a replacement text.  Naively, the
+candidate byte sequence is then obtained by concatenating all live
+tokens and all replacements in original token order.
+
+For the purpose of rendering a token *tree* (not a flat list), the
+complication is that replacement is expressed on TTNode, which includes
+interior nodes.  Therefore, when an interior node N has a replacement,
+that is expressed in the CTM by saying that the first token T in its
+original span is associated with N's replacement text, and all others in
+the span have *empty* replacement text.  (In general, the replacements
+in the CTM will be different from the leaf node replacements in the
+token tree.)
 
 For example, if we have "int foo() {...} int x;" and the "{...}" is
 replaced by ";", then CTM associates the original token "{" with ";" as
 its replacement, and all tokens in "...}" with empty replacements.
 
-Now we can describe how to render a CTM.  A contiguous sequence of live
-tokens is simply rendered as the concatentation of their original texts.
-Suppose we have a gap in the live tokens:
+Now we can describe how to render a candidate byte sequence from a flat
+token list and a CTM.  A contiguous sequence of live tokens is simply
+rendered as the concatentation of their original texts.  Suppose we have
+a gap in the live tokens:
 
   ..., A, D1, D2, ..., Dn, B, ...
 
@@ -310,9 +316,9 @@ in the CTM.
 
 We want to ensure each emitted token (B) or non-trivial replacement (Ri)
 appears on a line that has the same indentation as the line that
-originally contained that token or the token it replaces (preserve
+originally contained that token or the token it replaces (RULE: preserve
 indentation), and furthermore not on the same line as a token it was
-originally on a different line from (don't join lines).
+originally on a different line from (RULE: don't join lines).
 
 Let trail_indent(s: str) -> str be the last newline in s followed by
 whatever contiguous whitespace immediately follows it in s, or the empty
@@ -321,8 +327,8 @@ string if s does not contain a newline.
 We'll start with the non-trivial Ri.  Let Rj be the first Ri that is not
 empty, and DD[1,j] be the concatenation of D1 through Dj.  Rather than
 emitting Rj alone, emit trail_indent(DD[1,j])+Rj.  Note that Dj itself
-potentially contributes indentation to its replacement Rj, because the
-indentation in Dj preceded its non-whitespace.
+potentially contributes indentation to its replacement Rj, which we want
+because the indentation in Dj preceded its non-whitespace.
 
 Continue in the same way for each non-trivial Ri, preceding it with the
 trail_indent of the concatenation of Dj for contiguous trivial preceding
@@ -339,7 +345,7 @@ Finally:
 As a final consideration, if B does not have any leading whitespace,
 and all Ri are trivial, then the above rules would emit A+B, but that
 risks allowing their tokens to inadvertently coalesce.  Therefore, in
-this situation, emit A+" "+B instead (don't coalesce tokens).
+this situation, emit A+" "+B instead (RULE: don't coalesce tokens).
 
 Implementation note: The algorithm description here, involving building
 a CTM and then operating on the flat token sequence, is primarily
