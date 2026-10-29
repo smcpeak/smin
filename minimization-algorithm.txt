@@ -28,11 +28,15 @@ Output:
   each report has:
 
   - The test program invocation sequence number, starting with 1.
-  - The size of the input being tested in bytes.
+  - The current last-accepted size of the input, in tokens.
   - A measure of progress, described in detail below.
 
   and a sequence of acceptance test result reports, each indicating
   whether the corresponding input was accepted.
+
+Rationale: In the output, the size is measured in tokens, partly because
+during development I want to see a bit more of the internals, and the
+units are somewhat arbitrary anyway.  This choice might be revisited.
 
 
 Data structures
