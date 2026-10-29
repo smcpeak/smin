@@ -509,8 +509,15 @@ wrapped only for exposition here):
 This also happens in response to Ctrl-C.  Note that when Ctrl-C is
 pressed, the test program will almost certainly be running, so the
 minimizer needs to recognize when the test program terminated for that
-reason (as opposed to an ordinary rejection).  When stopping due to
-Ctrl-C, the above final message is preceded by:
+reason (as opposed to an ordinary rejection).  Among other things, when
+the test terminates this way, the memoization table is not updated.
+
+The minimizer needs to also correctly handle Ctrl-C that is pressed
+while it is doing its own work (and potentially modifying its data
+structures) to ensure that what is left on disk is a recent input that
+was accepted by the test.
+
+When stopping due to Ctrl-C, the above final message is preceded by:
 
   Stopping early due to Ctrl-C.
 
