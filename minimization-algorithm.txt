@@ -349,8 +349,8 @@ Rj, and of Di itself.
 
 Finally:
 
-* If B contains a newline, then emit it in the obvious way.  (It already
-  contains its own indentation.)
+* If leading_ws(B) contains a newline, then emit it in the obvious way.
+  (It already contains its own indentation.)
 
 * Otherwise, precede B with the trail_indent of the concatenation of Dj
   for contiguous trivial preceding Rj.
