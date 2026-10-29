@@ -31,6 +31,7 @@ PYTHON_SRCS += group_delimiters.py
 PYTHON_SRCS += group_indentation.py
 PYTHON_SRCS += group_lines.py
 PYTHON_SRCS += group_paragraphs.py
+PYTHON_SRCS += minimizer.py
 PYTHON_SRCS += smin_token.py
 PYTHON_SRCS += string_util.py
 PYTHON_SRCS += test_util.py
