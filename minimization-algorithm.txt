@@ -42,12 +42,13 @@ units are somewhat arbitrary anyway.  This choice might be revisited.
 Data structures
 ---------------
 
-TTNode is augmented with a new mutable `replacement` attribute of type
-`Optional[bytes]`.  None means the node has not been replaced, while a
-byte sequence means it has been replaced with that sequence.  Initially
-all nodes are marked as unreplaced.  (The replacement is sometimes
-referred to in this spec as a "string" for familiarity and concision,
-but "byte sequence" is what is technically meant.)
+`replacement` maps a TTNode instance (using its id() as the key) to
+`bytes`.  An absent mapping means the node has not been replaced, while
+mapping to a byte sequence means it has been replaced with that
+sequence.  Initially all nodes are marked as unreplaced (the map is
+empty).  (The replacement is sometimes referred to in this spec as a
+"string" for familiarity and concision, but "byte sequence" is what is
+technically meant.)
 
 `memoized_accept` is a global memoization table that maps an md5sum of a
 candidate byte sequence to either true (accepted) or false (rejected).
