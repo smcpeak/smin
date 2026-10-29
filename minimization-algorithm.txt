@@ -92,8 +92,9 @@ killing nodes when doing so results in an accepted candidate input.  The
 recursion is started by `minimize_node(root)`.
 
 minimize_node(parent) scans the children of `parent` in reverse order,
-ignoring dead nodes.  It also skips the delimiters at either end if
-`parent` is a delimiter group.  For a given child node N with size s:
+ignoring dead (not alive) nodes.  It also skips the delimiters at either
+end if `parent` is a delimiter group.  For a given child node N with
+size s:
 
 1. If s > G/2, N is large enough to try replacing in its entirety.  Test
    the candidate formed by replacing it with the empty string.  If that
