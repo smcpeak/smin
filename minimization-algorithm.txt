@@ -421,12 +421,24 @@ I'm planning to use is ";", which will never coalesce (in C++), and I'd
 rather not add an extra space before it for aesthetic reasons.  This
 rule will need to revisited if/when other replacements become possible.
 
-Now let's consider token gaps at the ends.  In practice, we only expect
-the dead ends to contain trivial replacements, and that the first live
-token will not have had any indentation in the original input.
-Therefore, it should suffice to simply use naive concatenation with no
-additional whitespace at the ends.  But the implementation is free to do
-whatever is most convenient here.
+Now let's consider token gaps at the ends.  At the end of the file, we
+have:
+
+  A, Di, ..., Dj
+
+Follow the same procedure to partition the sequence into pieces and
+render them as such, except that there is no B, so the last piece
+contains only deleted tokens with trivial replacements, so can be
+entirely discarded.
+
+At the start of the file, we have:
+
+  Di, ..., Dj, B
+
+Again, partition into pieces and render as before, except that the rule
+that prepends a space to B is not needed since nothing (that can
+potentially coalesce, given the assumption of non-coalescing
+replacements) is emitted before it.
 
 Implementation note: The algorithm description here, involving building
 a CTM and then operating on the flat token sequence, is primarily
