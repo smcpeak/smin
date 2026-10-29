@@ -39,9 +39,11 @@ Data structures
 ---------------
 
 TTNode is augmented with a new mutable `replacement` attribute of type
-`Optional[str]`.  None means the node is "alive", while a string means
-it is "dead", having been replaced with that string.  Initially all
-nodes are marked as live.
+`Optional[bytes]`.  None means the node is has not been replaced, while
+a byte sequence means it has been replaced with that sequence.
+Initially all nodes are marked as unreplaced.  (The replacement is
+sometimes referred to in this spec as a "string" for familiarity and
+concision, but "byte sequence" is what is technically meant.)
 
 `memoized_accept` is a global memoization table that maps an md5sum of a
 candidate byte sequence to either true (accepted) or false (rejected).
