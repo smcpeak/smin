@@ -94,7 +94,7 @@ ignoring dead nodes.  It also skips the delimiters at either end if
 1. If s > G/2, N is large enough to try replacing in its entirety.  Test
    the candidate formed by replacing it with the empty string.  If that
    fails, and it has a non-trivial replacement, try that too.  If either
-   succeeds, mark the node as replaced.
+   succeeds, mark the node as replaced and skip case 2.
 
 2. If s > G, N is so large that we should try replacing its children
    too, so recursively call `minimize_node(N)`.
