@@ -146,12 +146,17 @@ the final G until quiescence, but full 1-minimality is more of an
 aspirational goal than a hard requirement, and omitting iteration to
 quiescence allows for a more meaningful progress report.
 
-Note: The first pass, with G=S, only tests one candidate, that formed by
-deleting the entire file, since we can't get into case 2 since s=S=G.
-It should always by accepted at the memoization test phase (even if it
-has a non-trivial replacement, since we try replacing with the empty
-string first).  The cost is insignificant; this behavior is retained for
-uniformity.
+Note: On the first pass, G=S, which means no node will satisfy case 2
+(since no node's size can be greater than G), and hence the
+grandchildren of the root node will not be considered for replacement,
+only its direct children will (typically as part of runs).  That is
+likely to be the case for the first several passes in fact.
+
+Rationale: It has been suggested to have minimize_node accept a sequence
+of nodes instead of just one node so that the root can be processed by
+case 1 and hence potentially discarded in its entirety.  In practice,
+that is very unlikely to satisfy the acceptance test, and I prefer the
+slightly simpler interface of having it accept just one node.
 
 
 Progress report
@@ -164,8 +169,8 @@ there are L live tokens, and we are testing a candidate that tries
 removing a sequence that ends with (1-based) live token E, then the
 completion fraction is (L - E) / L.
 
-Rationale: On each pass, the first thing we try is removing a suffix the
-remaining live file.  In that case, E=L, so the first completion
+Rationale: On each pass, the first thing we try is removing a suffix of
+the remaining live file.  In that case, E=L, so the first completion
 fraction is 0.  Typically, the fraction reaches a maximum (but not
 exactly 1) when we try to remove only the very first token of the file.
 It increases monotonically (but not strictly) as the algorithm runs; see
