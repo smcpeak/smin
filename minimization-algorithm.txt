@@ -7,12 +7,10 @@ Input:
   structure-deduction-algorithm.txt).
 
 * A deterministic, language-dependent function that takes as input a
-  node in the token tree and yields a possibly-empty sequence of
-  non-trivial candidate replacements that (notionally) make the input
-  smaller.  Each replacement is a (possibly empty) byte sequence.
-  Implicitly, every node has the empty string as a trivial candidate
-  replacement; the non-trivial alternatives are only tried after the
-  empty string fails.
+  node in the token tree and yields an optional non-trivial candidate
+  replacement text.  Every node has the empty string as a trivial
+  candidate replacement; the non-trivial alternative (if present) is
+  only tried after the empty string fails.
 
 * A deterministic acceptance test that takes as input a byte sequence
   and returns a boolean saying if that sequence is accepted.  The
@@ -22,9 +20,9 @@ Input:
 Output:
 
 * A minimized input byte sequence that passes the acceptance test and is
-  1-minimal, meaning that for every node in the tree that has not been
-  replaced (or had an ancestor node replaced), using any of its
-  replacements results in an input that is not accepted.
+  close to 1-minimal, meaning that for every live node in the tree,
+  replacing it (with any candidate replacement) results in an input that
+  is not accepted.
 
 * While running, a sequence of acceptance test invocation reports, where
   each report has:
@@ -35,21 +33,6 @@ Output:
 
   and a sequence of acceptance test result reports, each indicating
   whether the corresponding input was accepted.
-
-
-Simplifying assumptions
------------------------
-
-All nodes have the trivial candidate replacement of the empty string,
-which is what gets tried first.  Some (in practice, just brace pairs,
-with the candidate ";") have non-trivial candidates.
-
-
-Definitions
------------
-
-The "level" of a node is its distance from the root.  The root node is
-level 0, its children are level 1, etc.
 
 
 Data structures
@@ -68,93 +51,127 @@ textually identical, but acceptance is tracked for symmetry and possible
 occasional utility.)
 
 
-Algorithm loops
----------------
+Node size
+---------
 
-The core algorithm consists of these functions, which form a series of
-nested loops:
+This algorithm measures the size of a node by the number of live,
+original tokens it contains.  A node is "live" if it, and all of its
+ancestors, has not been replaced.  The size does *not* depend on which
+replacement string is used, and it also does not depend on whether any
+whitespace will be inserted to prevent token coalescing during
+rendering.
 
-minimize_tree (the outermost) iterates `level_limit`, starting at 1 and
-counting upward with each iteration.  It does not have an upper limit.
-Instead, minimize_tree terminates when an iteration fails to make any
-progress (no smaller input is found that is accepted).
 
-minimize_limited_tree iterates `level`, starting at 1 and going up to
-and including `level_limit`.
+Algorithm
+---------
 
-minimize_at_level iterates `parent` over all tree nodes whose level
-equals `level-1`, working from the end of the tree.  That is, it
-iterates over the parents of the nodes that exist at `level`.  For
-progress reporting purposes, it first counts the number of parent nodes,
-and identifies `parent` by its index in that sequence.
+Let S be the number of tokens in the input tree.  (If S=0 then halt
+early as there is nothing to do.)
 
-minimize_node operates on the `parent` node, trying to discard some of
-its `N` surviving non-delimiter children.  It first iterates `exponent`
-from 0 up to and including `max_exp = ceil(log_2(N))`.  During each
-iteration, it partitions the surviving non-delimiter children into
-`num_chunks = min(2**exponent,N)` approximately equal-sized chunks and
-calls minimize_chunked_node.  It then calls minimize_alt_children.
+Let G, a rational number, be the target granularity, the number of
+tokens we would ideally like to attempt to remove when forming each
+candidate.  It is set according to the sequence:
 
-Rationale: We do not want to try removing delimiters since that will
-almost always produce malformed input.  An entire delimiter group can be
-removed, however, and this prodedure *will* try emptying such a group by
-removing all of its non-delimiter children.
+  G = S, S/2, S/4, S/8, ...
 
-minimize_chunked_node iterates `chunk_index` from 0 to `num_chunks-1`.
-During each iteration, it tests a candidate input consisting of the
-surviving text outside `parent`, and the surviving children of `parent`
-except for those in the indicated chunk, which are replaced with the
-empty string.  If the candidate is accepted then all of the nodes in
-the chunk are updated to be `replaced` by the empty string.
+Each pass operates with successively smaller G.  The final pass has G in
+the range [1,2).  During a given pass, a node is a candidate to be
+removed if its size is in greater than G/2.  (Some smaller nodes also
+end up incidentally being candidates, depending on the context, as
+explained below.)  Consequently, the final pass tries to remove all
+nodes with size 1, i.e., individual tokens (and groups that only contain
+one live token).
 
-minimize_alt_children is called by minimize_node.  It iterates over
-every surviving `child` node of `parent` that has at least one
-non-trivial alternative.
+The algorithm core is the recursive function minimize_node, which takes
+as input a tree node (and G), and modifies the associated subtree,
+killing nodes when doing so results in an accepted candidate input.  The
+recursion is started by `minimize_node(root)`.
 
-minimize_alts_of_child iterates `alternative` over the non-trivial
-alternatives of `child`.  During an iteration, it tests the candidate
-formed by replacing `child` with `alternative`.  If that succeeds,
-`child` is marked as dead, permanently replaced by `alternative`;
-further alternatives for the same `child` are not considered.
+minimize_node(parent) scans the children of `parent` in reverse order,
+ignoring dead nodes.  It also skips the delimiters at either end if
+`parent` is a delimiter group.  For a given child node N with size s:
 
-Summarizing, the call structure is:
+1. If s > G/2, N is large enough to try replacing in its entirety.  Test
+   the candidate formed by replacing it with the empty string.  If that
+   fails, and it has a non-trivial replacement, try that too.  If either
+   succeeds, mark the node as replaced.
 
-  name                               iter var      num iterations
-  --------------------------------   --------      --------------
-  minimize_tree                      level_limit   unlimited (by default)
-    minimize_limited_tree            level         `level_limit`
-      minimize_at_level              parent index  num nodes at `level-1`
-        minimize_node                exponent      max_exp+1
-          minimize_chunked_node      chunk_index   num_chunks
-          minimize_alt_children      child         num children
-            minimize_alts_of_child   alternative   num alternatives
+2. If s > G, N is so large that we should try replacing its children
+   too, so recursively call `minimize_node(N)`.
 
-Each function returns a boolean, with true meaning it was able to kill
-at least one node.  The outer minimize_tree loop halts when
-minimize_limited_tree returns false.
+3. If s <= G/2, N by itself is too small, so it will form the last node
+   of a "run".  Continue working backwards, accumulating nodes into the
+   run so long as the total size is less than or equal to G.  Once the
+   run has been maximally filled or we are out of nodes to add, test the
+   candidate formed by replacing the entire run with the empty string.
+   If it succeeds, kill all nodes in the run.  If that fails, but the
+   run consists of just N alone, then also try its non-trivial
+   replacement if it has one.
+
+minimize_node(leaf) should only ever happen if the input contains just
+one token.  This case is not important; just return without doing
+anything.
+
+Rationale: One might be tempted, in case 2, to skip the case 1 test
+since we will have already attempted to replace N on a previous pass
+with a larger G.  But if we made progress in the meantime, we might have
+deleted something that was blocking N from being removed, so trying
+again could work.  (And if there was literally no progress in the
+meantime, then memoization means this costs basically nothing.)  Trying
+to remove entire nodes is important because some constructs, such as C++
+function definitions, can be difficult or impossible to hollow out, even
+in cases where deleting the entire thing would work.
+
+Rationale: The reason for going backwards is that we expect the input to
+be something like a C++ program, which mostly contains declarations
+before references.  Deleting a declaration without deleting its
+references is almost always unproductive since typical acceptance tests
+require that the input be well-formed.  That said, working backwards is
+a very crude way to avoid breaking decl-ref edges, and a possible future
+extension is to explicitly compute, represent, and respect such edges.
+
+Discussion: Because we use a hard stop condition when G is less than 2,
+this algorithm does not guarantee 1-minimality, despite the requirements
+calling for that.  It's of course easy to modify it to keep repeating
+the final G until quiescence, but full 1-minimality is more of an
+aspirational goal than a hard requirement, and omitting iteration to
+quiescence allows for a more meaningful progress report.
 
 
 Progress report
 ---------------
 
-Prior to testing a candidate in minimize_chunked_node, issue a progress
-report object with attributes:
+The "completion fraction" of a given candidate is the position of the
+last token being considered for replacement within the sequence of live
+tokens, measured from the end (since we work backwards).  That is, if
+there are L live tokens, and we are testing a candidate that tries
+removing a sequence that ends with (1-based) live token E, then the
+completion fraction is (L - E) / L.
 
-  M:  level_limit
-  L:  level
-  P:  parent index + 1
-  Pm: num nodes at level
-  E:  exponent + 1
-  Em: max_exp + 2
-  C:  chunk_index + 1
-  Cm: num_chunks
+Rationale: On each pass, the first thing we try is removing the entire
+file.  In that case, E=L, so the completion fraction is 0.  The fraction
+reaches a maximum (but never exactly 1) when we try to remove the only
+very first token of the file.  It's a bit crude as a measure due to the
+way the algorithm interleaves testing removal of chunks of various
+sizes, but also relatively simple, so should suffice as a first attempt.
 
-This is rendered as a string as:
+Prior to testing a candidate, issue a progress report object with
+attributes:
 
-  M=$M L=($L/$M) P=($P/$Pm) E=($E/$Em) C=($C/$Cm)
+  P:  pass number, starting with 1
+  Pm: number of passes, ceil(log_2(S))+1
+  G:  granularity, rounded to the nearest 0.1
+  F:  completion fraction as an integer percentage
+  R:  sum of sizes of nodes replaced in this candidate
 
-Each of the numerators is printed with enough leading zeroes to ensure
-it has the same number of digits as the corresponding denominator.
+This is rendered as a <status> string as:
+
+  P=($P/$Pm) G=$G F=$F% R=$s
+
+$P is printed with enough leading zeroes to ensure it has the same
+number of digits as $Pm.  $G and $R have leading zeroes to keep their
+length consistent, taking into account the maximum value of S.  $F is
+printed with two digits.
 
 As the minimizer runs, it prints status lines to the console.  Prior to
 testing a candidate, it prints:
@@ -163,24 +180,28 @@ testing a candidate, it prints:
 
 without printing a trailing newline.  $N is the sequence number of the
 candidate being tested, and is padded with leading zeroes so it has at
-least 6 digits.  $S is the size of the candidate in bytes, padded with
+least 6 digits.  $S is the size of the candidate in tokens, padded with
 zeroes so it has the same number of digits as the original input file
 size.
 
 When the test completes, print either "rejected" or "ACCEPTED", then
 a newline.
 
+Rationale: The digit padding should keep all fields in consistent
+columns in the console output for ease of reading when iterations are
+rapid.  As the minimizer runs, N will be increasing, and S decreases
+whenever progress is made.  P provides the outer loop progress and F the
+inner loop progress, with G and s providing a bit more insight into the
+operation of each loop.
+
 
 Candidate testing
 -----------------
 
-In minimize_chunked_node and minimize_alts_of_child, candidate inputs
-are tested for acceptance by calling a `test_candidate` function.  This
-function first calls `render_candidate`, which takes the tree root node
-as input along with a node reference and the text to substitute for that
-node.  It renders the complete candidate by walking the tree from the
-root, using the substituted text for the specified node, and otherwise
-rendering the nodes according to their `replacement` status.
+Candidate inputs are tested for acceptance by calling a `test_candidate`
+function.  This function first calls `render_candidate`, which takes the
+tree root node as input along with a set of candidate-specific node
+replacements, and yields a byte sequence.
 
 Then the md5 hash of the rendered text is checked with the memoization
 table, short-circuiting the actual test on a hit.  On a miss, the
@@ -189,6 +210,265 @@ contained the initial input (which was backed up before the main
 algorithm began).  Then the acceptance test program is run, its
 result stored in the memoization table, and that result returned to
 the invoking routine.
+
+
+Candidate rendering
+-------------------
+
+The input to render_candidate is a token tree with its already
+established replacements on TTNode (which describe the most recently
+accepted state), along with a map from TTNode to bytes of additional
+candidate node replacements to test.  The output is a byte sequence.
+
+Conceptually, every candidate can be expressed as a candidate token map
+CTM from original token (identified by its index, for example) to either
+None (meaning the token is live) or a replacement text.  For the purpose
+of rendering a token tree, the complication is that replacement is
+expressed on TTNode, which includes interior nodes.  Consequently, when
+an interior node N has a replacement, that is expressed in CTM by saying
+that the first token T in its original span is associated with N's
+replacement text, and all others in the span have *empty* replacement
+text.  (In general, the replacements in the CTM will be different from
+the leaf node replacements in the token tree.)
+
+For example, if we have "int foo() {...} int x;" and the "{...}" is
+replaced by ";", then CTM associates the original token "{" with ";" as
+its replacement, and all tokens in "...}" with empty replacements.
+
+Now we can describe how to render a CTM.  A contiguous sequence of live
+tokens is simply rendered as the concatentation of their original texts.
+Suppose we have a gap in the live tokens:
+
+  ..., A, D1, D2, ..., Dn, B, ...
+
+where A and B are live tokens and all Di are dead, with replacements Ri
+in the CTM.
+
+We want to ensure each emitted token (B) or non-trivial replacement (Ri)
+appears on a line that has the same indentation as the line that
+originally contained that token or the token it replaces (preserve
+indentation), and furthermore not on the same line as a token it was
+originally on a different line from (don't join lines).
+
+Let trail_indent(s: str) -> str be the last newline in s followed by
+whatever contiguous whitespace immediately follows it in s, or the empty
+string if s does not contain a newline.
+
+We'll start with the non-trivial Ri.  Let Rj be the first Ri that is not
+empty, and DD[1,j] be the concatenation of D1 through Dj.  Rather than
+emitting Rj alone, emit trail_indent(DD[1,j])+Rj.  Note that Dj itself
+potentially contributes indentation to its replacement Rj, because the
+indentation in Dj preceded its non-whitespace.
+
+Continue in the same way for each non-trivial Ri, preceding it with the
+trail_indent of the concatenation of Dj for contiguous trivial preceding
+Rj, and of Di itself.
+
+Finally:
+
+* If B contains a newline, then emit it in the obvious way.  (It already
+  contains its own indentation.)
+
+* Otherwise, precede B with the trail_indent of the concatenation of Dj
+  for contiguous trivial preceding Rj.
+
+As a final consideration, if B does not have any leading whitespace,
+and all Ri are trivial, then the above rules would emit A+B, but that
+risks allowing their tokens to inadvertently coalesce.  Therefore, in
+this situation, emit A+" "+B instead (don't coalesce tokens).
+
+Implementation note: The algorithm description here, involving building
+a CTM and then operating on the flat token sequence, is primarily
+intended for expositional clarity.  The implementation is free to
+reorganize the computation for efficiency.  That said, my intent is to
+start with a naive implementation that closely follows the spec in order
+to validate that spec and to provide a reference implementation that a
+more optimized implementation could be tested against.
+
+
+
+
+
+
+
+
+LEFTOVER JUNK TO BE DELETED
+===========================
+
+We have a few cases:
+
+* If the leading whitespace of B contains a newline, then nothing
+  special is required; emit A+RR+B.
+
+* Otherwise, if RR is empty:
+
+  * If DD contains a newline, then B should be emitted onto a new line
+    (so it is not joined with A's line), with the same indentation that
+    it originally had.  Emit A+trail_indent(DD)+B.
+
+  * Otherwise, emit join_no_coalesce(A,B), which is A+B if either has a
+    whitespace character adjacent to the join point, and A+" "+B
+    otherwise.
+
+* Otherwise (some Ri is not empty), each non-trivial Ri must be emitted
+  with the applicable trailing indentation, which is trail_indent of the
+  concatenation of Dj for the preceding trivial Rj, and Di itself.
+  Then, before B, emit the trail_indent of the concatenation of Dj for
+  the trivial Rj that precedes B.
+
+    For example, if we have:
+
+      original  replacement
+      --------  -----------
+      "foo"     None
+      " x"      ""     \
+      "\n  {"   ";"    _> trail_indent T1 is "\n  "
+      "}"       ""     \
+      "\ny"     ""      > trail_indent T2 is "\n"
+      "{"       ";"    /
+      "}"       ""     \
+      "\n !"    ""     _> trail_indent T3 is "\n "
+      "bar"     None
+
+    Then this is rendered as:
+
+      "foo\n  ;\n;\n bar"
+          ^^^^ ^^ ^^^
+          T1   T2 T3
+
+The point of these rules is to ensure each emitted token or replacement
+appears on a line that has the same indentation as the line that
+originally contained that token or the token it replaces.
+
+
+
+
+
+
+
+
+Rendering is implemented with a recursive render(node) function that
+returns a byte sequence.
+
+If N is a live token, or a group where all of its children are live,
+then simply return the concatenation of render(C) for all children C.
+
+Consider rendering a node with the child sequence [A,B,C], where A and C
+are live but B is dead, with the empty string as its replacement.
+
+1. If the leading whitespace of C contains a newline, then nothing more
+   is needed; emit render(A)+render(C).
+
+2. Otherwise, if the original text (the concatenation of all original
+   tokens) of B contained a newline, then let INDENT be a newline
+   followed by whatever whitespace followed the last newline in that
+   original text.  Emit render(A)+INDENT+render(C).
+
+     Rationale: This ensures that C will not be put onto the same line
+     as A (we don't want to emit text that joins things that previously
+     were on different lines), and appears on a line that is indented
+     the same amount as it was previously.
+
+3. Otherwise (C has no leading newline and B had no newline), if
+   render(A) does not end with whitespace and render(C) does not start
+   with whitespace, emit render(A)+" "+render(C).
+
+     Rationale: The text for A and C might otherwise coalesce, for
+     example of A is "3", B was "+", and C is "c", we'd get "3c", a
+     malformed single token (in C++).
+
+Now suppose B has non-trivial replacement text REPL.  For practical
+purposes, that means it was a brace-enclosed group and its replacement
+text is ";".  Adjust the cases:
+
+1. Emit render(A)+REPL+render(C).
+
+2. We still want C on a separate line from A, so emit
+   render(A)+REPL+INDENT+render(C).
+
+3. We assume that the replacement text alone is sufficient to prevent
+   coalescing, so emit render(A)+REPL+render(C).
+
+Now suppose the child sequence is [A,B1,B2,C] where B1 and B2 are dead.
+Adjust the cases:
+
+1. Emit render(A)+REPL1+REPL2+render(C).
+
+2. Calculate INDENT from the original text of B1+B2, and emit
+   render(A)+REPL1+REPL2+INDENT+render(C).
+
+3a. If REPL1+REPL2 is empty, then emit render(A)+" "+render(C).
+
+3b. Otherwise, emit render(A)+REPL1+REPL2+render(C).
+
+
+
+
+render(node) -> str:
+
+  result = ""
+  had_gap = False
+
+
+  for c in children(node):
+    if is_live(c):
+      next = render(c)
+      if (had_gap and
+          does_not_end_with_ws(result) and
+          does_not_start_with_ws(next)):
+        next = " " + next
+      result += next
+      had_gap = False
+
+    else:
+      result += c.replacement
+      had_gap = True
+
+
+
+
+
+
+
+
+Conceptually, every candidate can be expressed as a set of original
+token numbers, each in [0,S-1].  As a first approximation, the
+corresponding rendered candidate is then obtained by concatenating in
+order, for every original token:
+
+* The token text if it is live.
+
+* The replacement text if it is not.
+
+concatenation of the associated token texts.
+
+However, one issue relates to newlines and indentation.  We don't want
+to render two tokens on the same line when they were originally on
+different lines, and we don't want to alter the indentation of any line.
+Therefore, when there is a gap in the live token sequence, we locate the
+rightmost dead token in the gap that contains a newline, and then
+extract its rightmost newline and following whitespace (which is the
+indentation).  Those are then inserted into the rendered text at the
+right edge of the gap (i.e., after any replacement text for dead tokens
+in the gap).
+
+A second issue is that tokens on the same line might inappropriately
+coalesce.  For example, if we delete "+" from "3+a", then naively that
+will render as "3a", which will then be presumably interpreted as a
+single malformed token during acceptance testing.  Therefore, if a token
+gap does not contain any newlines, and the live tokens on either side of
+the gap do not have any adjacent whitespace, then rendering inserts a
+single space to ensure they stayseparate.  Except, if at least one dead
+token in the gap contains a non-trivial replacement token, then omit the
+inserted space.
+
+Rationale: The only non-trivial replacement I'm considering is using ";"
+to replace brace-delimited groups.  The semicolon eliminates the risk of
+coalescing on either side (in C++ at least), and extra spaces in that
+case would look ugly.
+
+
+
 
 
 Candidate rendering
