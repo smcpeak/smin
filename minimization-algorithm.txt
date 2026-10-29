@@ -161,7 +161,7 @@ completion fraction is (L - E) / L.
 Rationale: On each pass, the first thing we try is removing
 approximately the second half of the entire file.  In that case, E=L, so
 the first completion fraction is 0.  The fraction reaches a maximum (but
-never exactly 1) when we try to remove the only very first token of the
+never exactly 1) when we try to remove only the very first token of the
 file.  It increases monotonically (but not strictly) as the algorithm
 runs; see proof below.  It's a bit crude as a measure due to the way the
 algorithm interleaves testing removal of chunks of various sizes, but
