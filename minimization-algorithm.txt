@@ -100,13 +100,17 @@ ignoring dead nodes.  It also skips the delimiters at either end if
    too, so recursively call `minimize_node(N)`.
 
 3. If s <= G/2, N by itself is too small, so it will form the last node
-   of a "run".  Continue working backwards, accumulating nodes into the
-   run so long as the total size is less than or equal to G.  Once the
-   run has been maximally filled or we are out of nodes to add, test the
-   candidate formed by replacing the entire run with the empty string.
-   If it succeeds, kill all nodes in the run.  If that fails, but the
-   run consists of just N alone, then also try its non-trivial
-   replacement if it has one.
+   of a "run".  Continue working backwards, accumulating nodes with size
+   less than or equal to G/2 (*) into the run so long as the total size
+   is less than or equal to G.  Once the run has been maximally filled
+   or we are out of nodes to add, test the candidate formed by replacing
+   the entire run with the empty string.  If it succeeds, kill all nodes
+   in the run.  If that fails, but the run consists of just N alone,
+   then also try its non-trivial replacement if it has one.  Then
+   continue the loop with the next sibling after the last one in the run.
+
+   (*): This condition ensures that nodes that meet the case 1 condition
+        will still be tried on their own.
 
 minimize_node(leaf) should only ever happen if the input contains just
 one token.  This case is not important; just return without doing
