@@ -367,6 +367,13 @@ plan to use, at least in the short term.  For ";", I'd rather not
 surround it with unnecessary spaces since that looks a bit ugly.  This
 rule will need to revisited if/when other replacements become possible.
 
+Now let's consider token gaps at the ends.  In practice, we only expect
+the dead ends to contain trivial replacements, and that the first live
+token will not have had any indentation in the original input.
+Therefore, it should suffice to simply use naive concatenation with no
+additional whitespace at the ends.  But the implementation is free to do
+whatever is most convenient here.
+
 Implementation note: The algorithm description here, involving building
 a CTM and then operating on the flat token sequence, is primarily
 intended for expositional clarity.  The implementation is free to
