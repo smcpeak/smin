@@ -51,10 +51,8 @@ concision, but "byte sequence" is what is technically meant.)
 
 `memoized_accept` is a global memoization table that maps an md5sum of a
 candidate byte sequence to either true (accepted) or false (rejected).
-(In practice, it will be at most very rare to get a hit for a previously
-accepted input, since it means a subsequent "smaller" candidate was
-textually identical, but acceptance is tracked for symmetry and possible
-occasional utility.)
+(Hits for accepted inputs will be unusual, but can happen in some corner
+cases.)
 
 
 Node size
@@ -160,12 +158,21 @@ completion fraction is (L - E) / L.
 
 Rationale: On each pass, the first thing we try is removing
 approximately the second half of the entire file.  In that case, E=L, so
-the first completion fraction is 0.  The fraction reaches a maximum (but
-never exactly 1) when we try to remove only the very first token of the
-file.  It increases monotonically (but not strictly) as the algorithm
-runs; see proof below.  It's a bit crude as a measure due to the way the
-algorithm interleaves testing removal of chunks of various sizes, but
-also relatively simple, so should suffice as a first attempt.
+the first completion fraction is 0.  Typically, the fraction reaches a
+maximum (but not exactly 1) when we try to remove only the very first
+token of the file.  It increases monotonically (but not strictly) as the
+algorithm runs; see proof below.  It's a bit crude as a measure due to
+the way the algorithm interleaves testing removal of chunks of various
+sizes, but also relatively simple, so should suffice as a first attempt.
+
+There is a corner case to consider though: it is possible for a
+candidate to be formed by trying to delete a node, or a run of nodes,
+that have no remaining live tokens.  We would expect the attempt to
+succeed at the memoization stage, but we run the test machinery anyway
+for uniformity.  In that case, let E be 1-based index of the live token
+immediately to the left of the first node's subtree, or 0 if there is
+none.  That in turn means that the completion fraction could be 1; so be
+it.
 
 Prior to testing a candidate, issue a progress report object with
 attributes:
@@ -173,7 +180,7 @@ attributes:
   P:  pass number, starting with 1
   Pm: number of passes, floor(log_2(S))+1
   G:  granularity, rounded to the nearest 0.1
-  F:  completion fraction as an integer percentage, rounded down
+  F:  completion fraction as an integer percentage, capped at 99
   R:  sum of sizes of nodes replaced in this candidate
 
 Brief justification of Pm formula: For S=4, G=[4, 2, 1], log_2(S)=2, so
@@ -187,7 +194,7 @@ This is rendered as a <status> string as:
 $P is printed with enough leading zeroes to ensure it has the same
 number of digits as $Pm.  $G and $R have leading zeroes to keep their
 length consistent, taking into account the maximum value of S.  $F is
-printed with two digits (which is sufficient due to rounding down).
+printed with two digits (which is sufficient due to the cap).
 
 As the minimizer runs, it prints status lines to the console.  Prior to
 testing a candidate, it prints:
@@ -217,12 +224,15 @@ operation of each loop.
 Proof that completion fraction increases monotonically
 ------------------------------------------------------
 
-When a candidate chunk is not removed, the number of live tokens L does
-not change, and due to the way the algorithm is structured, the next E
-will either be the same or less, so (L - E) / L will be nondecreasing.
+When a candidate chunk (node or run of nodes) is not removed, the number
+of live tokens L does not change, and due to the way the algorithm is
+structured, the next E will either be the same or less, so (L - E) / L
+will be nondecreasing.
 
 When a candidate chunk *is* removed, L decreases by s (the chunk size),
-and the next E will be at most (E - s).
+and the next E will be at most (E - s).  (There is the corner case where
+s=0; in that case the fraction does not change; that case is ignored
+hereafter.)
 
 Thus, we must prove the claim:
 
@@ -453,7 +463,8 @@ or:
 
 depending on which is applicable.
 
-Then proceed with the minimization algorithm specified above.
+Initialize the memoization table to record the acceptance of the initial
+input.  Then proceed with the minimization algorithm specified above.
 
 
 Termination
