@@ -298,7 +298,8 @@ that is expressed in the CTM by saying that the first token T in its
 original span is associated with N's replacement text, and all others in
 the span have *empty* replacement text.  (In general, the replacements
 in the CTM will be different from the leaf node replacements in the
-token tree.)
+token tree.  Also note that a replacement in an ancestor node
+effectively overrides any replacements in descendant nodes.)
 
 For example, if we have "int foo() {...} int x;" and the "{...}" is
 replaced by ";", then CTM associates the original token "{" with ";" as
