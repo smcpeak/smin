@@ -347,6 +347,13 @@ and all Ri are trivial, then the above rules would emit A+B, but that
 risks allowing their tokens to inadvertently coalesce.  Therefore, in
 this situation, emit A+" "+B instead (RULE: don't coalesce tokens).
 
+Rationale / limitation: The don't-coalesce rule assumes that a
+non-trivial replacement text is always inherently non-coalescing, as is
+the case for ";" in C++, which is the only non-trivial replacement I
+plan to use, at least in the short term.  For ";", I'd rather not
+surround it with unnecessary spaces since that looks a bit ugly.  This
+rule will need to revisited if/when other replacements become possible.
+
 Implementation note: The algorithm description here, involving building
 a CTM and then operating on the flat token sequence, is primarily
 intended for expositional clarity.  The implementation is free to
