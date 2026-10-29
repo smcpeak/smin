@@ -161,10 +161,14 @@ Prior to testing a candidate, issue a progress report object with
 attributes:
 
   P:  pass number, starting with 1
-  Pm: number of passes, ceil(log_2(S))+1
+  Pm: number of passes, floor(log_2(S))+1
   G:  granularity, rounded to the nearest 0.1
   F:  completion fraction as an integer percentage
   R:  sum of sizes of nodes replaced in this candidate
+
+Brief justification of Pm formula: For S=4, G=[4, 2, 1], log_2(S)=2, so
+Pm=3, which is right.  For S=5, G=[5, 2.5, 1.25], log_2(S) is about 2.3,
+so again Pm=3.
 
 This is rendered as a <status> string as:
 
