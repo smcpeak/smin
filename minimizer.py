@@ -78,6 +78,41 @@ class TestStartReport:
   # `last_accepted_tok_count - removed_tok_count`.
   removed_tok_count: int
 
+  # Number of tokens in the initial input.  This is the maximum value of
+  # S, G, and R, so it determines how wide their fields are.
+  initial_tok_count: int
+
+
+  def to_console_string(self) -> str:
+    """
+    Return the line to print to the console before the test starts,
+    without a trailing newline.  See minimization-algorithm.txt,
+    "Progress report".
+    """
+
+    # Width of a field holding up to `initial_tok_count`.
+    tok_width = len(str(self.initial_tok_count))
+
+    # The granularity is printed with one digit after the decimal point.
+    g_width = tok_width + 2
+
+    p_width = len(str(self.total_num_passes))
+
+    # Truncate rather than round, so that a fraction just below 1 does
+    # not print as 100.
+    f_percent = min(int(self.completion_fraction * 100), 99)
+
+    status = (
+      f"P=({self.pass_num:0{p_width}d}/{self.total_num_passes}) "
+      f"G={self.granularity:0{g_width}.1f} "
+      f"F={f_percent:02d}% "
+      f"R={self.removed_tok_count:0{tok_width}d}")
+
+    return (
+      f"N={self.sequence_num:06d} "
+      f"S={self.last_accepted_tok_count:0{tok_width}d} "
+      f"{status} ...")
+
 
 # Signature of a function that accepts a test start report.  In normal
 # operation, the callee prints this data to the console.
@@ -459,6 +494,7 @@ class Minimizer:
       granularity=len(self.tokens) / (1 << self.pass_index),
       completion_fraction=(num_live - e) / num_live,
       removed_tok_count=sum(self.node_size(n) for n in nodes),
+      initial_tok_count=len(self.tokens),
     )
 
 
