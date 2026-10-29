@@ -369,7 +369,10 @@ For the last piece Di, Di+1, ..., Dj-1, B:
     " " + B
 
   in order to ensure that it does not coalesce with A (RULE: don't
-  coalesce tokens).
+  coalesce tokens).  This rule is conservative, adding spaces in cases
+  that might not need them; I accept that imprecision in exchange for
+  simplicity and less direct dependence on the input file language
+  rules.
 
 * Otherwise, simply emit:
 
