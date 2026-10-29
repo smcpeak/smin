@@ -28,6 +28,7 @@ PYTHON_SRCS :=
 PYTHON_SRCS += acceptance_test_result.py
 PYTHON_SRCS += build_tree.py
 PYTHON_SRCS += build_tree_util.py
+PYTHON_SRCS += check_accept.py
 PYTHON_SRCS += group_delimiters.py
 PYTHON_SRCS += group_indentation.py
 PYTHON_SRCS += group_lines.py
