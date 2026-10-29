@@ -278,12 +278,12 @@ tree root node as input along with a set of candidate-specific node
 replacements, and yields a byte sequence.
 
 Then the md5 hash of the rendered text is checked with the memoization
-table, short-circuiting the actual test on a hit.  On a miss, the
-candidate is written to disk, overwriting the file that originally
-contained the initial input (which was backed up before the main
-algorithm began).  Then the acceptance test program is run, its
-result stored in the memoization table, and that result returned to
-the invoking routine.
+table, short-circuiting the actual test on a hit, and also not printing
+any status line.  On a miss, the candidate is written to disk,
+overwriting the file that originally contained the initial input (which
+was backed up before the main algorithm began).  Then the acceptance
+test program is run, its result stored in the memoization table, and
+that result returned to the invoking routine.
 
 When running the test program, close its stdin (so it can't hang due to
 trying to read user input), and redirect its stdout and stderr to the
