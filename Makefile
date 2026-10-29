@@ -45,6 +45,7 @@ PYTHON_TESTS += group_delimiters_test.py
 PYTHON_TESTS += group_indentation_test.py
 PYTHON_TESTS += group_lines_test.py
 PYTHON_TESTS += group_paragraphs_test.py
+PYTHON_TESTS += minimizer_test.py
 PYTHON_TESTS += string_util_test.py
 PYTHON_TESTS += test_util_test.py
 PYTHON_TESTS += token_tree_test.py
