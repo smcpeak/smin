@@ -507,6 +507,9 @@ depending on which is applicable.
 Initialize the memoization table to record the acceptance of the initial
 input.  Then proceed with the minimization algorithm specified above.
 
+Just for specificity: This initial test is *not* counted toward the
+attempt numbering in the progress reports.  Those start at 1.
+
 
 Termination
 -----------
