@@ -173,7 +173,7 @@ attributes:
   P:  pass number, starting with 1
   Pm: number of passes, floor(log_2(S))+1
   G:  granularity, rounded to the nearest 0.1
-  F:  completion fraction as an integer percentage
+  F:  completion fraction as an integer percentage, rounded down
   R:  sum of sizes of nodes replaced in this candidate
 
 Brief justification of Pm formula: For S=4, G=[4, 2, 1], log_2(S)=2, so
@@ -187,7 +187,7 @@ This is rendered as a <status> string as:
 $P is printed with enough leading zeroes to ensure it has the same
 number of digits as $Pm.  $G and $R have leading zeroes to keep their
 length consistent, taking into account the maximum value of S.  $F is
-printed with two digits.
+printed with two digits (which is sufficient due to rounding down).
 
 As the minimizer runs, it prints status lines to the console.  Prior to
 testing a candidate, it prints:
