@@ -43,11 +43,11 @@ Data structures
 ---------------
 
 TTNode is augmented with a new mutable `replacement` attribute of type
-`Optional[bytes]`.  None means the node is has not been replaced, while
-a byte sequence means it has been replaced with that sequence.
-Initially all nodes are marked as unreplaced.  (The replacement is
-sometimes referred to in this spec as a "string" for familiarity and
-concision, but "byte sequence" is what is technically meant.)
+`Optional[bytes]`.  None means the node has not been replaced, while a
+byte sequence means it has been replaced with that sequence.  Initially
+all nodes are marked as unreplaced.  (The replacement is sometimes
+referred to in this spec as a "string" for familiarity and concision,
+but "byte sequence" is what is technically meant.)
 
 `memoized_accept` is a global memoization table that maps an md5sum of a
 candidate byte sequence to either true (accepted) or false (rejected).
@@ -80,11 +80,11 @@ candidate.  It is set according to the sequence:
 
 Each pass operates with successively smaller G.  The final pass has G in
 the range [1,2).  During a given pass, a node is a candidate to be
-removed if its size is in greater than G/2.  (Some smaller nodes also
-end up incidentally being candidates, depending on the context, as
-explained below.)  Consequently, the final pass tries to remove all
-nodes with size 1, i.e., individual tokens (and groups that only contain
-one live token).
+removed if its size is greater than G/2.  (Some smaller nodes also end
+up incidentally being candidates, depending on the context, as explained
+below.)  Consequently, the final pass tries to remove all nodes with
+size 1, i.e., individual tokens (and groups that only contain one live
+token).
 
 The algorithm core is the recursive function minimize_node, which takes
 as input a tree node (and G), and modifies the associated subtree,
@@ -236,7 +236,7 @@ Rationale: The digit padding should keep all fields in consistent
 columns in the console output for ease of reading when iterations are
 rapid.  As the minimizer runs, N will be increasing, and S decreases
 whenever progress is made.  P provides the outer loop progress and F the
-inner loop progress, with G and s providing a bit more insight into the
+inner loop progress, with G and R providing a bit more insight into the
 operation of each loop.
 
 
@@ -355,7 +355,7 @@ its replacement, and all tokens in "...}" with empty replacements.
 
 Now we can describe how to render a candidate byte sequence from a flat
 token list and a CTM.  A contiguous sequence of live tokens is simply
-rendered as the concatentation of their original texts.  Suppose we have
+rendered as the concatenation of their original texts.  Suppose we have
 a gap in the live tokens:
 
   ..., A, D1, D2, ..., Dn, B, ...
@@ -428,14 +428,15 @@ For the last piece Di, Di+1, ..., Dj-1, B:
     B
 
   This is the case where A and B were originally on the same line, and
-  will remain so, and B already has whitepsace to keep them separate.
+  will remain so, and B already has whitespace to keep them separate.
 
 Rationale / limitation: The anti-coalescence rule above is only applied
 to the final piece, not to non-trivial replacement texts, even though in
 general those could coalesce too.  Currently, the only replacement text
 I'm planning to use is ";", which will never coalesce (in C++), and I'd
 rather not add an extra space before it for aesthetic reasons.  This
-rule will need to revisited if/when other replacements become possible.
+rule will need to be revisited if/when other replacements become
+possible.
 
 Now let's consider token gaps at the ends.  At the end of the file, we
 have:
