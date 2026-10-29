@@ -178,7 +178,7 @@ so again Pm=3.
 
 This is rendered as a <status> string as:
 
-  P=($P/$Pm) G=$G F=$F% R=$s
+  P=($P/$Pm) G=$G F=$F% R=$R
 
 $P is printed with enough leading zeroes to ensure it has the same
 number of digits as $Pm.  $G and $R have leading zeroes to keep their
@@ -192,9 +192,12 @@ testing a candidate, it prints:
 
 without printing a trailing newline.  $N is the sequence number of the
 candidate being tested, and is padded with leading zeroes so it has at
-least 6 digits.  $S is the size of the candidate in tokens, padded with
-zeroes so it has the same number of digits as the original input file
-size.
+least 6 digits.  $S is the size of the last-accepted input in tokens,
+padded with zeroes so it has the same number of digits as the number of
+tokens in the initial input.  (Here, I'm overloading S a little, since
+in the algorithm it stays constant, but here it tracks the reduction in
+size of the accepted input.)  Note that the size of the candidate being
+tested can be calculated as S-R.
 
 When the test completes, print either "rejected" or "ACCEPTED", then
 a newline.
