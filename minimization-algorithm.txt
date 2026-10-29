@@ -322,13 +322,26 @@ originally on a different line from (RULE: don't join lines).
 
 Let trail_indent(s: str) -> str be the last newline in s followed by
 whatever contiguous whitespace immediately follows it in s, or the empty
-string if s does not contain a newline.
+string if s does not contain a newline.  This captures the line
+indentation of any text following s.
+
+Let leading_ws(s: str) -> str be the contiguous leading whitespace in s.
+This is needed to separate the indentation that was present in a deleted
+token from possible later newlines in that same token (which are not
+relevant due to the deletion).
+
+Let DD[n,m] be the concatenation of Dn through Dm (inclusive).
 
 We'll start with the non-trivial Ri.  Let Rj be the first Ri that is not
-empty, and DD[1,j] be the concatenation of D1 through Dj.  Rather than
-emitting Rj alone, emit trail_indent(DD[1,j])+Rj.  Note that Dj itself
-potentially contributes indentation to its replacement Rj, which we want
-because the indentation in Dj preceded its non-whitespace.
+empty.  Rather than emitting Rj alone, emit:
+
+  trail_indent(DD[1,j-1] + leading_ws(Dj)) + Rj
+
+Note that Dj itself potentially contributes indentation to its own
+replacement Rj, which we want because the indentation in Dj preceded its
+non-whitespace.  But (due to using leading_ws) we do not get fooled by
+a newline that might appear later inside Dj (say, in a block comment)
+and hence should not be considered as part of its indentation.
 
 Continue in the same way for each non-trivial Ri, preceding it with the
 trail_indent of the concatenation of Dj for contiguous trivial preceding
