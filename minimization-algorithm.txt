@@ -341,4 +341,25 @@ to validate that spec and to provide a reference implementation that a
 more optimized implementation could be tested against.
 
 
+Termination
+-----------
+
+At the end of the final pass, the original input file is overwritten
+with the rendering of current tree (with no candidate substitutions),
+and a final message printed (on two lines; the first is wrapped only for
+exposition here):
+
+  Reduced file <fname> from <orig S> tokens (<orig size> bytes)
+  to <S> tokens (<size> bytes).
+  Elapsed time (D:HH:MM:SS): <days>:<hours>:<mins>:<secs>
+
+This also happens in response to Ctrl-C.  Note that when Ctrl-C is
+pressed, the test program will almost certainly be running, so the
+minimizer needs to recognize when the test program terminated for that
+reason (as opposed to an ordinary rejection).  When stopping due to
+Ctrl-C, the above final message is preceded by:
+
+  Stopping early due to Ctrl-C.
+
+
 EOF
