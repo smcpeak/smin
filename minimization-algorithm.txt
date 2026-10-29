@@ -266,6 +266,15 @@ algorithm began).  Then the acceptance test program is run, its
 result stored in the memoization table, and that result returned to
 the invoking routine.
 
+When running the test program, close its stdin (so it can't hang due to
+trying to read user input), and redirect its stdout and stderr to the
+platform equivalent of /dev/null.  (Later we might add an option to save
+that output somewhere.)
+
+TODO: It would be nice to have a way for the test program to communicate
+a short verdict phrase to include in the minimizer console output so
+that the different rejection reasons could be observed in real time.
+
 
 Candidate rendering
 -------------------
@@ -341,13 +350,55 @@ to validate that spec and to provide a reference implementation that a
 more optimized implementation could be tested against.
 
 
+Startup
+-------
+
+Start by reading the input <fname> and building a token tree from it
+using C++ language rules.  (Later we might add more languages, and an
+option to choose the language.)  Halt with an error if <fname> cannot be
+read.
+
+Summarize the initial input on one line:
+
+  Initial <fname> has <S> tokens, <bytes> bytes, and a maximum tree
+  depth of <depth>.
+
+Then, as a sanity check, render the initial tree as a byte sequence in
+memory and verify it exactly matches the contents of <fname> (halt with
+internal error otherwise).
+
+Next, run the test program.  First print (without a newline, but
+flushing the output):
+
+  Checking <program> on initial <fname> ...
+
+Then if the test passes, print "accepted\n", otherwise "REJECTED\n".
+In the latter case, halt with:
+
+  Stopping because the initial input was rejected.
+
+Next, make a backup of the input file, with the name of the backup being
+"<fname>.bak", overwriting an older backup if one is present.  Print a
+message:
+
+  Copied <fname> to <fname>.bak.
+
+or:
+
+  Copied <fname> to <fname>.bak (which was overwritten).
+
+depending on which is applicable.
+
+Then proceed with the minimization algorithm specified above.
+
+
 Termination
 -----------
 
 At the end of the final pass, the original input file is overwritten
-with the rendering of current tree (with no candidate substitutions),
-and a final message printed (on two lines; the first is wrapped only for
-exposition here):
+with the rendering of the current tree (with no candidate
+substitutions), and a final message printed (on two lines; the first is
+wrapped only for exposition here):
 
   Reduced file <fname> from <orig S> tokens (<orig size> bytes)
   to <S> tokens (<size> bytes).
