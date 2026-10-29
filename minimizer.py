@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from enum import Enum
 from typing import Callable, Optional
 
+from acceptance_test_result import AcceptanceTestResult
 from smin_token import SMToken
 from token_tree import TTNode
 
@@ -28,13 +28,6 @@ _NEWLINE: int = ord("\n")
 # replacement by the empty sequence, we also consider replacing the node
 # with the specified sequence.
 NTReplacementFunc = Callable[[TTNode], Optional[bytes]]
-
-
-class AcceptanceTestResult(Enum):
-  """Possible results of an acceptance test invocation."""
-  ACCEPT = 1
-  REJECT = 2
-  INTERRUPTED = 3       # Ctrl-C
 
 
 # Signature of a function that checks a candidate input for acceptance

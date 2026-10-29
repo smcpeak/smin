@@ -25,6 +25,7 @@ MYPY_OPTS = --strict
 
 
 PYTHON_SRCS :=
+PYTHON_SRCS += acceptance_test_result.py
 PYTHON_SRCS += build_tree.py
 PYTHON_SRCS += build_tree_util.py
 PYTHON_SRCS += group_delimiters.py
