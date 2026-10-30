@@ -46,8 +46,9 @@ class TestStartReport:
 
   # The short identifiers like "N" are the names used in the spec.
 
-  # N: Numbering of the invocations during this minimization attempt,
-  # starting with 1.
+  # N: Numbering of the candidates reported during this minimization
+  # attempt, starting with 1.  This includes candidates whose verdict
+  # was found in the memoization table.
   sequence_num: int
 
   # S: Number of live tokens in the most recently accepted input.
@@ -112,9 +113,11 @@ class TestStartReport:
 # operation, the callee prints this data to the console.
 TestStartReportFunc = Callable[[TestStartReport], None]
 
-# Signature of a function called when a test finishes.  Again, this is
-# normally just printed to the console.
-TestFinishedReportFunc = Callable[[AcceptanceTestResult], None]
+# Signature of a function called when a test finishes.  The second
+# argument is True if the result came from the memoization table rather
+# than running the test.  Again, this is normally just printed to the
+# console.
+TestFinishedReportFunc = Callable[[AcceptanceTestResult, bool], None]
 
 
 class Minimizer:
@@ -177,7 +180,8 @@ class Minimizer:
   minimizer_invoked: bool
 
   # ---- Progress data ----
-  # Number of acceptance test invocations so far.
+  # Number of candidates reported so far, including those whose verdict
+  # was found in the memoization table.
   sequence_num: int
 
   # Number of passes the algorithm will make.
@@ -447,12 +451,15 @@ class Minimizer:
     text: bytes = self.render_candidate(extra)
     digest: bytes = _digest(text)
 
+    self.sequence_num += 1
+    self.report_test_starting(self._make_report(nodes))
+
     result: Optional[AcceptanceTestResult] = self.memoized_accept.get(digest)
-    if result is None:
-      self.sequence_num += 1
-      self.report_test_starting(self._make_report(nodes))
+    if result is not None:
+      self.report_test_finished(result, True)
+    else:
       result = self.test_acceptance(text)
-      self.report_test_finished(result)
+      self.report_test_finished(result, False)
       if result == AcceptanceTestResult.INTERRUPTED:
         raise _StopMinimization(result)
       self.memoized_accept[digest] = result

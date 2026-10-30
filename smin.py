@@ -63,13 +63,18 @@ class _Console:
   def report_test_starting(self, report: TestStartReport) -> None:
     self.write(report.to_console_string())
 
-  def report_test_finished(self, result: AcceptanceTestResult) -> None:
+  def report_test_finished(
+    self,
+    result: AcceptanceTestResult,
+    memoized: bool,
+  ) -> None:
     if result == AcceptanceTestResult.ACCEPT:
-      self.write(" ACCEPTED\n")
+      verdict = " ACCEPTED"
     elif result == AcceptanceTestResult.REJECT:
-      self.write(" rejected\n")
+      verdict = " rejected"
     else:
-      self.write(" INTERRUPTED\n")
+      verdict = " INTERRUPTED"
+    self.write(verdict + (" (memo)" if memoized else "") + "\n")
 
 
 def parse_command_line(argv: list[str]) -> argparse.Namespace:

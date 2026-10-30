@@ -27,12 +27,15 @@ Output:
 * While running, a sequence of acceptance test invocation reports, where
   each report has:
 
-  - The test program invocation sequence number, starting with 1.
+  - The candidate sequence number, starting with 1.  Candidates that
+    are identical to previous ones (and hence have memoized verdicts)
+    *are* shown and counted.
   - The current last-accepted size of the input, in tokens.
   - A measure of progress, described in detail below.
 
   and a sequence of acceptance test result reports, each indicating
-  whether the corresponding input was accepted.
+  whether the corresponding input was accepted and whether the verdict
+  was a hit in the memo table.
 
 Rationale: In the output, the size is measured in tokens, partly because
 during development I want to see a bit more of the internals, and the
@@ -233,6 +236,16 @@ tested can be calculated as S-R.
 When the test completes, print either "rejected" or "ACCEPTED", then
 a newline.
 
+If this progress report was issued for a candidate that was not actually
+run due to a hit in the memoization table, then write " (memo)" after
+the verdict.
+
+  Rationale: Although this contributes a bit of verbiage to the output,
+  it also makes it a lot easier to follow what the algorithm is doing
+  when I am studying the individual candidates and looking for ways to
+  improve its efficiency.  Without it, candidates I expect to see just
+  don't appear, and I have to recognize the textual identity myself.
+
 Rationale: The digit padding should keep all fields in consistent
 columns in the console output for ease of reading when iterations are
 rapid.  As the minimizer runs, N will be increasing, and S decreases
@@ -308,12 +321,12 @@ tree root node as input along with a set of candidate-specific node
 replacements, and yields a byte sequence.
 
 Then the md5 hash of the rendered text is checked with the memoization
-table, short-circuiting the actual test on a hit, and also not printing
-any status line.  On a miss, the candidate is written to disk,
-overwriting the file that originally contained the initial input (which
-was backed up before the main algorithm began).  Then the acceptance
-test program is run, its result stored in the memoization table, and
-that result returned to the invoking routine.
+table, short-circuiting the actual test on a hit, but still printing a
+status line.  On a miss, the candidate is written to disk, overwriting
+the file that originally contained the initial input (which was backed
+up before the main algorithm began).  Then the acceptance test program
+is run, its result stored in the memoization table, and that result
+returned to the invoking routine.
 
 When running the test program, redirect its stdin from the platform
 equivalent of /dev/null (so it can't hang due to trying to read user

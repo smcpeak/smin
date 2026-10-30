@@ -143,7 +143,7 @@ class MainTest(unittest.TestCase):
 
     # Every test line has a result.
     for line in lines[3:-2]:
-      self.assertRegex(line, r"^N=\d{6} .* \.\.\. (rejected|ACCEPTED)$")
+      self.assertRegex(line, r"^N=\d{6} .* \.\.\. (rejected|ACCEPTED)( \(memo\))?$")
 
   def test_backup_overwritten(self) -> None:
     self.input_path.write_bytes(b"keep\n")

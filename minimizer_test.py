@@ -65,7 +65,7 @@ class Recorder:
 
     # Reports received, in order.
     self.starts: list[TestStartReport] = []
-    self.finishes: list[AcceptanceTestResult] = []
+    self.finishes: list[tuple[AcceptanceTestResult, bool]] = []
 
   def test(self, data: bytes) -> AcceptanceTestResult:
     self.tested.append(data)
@@ -79,7 +79,10 @@ class Recorder:
     nt: NTReplacementFunc = no_replacement,
   ) -> Minimizer:
     return Minimizer(root, nt, self.test, self.starts.append,
-                     self.finishes.append)
+                     self.finish)
+
+  def finish(self, result: AcceptanceTestResult, memoized: bool) -> None:
+    self.finishes.append((result, memoized))
 
 
 class RenderCandidateTest(unittest.TestCase):
@@ -222,8 +225,11 @@ class TestStartReportTest(unittest.TestCase):
 class MinimizerTest(unittest.TestCase):
   def check_reports(self, rec: Recorder, m: Minimizer) -> None:
     """Check the consistency of the reports in `rec`."""
-    self.assertEqual(len(rec.starts), len(rec.tested))
-    self.assertEqual(len(rec.finishes), len(rec.tested))
+    self.assertEqual(len(rec.finishes), len(rec.starts))
+
+    # Every candidate not found in the memoization table is tested.
+    self.assertEqual(sum(1 for _, memo in rec.finishes if not memo),
+                     len(rec.tested))
 
     # Memoization means no input is tested twice.
     self.assertEqual(len(set(rec.tested)), len(rec.tested))
@@ -296,7 +302,7 @@ class MinimizerTest(unittest.TestCase):
     m = rec.make_minimizer(build_tree(tokenize_cpp(
       b"int a;\nint keep;\nint b;\n")))
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
-    self.assertEqual(rec.finishes[-1], INTERRUPTED)
+    self.assertEqual(rec.finishes[-1], (INTERRUPTED, False))
     self.assertEqual(len(rec.tested), 4)
 
     # The result is the last accepted input, not the interrupted one.
@@ -307,6 +313,20 @@ class MinimizerTest(unittest.TestCase):
     # The interrupted outcome is not memoized: the initial input, plus
     # the three completed tests.
     self.assertEqual(len(m.memoized_accept), 4)
+
+  def test_memo_hits_reported(self) -> None:
+    # Nothing can be removed, so later passes repeat candidates that
+    # earlier passes already rejected.
+    src = b"a;\nb;\nc;\nd;\n"
+    rec = Recorder(lambda d: d == src)
+    m = rec.make_minimizer(build_tree(tokenize_cpp(src)))
+    self.assertEqual(m.run_minimizer(), ACCEPT)
+    self.check_reports(rec, m)
+
+    memo_results = [r for r, memo in rec.finishes if memo]
+    self.assertGreater(len(memo_results), 0)
+    self.assertEqual(set(memo_results), {REJECT})
+    self.assertEqual(len(rec.starts), len(rec.tested) + len(memo_results))
 
   def test_initial_input_memoized(self) -> None:
     rec = Recorder(lambda d: True)
