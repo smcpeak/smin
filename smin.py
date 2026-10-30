@@ -23,7 +23,8 @@ from typing import Optional
 from acceptance_test_result import AcceptanceTestResult
 from build_tree import build_tree
 from check_accept import CheckAccept
-from minimizer import Minimizer, TestStartReport
+from minimizer import Minimizer
+from start_report import TestStartReport
 from lang_cpp import CPPLanguage
 from language import Language
 
@@ -194,7 +195,7 @@ def main(argv: list[str]) -> int:
     console.write(
       f"Checking {test_command[0]} on initial {fname} ... ")
     try:
-      result = checker.run_acceptance_test(data)
+      result = checker.run_acceptance_test(data, None)
     except OSError as e:
       console.end_line()
       print(f"smin.py: error: cannot run {test_command[0]!r}: "

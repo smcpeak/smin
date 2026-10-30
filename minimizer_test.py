@@ -13,8 +13,8 @@ from build_tree import build_tree
 from minimizer import (
   Minimizer,
   NTReplacementFunc,
-  TestStartReport,
 )
+from start_report import TestStartReport
 from test_util import all_nodes
 from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
@@ -67,7 +67,9 @@ class Recorder:
     self.starts: list[TestStartReport] = []
     self.finishes: list[tuple[AcceptanceTestResult, bool]] = []
 
-  def test(self, data: bytes) -> AcceptanceTestResult:
+  def test(self, data: bytes, report: TestStartReport) -> AcceptanceTestResult:
+    # The test receives the report issued just before it.
+    assert report is self.starts[-1]
     self.tested.append(data)
     if len(self.tested) == self.interrupt_at:
       return INTERRUPTED
@@ -159,67 +161,6 @@ class RenderCandidateTest(unittest.TestCase):
     self.assertEqual(
       self.render(b"f(a, b);", {b"(a, b)": b"()", b"a": b"zzz"}),
       b"f() ;")
-
-
-def make_report(
-  sequence_num: int = 1,
-  last_accepted_tok_count: int = 1234,
-  pass_num: int = 1,
-  total_num_passes: int = 11,
-  granularity: float = 1234,
-  completion_fraction: float = 0,
-  removed_tok_count: int = 1234,
-  initial_tok_count: int = 1234,
-) -> TestStartReport:
-  """Make a report, with defaults for a 1234-token input."""
-  return TestStartReport(
-    sequence_num=sequence_num,
-    last_accepted_tok_count=last_accepted_tok_count,
-    pass_num=pass_num,
-    total_num_passes=total_num_passes,
-    granularity=granularity,
-    completion_fraction=completion_fraction,
-    removed_tok_count=removed_tok_count,
-    initial_tok_count=initial_tok_count,
-  )
-
-
-class TestStartReportTest(unittest.TestCase):
-  def test_first_report(self) -> None:
-    self.assertEqual(
-      make_report().to_console_string(),
-      "N=000001 S=1234 P=(01/11) G=1234.0 F=00% R=1234 ...")
-
-  def test_padding(self) -> None:
-    self.assertEqual(
-      make_report(sequence_num=42, last_accepted_tok_count=567,
-                  pass_num=4, granularity=154.25,
-                  completion_fraction=0.5, removed_tok_count=8)
-        .to_console_string(),
-      "N=000042 S=0567 P=(04/11) G=0154.2 F=50% R=0008 ...")
-
-  def test_wide_fields(self) -> None:
-    # N grows beyond 6 digits rather than being truncated.
-    self.assertEqual(
-      make_report(sequence_num=1234567, pass_num=11,
-                  granularity=1234 / 1024, completion_fraction=0.07,
-                  removed_tok_count=1)
-        .to_console_string(),
-      "N=1234567 S=1234 P=(11/11) G=0001.2 F=07% R=0001 ...")
-
-  def test_completion_fraction_capped(self) -> None:
-    # Truncation keeps a fraction just below 1 at 99%, and the cap
-    # handles a fraction of exactly 1.
-    for f in [0.999, 1.0]:
-      self.assertIn(" F=99% ",
-                    make_report(completion_fraction=f).to_console_string())
-
-  def test_single_token_input(self) -> None:
-    self.assertEqual(
-      make_report(last_accepted_tok_count=1, total_num_passes=1,
-                  granularity=1, removed_tok_count=1,
-                  initial_tok_count=1).to_console_string(),
-      "N=000001 S=1 P=(1/1) G=1.0 F=00% R=1 ...")
 
 
 class MinimizerTest(unittest.TestCase):

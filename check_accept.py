@@ -10,8 +10,10 @@ import signal
 import subprocess
 from dataclasses import dataclass
 from types import FrameType
+from typing import Optional
 
 from acceptance_test_result import AcceptanceTestResult
+from start_report import TestStartReport
 
 
 @dataclass
@@ -37,27 +39,34 @@ class CheckAccept:
   def run_acceptance_test(
     self,
     input_contents: bytes,
+    report: Optional[TestStartReport],
   ) -> AcceptanceTestResult:
     """
     First, write `input_contents` to `input_file_name` (any exception
     due to that will propagate to the caller).
 
-    Then, in the current directory, invoke `acceptance_command`.  It is
-    executed with envvar "INPUT" added to the environment with value
-    `input_file_name`.  Its stdin reads from, and its stdout and stderr
-    write to, the platform equivalent of /dev/null.  The former is to
-    ensure it will not hang if it tries to read user input (the
-    acceptance test should be entirely non-interactive), and the latter
-    is to avoid disrupting the minimizer progress reports it writes to
-    the console.
+    Then, in the current directory, invoke `acceptance_command`.
+
+    It is executed with envvar "INPUT" added to the environment with
+    value `input_file_name`, and envvar "SMIN_PROGRESS" set to the
+    progress report text of `report`.  If `report` is None (as for the
+    initial test, which has no progress report), SMIN_PROGRESS is
+    instead set to "initial".
+
+    Its stdin reads from, and its stdout and stderr write to, the
+    platform equivalent of /dev/null.  The former is to ensure it will
+    not hang if it tries to read user input (the acceptance test should
+    be entirely non-interactive), and the latter is to avoid disrupting
+    the minimizer progress reports it writes to the console.
 
     This function waits for the spawned program to terminate.  It
     returns ACCEPT if the exit code is 0, INTERRUPTED if it was
     interrupted by Ctrl-C, and REJECT otherwise (including other forms
     of death by signal).
 
-    The signature of this function follows that of `AcceptanceTestFunc`
-    in the `minimizer` module.
+    The signature of this function is compatible with that of
+    `AcceptanceTestFunc` in the `minimizer` module so it can be used as
+    such.
 
     Ctrl-C is detected by temporarily replacing the SIGINT handler of
     this process while the program runs, so this must be called from
@@ -89,6 +98,9 @@ class CheckAccept:
 
     env = dict(os.environ)
     env["INPUT"] = self.input_file_name
+    env["SMIN_PROGRESS"] = (
+      "initial" if report is None
+      else report.to_progress_string())
 
     # Number of times SIGINT has been received while the program runs.
     interrupt_count = 0

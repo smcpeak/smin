@@ -20,9 +20,12 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from typing import Optional
+from unittest import mock
 
 from acceptance_test_result import AcceptanceTestResult
 from check_accept import CheckAccept
+from start_report import TestStartReport
 
 
 ACCEPT = AcceptanceTestResult.ACCEPT
@@ -47,11 +50,15 @@ class CheckAcceptTest(unittest.TestCase):
   def tearDown(self) -> None:
     self.temp_dir.cleanup()
 
-  def run_code(self, code: str,
-               contents: bytes = b"") -> AcceptanceTestResult:
+  def run_code(
+    self,
+    code: str,
+    contents: bytes = b"",
+    report: Optional[TestStartReport] = None,
+  ) -> AcceptanceTestResult:
     """Run Python `code` as the acceptance test."""
     checker = CheckAccept(self.input_file_name, python_command(code))
-    return checker.run_acceptance_test(contents)
+    return checker.run_acceptance_test(contents, report)
 
   def test_accept(self) -> None:
     self.assertEqual(self.run_code("pass"), ACCEPT)
@@ -71,6 +78,27 @@ class CheckAcceptTest(unittest.TestCase):
       "sys.exit(0 if ok else 1)\n")
     self.assertEqual(self.run_code(code, b"int x;\n"), ACCEPT)
     self.assertEqual(Path(self.input_file_name).read_bytes(), b"int x;\n")
+
+  def test_progress_envvar_set(self) -> None:
+    report = TestStartReport(
+      sequence_num=56, last_accepted_tok_count=16, pass_num=6,
+      total_num_passes=7, granularity=2.1, completion_fraction=0.06,
+      removed_tok_count=7, initial_tok_count=67)
+    expect = "N=000056 S=16 P=(6/7) G=02.1 F=06% R=07"
+    self.assertEqual(report.to_progress_string(), expect)
+    code = (
+      "import os, sys\n"
+      f"sys.exit(0 if os.environ.get('SMIN_PROGRESS') == {expect!r} "
+      "else 1)\n")
+    self.assertEqual(self.run_code(code, report=report), ACCEPT)
+
+  def test_initial_progress_envvar(self) -> None:
+    code = (
+      "import os, sys;\n"
+      "sys.exit(0 if os.environ.get('SMIN_PROGRESS') == 'initial' "
+      "else 1)\n")
+    with mock.patch.dict(os.environ, {"SMIN_PROGRESS": "stale"}):
+      self.assertEqual(self.run_code(code), ACCEPT)
 
   def test_input_overwritten(self) -> None:
     Path(self.input_file_name).write_bytes(b"old contents, longer\n")
@@ -94,7 +122,7 @@ class CheckAcceptTest(unittest.TestCase):
     checker = CheckAccept(self.input_file_name,
                           [str(self.dir / "no-such-program")])
     with self.assertRaises(FileNotFoundError):
-      checker.run_acceptance_test(b"")
+      checker.run_acceptance_test(b"", None)
 
   def test_sigint_handler_restored(self) -> None:
     before = signal.getsignal(signal.SIGINT)
@@ -203,7 +231,7 @@ def manual_test(program: str) -> None:
     checker = CheckAccept(input_file_name, [program])
     print(f"Running {program!r} with INPUT={input_file_name!r} ...",
           flush=True)
-    result = checker.run_acceptance_test(b"manual test input\n")
+    result = checker.run_acceptance_test(b"manual test input\n", None)
     print(f"Result: {result.name}")
 
 
