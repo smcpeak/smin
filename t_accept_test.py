@@ -251,8 +251,10 @@ class TAcceptTest(unittest.TestCase):
     self.assertEqual(
       ilog.read_bytes(),
       f"\n{dashes} ACCEPT {dashes}\n"
+      f"Progress: None\n"
       f"a\n"
       f"\n{dashes} reject {dashes}\n"
+      f"Progress: None\n"
       f"b".encode())
 
   # ---- Errors ----

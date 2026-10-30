@@ -61,6 +61,7 @@ Options:
     * A newline.
     * A 72-character separator/header line with either " ACCEPT " or
       " reject " centered between lines of dashes.
+    * A line: "Progress: $SMIN_PROGRESS".
     * The contents of the input file.
 
 It is an error (exit code 2) if INPUT is not set in the environment or
@@ -132,8 +133,11 @@ def main(argv: list[str]) -> int:
 
   if args.input_log is not None:
     label = " reject " if failure is not None else " ACCEPT "
+    progress = os.environ.get("SMIN_PROGRESS", "None")
     with open(args.input_log, "ab") as f:
-      f.write(b"\n" + label.center(72, "-").encode() + b"\n" + data)
+      f.write(b"\n" + label.center(72, "-").encode() + b"\n")
+      f.write((f"Progress: {progress}\n").encode())
+      f.write(data)
 
   return 1 if failure is not None else 0
 
@@ -174,7 +178,8 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
     help="Append a line describing this invocation to LOGFILE.")
   parser.add_argument(
     "--input-log", metavar="ILOGFILE",
-    help="Append a verdict header line and the input to ILOGFILE.")
+    help="Append a verdict header line, minimizer progress status, and "
+         "the input itself to ILOGFILE.")
   return parser.parse_args(argv)
 
 
