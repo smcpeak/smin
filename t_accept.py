@@ -200,8 +200,11 @@ def _first_failure(
 
   if args.balanced_delim_counts:
     for opener, closer in (b"()", b"[]", b"{}"):
-      if data.count(opener) != data.count(closer):
-        return f"unbalanced {chr(opener)}{chr(closer)} counts"
+      n_opener = data.count(opener)
+      n_closer = data.count(closer)
+      if n_opener != n_closer:
+        return (f"unbalanced \"{chr(opener)}{chr(closer)}\" counts" +
+                f" ({n_opener} vs. {n_closer})")
 
   for before, after in args.before_after:
     if not _has_before_after(lines, os.fsencode(before),

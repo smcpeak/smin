@@ -109,7 +109,7 @@ class TAcceptTest(unittest.TestCase):
     self.check(argv, b"f(a[1] { }\n", 1)
     self.check(argv, b"f(a[1]) { }]\n", 1)
     self.check(argv, b"f(a[1]) {\n", 1)
-    self.assertEqual(self.out, "reject: unbalanced {} counts\n")
+    self.assertEqual(self.out, "reject: unbalanced \"{}\" counts (1 vs. 0)\n")
 
   def test_before_after(self) -> None:
     argv = ["--before-after", "decl", "use"]
