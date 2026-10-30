@@ -95,9 +95,11 @@ out/unittest.ok: out/mypy.ok out/ruff.ok $(ALL_PYTHON_FILES)
 
 
 # Minimize hello.c using just delimiter balancing.
-out/m/hello-delim.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
+out/m/hello-delim.c.ok: out/unittest.ok
+out/m/hello-delim.c.ok: test/hello.c $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	cp test/hello.c out/m/hello-delim.c
+	$(RM) out/m/hello-delim.c.ilog
 	$(PYTHON) ./smin.py ./t_accept.py \
 	  --balanced-delim-counts \
 	  --before-after helper helper \
@@ -114,6 +116,7 @@ check: out/m/hello-delim.c.ok
 out/m/hello-clang.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	cp test/hello.c out/m/hello-clang.c
+	$(RM) out/m/hello-clang.c.ilog
 	$(PYTHON) ./smin.py ./t_accept.py \
 	  --clang \
 	  --before-after helper helper \
