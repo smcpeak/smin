@@ -291,6 +291,10 @@ def main(argv: list[str]) -> int:
   if interrupted:
     console.line("Stopping early due to Ctrl-C.")
 
+  # Emit a blank line after the final pass for uniformity with the other
+  # passes.
+  console.line("")
+
   console.line(
     f"Reduced file {fname} from {orig_tok_count} tokens "
     f"({len(data)} bytes) to {final_tok_count} tokens "
