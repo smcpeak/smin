@@ -203,29 +203,43 @@ def main(argv: list[str]) -> int:
   minimizer: Optional[Minimizer] = None
 
   try:
-    best_was_overwritten: bool = os.path.exists(checker.best_file_name)
-    console.write(
-      f"Checking {test_command[0]} on initial {fname} ... ")
-    try:
-      result = checker.run_acceptance_test(data, None)
-    except OSError as e:
-      console.end_line()
-      print(f"smin.py: error: cannot run {test_command[0]!r}: "
-            f"{e.strerror}", file=sys.stderr)
-      return 2
+    best_existed: bool = os.path.exists(checker.best_file_name)
 
-    if result == AcceptanceTestResult.INTERRUPTED:
-      console.write("INTERRUPTED\n")
-      raise KeyboardInterrupt()
-    if result == AcceptanceTestResult.REJECT:
-      console.write("REJECTED\n")
-      console.line("Stopping because the initial input was rejected.")
-      return 1
-    console.write("accepted\n")
+    # Remove a left-over .best file since it's unrelated to the current
+    # minimization attempt.
+    if best_existed:
+      os.remove(checker.best_file_name)
+
+    initial_test_succeeded: bool = False
+    try:
+      console.write(
+        f"Checking {test_command[0]} on initial {fname} ... ")
+      try:
+        result = checker.run_acceptance_test(data, None)
+      except OSError as e:
+        console.end_line()
+        print(f"smin.py: error: cannot run {test_command[0]!r}: "
+              f"{e.strerror}", file=sys.stderr)
+        return 2
+
+      if result == AcceptanceTestResult.INTERRUPTED:
+        console.write("INTERRUPTED\n")
+        raise KeyboardInterrupt()
+      if result == AcceptanceTestResult.REJECT:
+        console.write("REJECTED\n")
+        console.line("Stopping because the initial input was rejected.")
+        return 1
+      console.write("accepted\n")
+      initial_test_succeeded = True
+
+    finally:
+      if best_existed and not initial_test_succeeded:
+        # Acknowledge having removing the .best file.
+        console.line(f"Note: I removed {checker.best_file_name}.")
 
     console.line(
       f"Will continuously update {checker.best_file_name}" +
-      (" (which was overwritten)." if best_was_overwritten else "."))
+      (" (which was overwritten)." if best_existed else "."))
 
     backup = fname + ".bak"
     bak_was_overwritten: bool = os.path.exists(backup)

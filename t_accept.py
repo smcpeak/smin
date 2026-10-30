@@ -62,18 +62,24 @@ Options:
     * A 72-character separator/header line with either " ACCEPT " or
       " reject " centered between lines of dashes.
     * A line: "Progress: $SMIN_PROGRESS".
-    * The contents of the input file.
+    * A unified diff of $INPUT_BEST versus $INPUT showing the change
+      under consideration.
+    * If the verdict is acceptance, a separator line with " NEW BEST "
+      centered between lines of equals-signs, then the contents of
+      the input file.
 
 It is an error (exit code 2) if INPUT is not set in the environment or
 the named file cannot be read.
 """
 
 import argparse
+import difflib
 import os
 import re
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from typing import Optional
 
 
@@ -137,9 +143,67 @@ def main(argv: list[str]) -> int:
     with open(args.input_log, "ab") as f:
       f.write(b"\n" + label.center(72, "-").encode() + b"\n")
       f.write((f"Progress: {progress}\n").encode())
-      f.write(data)
+      f.write(_diff_from_best(data))
+      if failure is None:
+        f.write(" NEW BEST ".center(72, "=").encode() + b"\n")
+        f.write(data)
 
   return 1 if failure is not None else 0
+
+
+def _diff_from_best(data: bytes) -> bytes:
+  """
+  Return the diff, for --input-log, from the file named by $INPUT_BEST
+  to `data`, or a note saying that file is not available.
+  """
+  best_name = os.environ.get("INPUT_BEST")
+  if best_name is None:
+    return b"(INPUT_BEST is not set, so there is no diff.)\n"
+  try:
+    with open(best_name, "rb") as f:
+      best = f.read()
+  except OSError:
+    return b"(Cannot read INPUT_BEST, so there is no diff.)\n"
+  return b"".join(_diff_lines(_split_lines(best), _split_lines(data)))
+
+
+def _split_lines(data: bytes) -> list[bytes]:
+  """
+  Split `data` into lines, each including its newline, except that the
+  last may lack one.
+  """
+  return re.findall(rb"[^\n]*\n|[^\n]+$", data)
+
+
+def _diff_lines(old: list[bytes], new: list[bytes]) -> Iterator[bytes]:
+  """
+  Yield the lines of a unified diff from `old` to `new`, with three
+  lines of context, but without the file header or the line numbers of
+  each hunk.  Hunks after the first are preceded by a "@@" line.
+  """
+  matcher = difflib.SequenceMatcher(None, old, new, autojunk=False)
+  for hunk_num, group in enumerate(matcher.get_grouped_opcodes(3)):
+    if hunk_num > 0:
+      yield b"@@\n"
+    for tag, i1, i2, j1, j2 in group:
+      if tag == "equal":
+        for line in old[i1:i2]:
+          yield _diff_line(b" ", line)
+        continue
+      for line in old[i1:i2]:
+        yield _diff_line(b"-", line)
+      for line in new[j1:j2]:
+        yield _diff_line(b"+", line)
+
+
+def _diff_line(prefix: bytes, line: bytes) -> bytes:
+  """
+  Return `line` with `prefix`, marking a missing final newline the way
+  the `diff` utility does.
+  """
+  if line.endswith(b"\n"):
+    return prefix + line
+  return prefix + line + b"\n\\ No newline at end of file\n"
 
 
 def _parse_command_line(argv: list[str]) -> argparse.Namespace:
@@ -178,8 +242,9 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
     help="Append a line describing this invocation to LOGFILE.")
   parser.add_argument(
     "--input-log", metavar="ILOGFILE",
-    help="Append a verdict header line, minimizer progress status, and "
-         "the input itself to ILOGFILE.")
+    help="Append a verdict header line, minimizer progress status, a "
+         "diff describing the change in the candidate, and upon "
+         "acceptance, the new best input; all to ILOGFILE.")
   return parser.parse_args(argv)
 
 

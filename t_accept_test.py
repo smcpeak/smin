@@ -240,22 +240,94 @@ class TAcceptTest(unittest.TestCase):
       log.read_text(),
       f"{self.input_path} {stamp} accept {captured}\n")
 
-  def test_input_log(self) -> None:
+  # Separator lines written by --input-log.
+  ACCEPT_LINE = "-" * 32 + " ACCEPT " + "-" * 32 + "\n"
+  REJECT_LINE = "-" * 32 + " reject " + "-" * 32 + "\n"
+  NEW_BEST_LINE = "=" * 31 + " NEW BEST " + "=" * 31 + "\n"
+
+  def run_input_log(self, best: bytes | None, contents: bytes,
+                    expect: int) -> str:
+    """
+    Run with --input-log, INPUT_BEST naming a file containing `best`
+    (or not set, if None), and SMIN_PROGRESS set.  The input is
+    accepted if it contains "keep".  Return what was logged.
+    """
+    ilog = self.dir / "ilog.txt"
+    ilog.unlink(missing_ok=True)
+    env = {"SMIN_PROGRESS": "N=000001"}
+    if best is not None:
+      best_path = self.dir / "input.cc.best"
+      best_path.write_bytes(best)
+      env["INPUT_BEST"] = str(best_path)
+    code = self.run_main(
+      ["--input-log", str(ilog), "--has-string", "keep"], contents, env)
+    self.assertEqual(code, expect)
+    return ilog.read_text()
+
+  def test_input_log_reject(self) -> None:
+    # The diff has three lines of context, and no header.
+    self.assertEqual(
+      self.run_input_log(b"1\n2\n3\n4\nkeep\n6\n7\n8\n9\n",
+                         b"1\n2\n3\n4\n6\n7\n8\n9\n", 1),
+      "\n" + self.REJECT_LINE +
+      "Progress: N=000001\n"
+      " 2\n 3\n 4\n-keep\n 6\n 7\n 8\n")
+
+  def test_input_log_accept(self) -> None:
+    # Hunks are separated by "@@", and the accepted input follows.
+    best = b"keep\n" + b"".join(b"%d\n" % i for i in range(1, 11))
+    contents = b"keep\n2\n3\n4\n5\n6\n7\n8\n9\nten\n"
+    self.assertEqual(
+      self.run_input_log(best, contents, 0),
+      "\n" + self.ACCEPT_LINE +
+      "Progress: N=000001\n"
+      " keep\n-1\n 2\n 3\n 4\n"
+      "@@\n"
+      " 7\n 8\n 9\n-10\n+ten\n" +
+      self.NEW_BEST_LINE +
+      contents.decode())
+
+  def test_input_log_no_final_newline(self) -> None:
+    self.assertEqual(
+      self.run_input_log(b"keep\nx\n", b"keep\nx", 0),
+      "\n" + self.ACCEPT_LINE +
+      "Progress: N=000001\n"
+      " keep\n-x\n+x\n\\ No newline at end of file\n" +
+      self.NEW_BEST_LINE +
+      "keep\nx")
+
+  def test_input_log_no_change(self) -> None:
+    self.assertEqual(
+      self.run_input_log(b"keep\n", b"keep\n", 0),
+      "\n" + self.ACCEPT_LINE +
+      "Progress: N=000001\n" +
+      self.NEW_BEST_LINE +
+      "keep\n")
+
+  def test_input_log_without_best(self) -> None:
+    self.assertEqual(
+      self.run_input_log(None, b"other\n", 1),
+      "\n" + self.REJECT_LINE +
+      "Progress: N=000001\n"
+      "(INPUT_BEST is not set, so there is no diff.)\n")
+
+  def test_input_log_best_unreadable(self) -> None:
+    ilog = self.dir / "ilog.txt"
+    env = {"INPUT_BEST": str(self.dir / "missing.best")}
+    self.run_main(["--input-log", str(ilog)], b"x\n", env)
+    self.assertIn("(Cannot read INPUT_BEST, so there is no diff.)\n",
+                  ilog.read_text())
+
+  def test_input_log_appends(self) -> None:
     ilog = self.dir / "ilog.txt"
     argv = ["--input-log", str(ilog), "--has-string", "a"]
     self.check(argv, b"a\n", 0)
-    # The input need not end with a newline.
-    self.check(argv, b"b", 1)
-
-    dashes = "-" * 32
-    self.assertEqual(
-      ilog.read_bytes(),
-      f"\n{dashes} ACCEPT {dashes}\n"
-      f"Progress: None\n"
-      f"a\n"
-      f"\n{dashes} reject {dashes}\n"
-      f"Progress: None\n"
-      f"b".encode())
+    self.check(argv, b"b\n", 1)
+    text = ilog.read_text()
+    self.assertEqual(text.count(self.ACCEPT_LINE), 1)
+    self.assertEqual(text.count(self.REJECT_LINE), 1)
+    self.assertLess(text.index(self.ACCEPT_LINE),
+                    text.index(self.REJECT_LINE))
 
   # ---- Errors ----
 
