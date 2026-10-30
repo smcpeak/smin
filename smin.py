@@ -81,22 +81,26 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
 
   parser = argparse.ArgumentParser(
     prog="smin.py",
-    usage="%(prog)s [options] test_program [test_prog_args...] -- input_file",
+    usage="%(prog)s [options] test_program [args...] -- input_file",
     description="Minimize input_file, preserving the property that "
                 "test_program accepts it.",
-    epilog="The test program is run with the INPUT environment variable "
-           "set to input_file, which holds the candidate input.  An exit "
-           "status of 0 means the candidate is accepted.  The original "
-           "input is saved in input_file.bak.")
+    epilog="""
+      For convenience, the test program is run with the INPUT
+      environment variable set to input_file.  An exit status of 0 means
+      the candidate is accepted.
+    """)
 
   # The test command, separator, and input file are all collected into
   # one list, and split below.  (With separate positional arguments,
   # argparse would discard a "--" immediately after `test_program`.)
   parser.add_argument(
     "cmd_and_input", nargs=argparse.REMAINDER,
-    metavar="test_program [test_prog_args...] -- input_file",
-    help="Program (and its arguments) to run to test a candidate input, "
-         "then the file to minimize.")
+    metavar="test_program [args...] -- input_file",
+    help="""
+      Program (and its arguments) to run to test a candidate input,
+      then the input file to minimize (which is copied to a .bak file
+      beforehand).
+    """)
 
   args = parser.parse_args(argv)
   cmd_and_input: list[str] = args.cmd_and_input
