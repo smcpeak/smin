@@ -124,10 +124,10 @@ class MainTest(unittest.TestCase):
     status, out, err = self.run_main(self.KEEP_CODE)
     self.assertEqual(status, 0)
     self.assertEqual(err, "")
-    self.assertEqual(self.input_path.read_bytes(), b"\nkeep")
+    self.assertEqual(self.input_path.read_bytes(), b"\nkeep\n")
     self.assertEqual(self.backup_path.read_bytes(),
                      b"int a;\nint keep;\nint b;\n")
-    self.assertEqual(self.best_path.read_bytes(), b"\nkeep")
+    self.assertEqual(self.best_path.read_bytes(), b"\nkeep\n")
     self.assertFalse(Path(f"{self.best_path}.tmp").exists())
 
     lines = out.splitlines()
@@ -142,7 +142,7 @@ class MainTest(unittest.TestCase):
     self.assertTrue(lines[4].startswith("N=000001 S=10 "))
     self.assertEqual(lines[-2],
       f"Reduced file {fname} from 10 tokens (24 bytes) "
-      f"to 1 tokens (5 bytes).")
+      f"to 1 tokens (6 bytes).")
     self.assertRegex(lines[-1], r"^Elapsed time \(D:HH:MM:SS\): 0:00:00:\d\d$")
 
     # Every test line has a result (aside from blank lines that separate
@@ -168,7 +168,7 @@ class MainTest(unittest.TestCase):
     self.assertEqual(status, 0)
     self.assertIn(f"Will continuously update {self.best_path} "
                   f"(which was overwritten).\n", out)
-    self.assertEqual(self.best_path.read_bytes(), b"keep")
+    self.assertEqual(self.best_path.read_bytes(), b"keep\n")
 
   def test_initial_input_rejected(self) -> None:
     self.input_path.write_bytes(b"int a;\n")
@@ -219,12 +219,13 @@ class MainTest(unittest.TestCase):
   @unittest.skipUnless(POSIX, "uses POSIX signals")
   def test_ctrl_c_during_minimization(self) -> None:
     self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
-    # Test N=3 (invocation 4) removes "int b;" and is accepted.  Test
-    # N=4 is interrupted.
-    status, out, _ = self.run_main(self.ctrl_c_code(5))
+    # Test N=2, removing the final newline, is a memo hit, since the
+    # newline is restored.  Test N=3 (invocation 3) removes "int b;" and
+    # is accepted.  Test N=4 (invocation 4) is interrupted.
+    status, out, _ = self.run_main(self.ctrl_c_code(4))
     self.assertEqual(status, EXIT_INTERRUPTED)
-    self.assertEqual(self.input_path.read_bytes(), b"int a;\nint keep;")
-    self.assertEqual(self.best_path.read_bytes(), b"int a;\nint keep;")
+    self.assertEqual(self.input_path.read_bytes(), b"int a;\nint keep;\n")
+    self.assertEqual(self.best_path.read_bytes(), b"int a;\nint keep;\n")
 
     lines = out.splitlines()
     self.assertRegex(lines[-5], r"^N=000003 .* ACCEPTED$")
@@ -232,7 +233,7 @@ class MainTest(unittest.TestCase):
     self.assertEqual(lines[-3], "Stopping early due to Ctrl-C.")
     self.assertEqual(lines[-2],
       f"Reduced file {self.input_path} from 10 tokens (24 bytes) "
-      f"to 6 tokens (16 bytes).")
+      f"to 6 tokens (17 bytes).")
 
   @unittest.skipUnless(POSIX, "uses POSIX signals")
   def test_ctrl_c_during_initial_test(self) -> None:

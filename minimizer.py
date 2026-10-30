@@ -76,6 +76,10 @@ class Minimizer:
   # by their index in this list.
   tokens: list[SMToken]
 
+  # True if the original input ends with a newline, in which case every
+  # rendered candidate does too.
+  ends_with_newline: bool
+
   # Map from the id() of each node to the half-open range [start, end)
   # of indices in `tokens` of the tokens it contains.
   node_span: dict[int, tuple[int, int]]
@@ -146,6 +150,8 @@ class Minimizer:
     self.node_span = {}
     end = self._compute_spans(tree_root, 0)
     assert end == len(self.tokens)
+    self.ends_with_newline = (
+      len(self.tokens) > 0 and self.tokens[-1].text.endswith(b"\n"))
 
     self.cur_replacement = {}
     self.token_live = [True] * len(self.tokens)
@@ -214,13 +220,18 @@ class Minimizer:
     """
     Render the input with the current replacements, plus those in
     `extra`, which maps a node's id() to its candidate replacement.
+    The result ends with a newline if the original input did.
     """
 
     # Candidate token map: for each token, None if it is live, and
     # otherwise its replacement text.
     ctm: list[bytes | None] = [None] * len(self.tokens)
     self._fill_ctm(self.tree_root, extra, ctm)
-    return _render_ctm([t.text for t in self.tokens], ctm)
+    text = _render_ctm([t.text for t in self.tokens], ctm)
+
+    if self.ends_with_newline and not text.endswith(b"\n"):
+      text += b"\n"
+    return text
 
 
   def node_size(self, node: TTNode) -> int:

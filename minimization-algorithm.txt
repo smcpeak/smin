@@ -490,6 +490,11 @@ that prepends a space to B is not needed since nothing (that can
 potentially coalesce, given the assumption of non-coalescing
 replacements) is emitted before it.
 
+At the very end, if the initial input file ended with a newline, but the
+current candidate does not, add one.  (It's somewhat easy for the
+algorithm to drop final newlines, but doing so causes needless annoyance
+when debugging smin.)
+
 Implementation note: The algorithm description here, involving building
 a CTM and then operating on the flat token sequence, is primarily
 intended for expositional clarity.  The implementation is free to

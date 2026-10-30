@@ -124,9 +124,21 @@ class RenderCandidateTest(unittest.TestCase):
     self.assertEqual(self.render(b"a+b", {b"a": b""}), b"+b")
 
   def test_end_of_file(self) -> None:
+    # The final newline is restored, since the original input had one.
     self.assertEqual(
       self.render(b"a;\nb;\n", {b"\nb;": b"", b"\n": b""}),
-      b"a;")
+      b"a;\n")
+
+  def test_end_of_file_without_newline(self) -> None:
+    # No newline is added if the original input lacked one.
+    self.assertEqual(self.render(b"a;\nb;", {b"\nb;": b""}), b"a;")
+
+  def test_final_newline_not_doubled(self) -> None:
+    self.assertEqual(self.render(b"a;\nb;\n", {b"\nb;": b""}), b"a;\n")
+
+  def test_final_newline_when_all_removed(self) -> None:
+    self.assertEqual(self.render(b"a;\n", {b"a;": b"", b"\n": b""}),
+                     b"\n")
 
   def test_indentation_of_b_not_doubled(self) -> None:
     # B's own horizontal whitespace is dropped in favor of the
@@ -146,7 +158,7 @@ class RenderCandidateTest(unittest.TestCase):
     self.assertEqual(
       self.render(b"#define A 1\nint x;\n",
                   {b"\nint x;": b";", b"\n": b""}),
-      b"#define A 1\n;")
+      b"#define A 1\n;\n")
 
   def test_non_trivial_ignores_newline_inside_token(self) -> None:
     # The comment's leading whitespace has no newline, so neither does
@@ -217,10 +229,10 @@ class MinimizerTest(unittest.TestCase):
     m = rec.make_minimizer(build_tree(tokenize_cpp(
       b"int a;\nint keep;\nint b;\n")))
     self.assertEqual(m.run_minimizer(), ACCEPT)
-    self.assertEqual(m.get_minimized_test_input(), b"\nkeep")
+    self.assertEqual(m.get_minimized_test_input(), b"\nkeep\n")
     self.assertEqual(m.total_num_passes, 4)
-    self.assertEqual(len(rec.tested), 8)
-    self.assertEqual(rec.tested[0], b"")
+    self.assertEqual(len(rec.tested), 7)
+    self.assertEqual(rec.tested[0], b"\n")
     self.check_reports(rec, m)
 
   def test_non_trivial_replacement(self) -> None:
@@ -235,7 +247,7 @@ class MinimizerTest(unittest.TestCase):
     m = rec.make_minimizer(
       build_tree(tokenize_cpp(b"void f() { x; }\nint keep;\n")), nt)
     self.assertEqual(m.run_minimizer(), ACCEPT)
-    self.assertEqual(m.get_minimized_test_input(), b" f();\nkeep")
+    self.assertEqual(m.get_minimized_test_input(), b" f();\nkeep\n")
     self.check_reports(rec, m)
 
   def test_interrupted(self) -> None:
@@ -257,8 +269,10 @@ class MinimizerTest(unittest.TestCase):
 
   def test_memo_hits_reported(self) -> None:
     # Nothing can be removed, so later passes repeat candidates that
-    # earlier passes already rejected.
-    src = b"a;\nb;\nc;\nd;\n"
+    # earlier passes already rejected.  (There is no final newline, since
+    # removing that would be accepted, via a memo hit, because the
+    # rendering restores it.)
+    src = b"a;\nb;\nc;\nd;"
     rec = Recorder(lambda d: d == src)
     m = rec.make_minimizer(build_tree(tokenize_cpp(src)))
     self.assertEqual(m.run_minimizer(), ACCEPT)
