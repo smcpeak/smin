@@ -43,6 +43,7 @@ PYTHON_SRCS += tokenizer.py
 
 PYTHON_TESTS :=
 PYTHON_TESTS += build_tree_test.py
+PYTHON_TESTS += check_accept_test.py
 PYTHON_TESTS += group_delimiters_test.py
 PYTHON_TESTS += group_indentation_test.py
 PYTHON_TESTS += group_lines_test.py
