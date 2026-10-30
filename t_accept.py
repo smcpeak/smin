@@ -79,7 +79,7 @@ def main(argv: list[str]) -> int:
   start_ns: int = time.time_ns()
 
   try:
-    args = _parse_command_line(argv)
+    args: argparse.Namespace = _parse_command_line(argv)
   except SystemExit as e:
     # argparse exits on error (status 2) and for --help (status 0).
     return e.code if isinstance(e.code, int) else 2
@@ -87,7 +87,7 @@ def main(argv: list[str]) -> int:
   if args.sleep is not None:
     time.sleep(args.sleep)
 
-  input_name = os.environ.get("INPUT")
+  input_name: Optional[str] = os.environ.get("INPUT")
   if input_name is None:
     return _error("the INPUT environment variable is not set")
   try:
@@ -96,7 +96,7 @@ def main(argv: list[str]) -> int:
   except OSError as e:
     return _error(f"cannot read {input_name!r}: {e.strerror}")
 
-  timestamp = _format_timestamp(start_ns)
+  timestamp: str = _format_timestamp(start_ns)
 
   captured: Optional[str] = None
   if args.capture is not None:
