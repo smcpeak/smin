@@ -48,10 +48,27 @@ class ParseCommandLineTest(unittest.TestCase):
     self.assertEqual(args.test_command, ["./test.sh", "-v", "x"])
     self.assertEqual(args.input_file, "in.cc")
 
-  def test_program_args_contain_separator(self) -> None:
-    args = parse_command_line(["grep", "-q", "--", "-x", "--", "in.cc"])
-    self.assertEqual(args.test_command, ["grep", "-q", "--", "-x"])
+  def test_program_option_like_args(self) -> None:
+    args = parse_command_line(["./test.sh", "-h", "--x", "--", "in.cc"])
+    self.assertEqual(args.test_command, ["./test.sh", "-h", "--x"])
     self.assertEqual(args.input_file, "in.cc")
+
+  def test_help(self) -> None:
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+      with self.assertRaises(SystemExit) as cm:
+        parse_command_line(["--help"])
+    self.assertEqual(cm.exception.code, 0)
+    self.assertIn("usage: smin.py", out.getvalue())
+
+  def test_two_separators(self) -> None:
+    self.check_error(["grep", "-q", "--", "x", "--", "in.cc"])
+
+  def test_leading_separator(self) -> None:
+    self.check_error(["--", "./test.sh", "--", "in.cc"])
+
+  def test_separator_not_second_to_last(self) -> None:
+    self.check_error(["./test.sh", "--", "in.cc", "extra"])
 
   def test_missing_separator(self) -> None:
     self.check_error(["./test.sh", "in.cc"])

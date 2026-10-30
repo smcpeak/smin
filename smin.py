@@ -88,23 +88,30 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
            "set to input_file, which holds the candidate input.  An exit "
            "status of 0 means the candidate is accepted.  The original "
            "input is saved in input_file.bak.")
-  parser.add_argument(
-    "test_program",
-    help="Program to run to test a candidate input.")
-  parser.add_argument(
-    "test_prog_args", nargs=argparse.REMAINDER, metavar="test_prog_args",
-    help="Arguments to pass to test_program.")
 
-  # The "--" and input file are separated here, rather than by argparse,
-  # since argparse has no way to express a mandatory "--" followed by a
-  # positional argument.  Only the last "--" is the separator, so the
-  # test program arguments can contain "--".
-  if len(argv) < 2 or argv[-2] != "--":
-    parser.error('the command line must end with "-- input_file"')
+  # The test command, separator, and input file are all collected into
+  # one list, and split below.  (With separate positional arguments,
+  # argparse would discard a "--" immediately after `test_program`.)
+  parser.add_argument(
+    "cmd_and_input", nargs=argparse.REMAINDER,
+    metavar="test_program [test_prog_args...] -- input_file",
+    help="Program (and its arguments) to run to test a candidate input, "
+         "then the file to minimize.")
 
-  args = parser.parse_args(argv[:-2])
-  args.test_command = [args.test_program] + args.test_prog_args
-  args.input_file = argv[-1]
+  args = parser.parse_args(argv)
+  cmd_and_input: list[str] = args.cmd_and_input
+
+  if cmd_and_input.count("--") != 1:
+    parser.error('there must be exactly one "--" argument')
+  sep = cmd_and_input.index("--")
+  if sep != len(cmd_and_input) - 2:
+    parser.error('"--" must be followed by exactly one argument, '
+                 'input_file')
+  if sep == 0:
+    parser.error('test_program is missing before "--"')
+
+  args.test_command = cmd_and_input[:sep]
+  args.input_file = cmd_and_input[-1]
   return args
 
 
