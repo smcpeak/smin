@@ -39,15 +39,17 @@ class CheckAccept:
     input_contents: bytes,
   ) -> AcceptanceTestResult:
     """
-    First, write `input_contents` to `input_file_name`.
+    First, write `input_contents` to `input_file_name` (any exception
+    due to that will propagate to the caller).
 
     Then, in the current directory, invoke `acceptance_command`.  It is
     executed with envvar "INPUT" added to the environment with value
     `input_file_name`.  Its stdin reads from, and its stdout and stderr
-    write to, the platform equivalent of /dev/null.  (Using the null
-    device rather than literally closing stdin achieves the same goal,
-    that the program cannot hang waiting for user input, while avoiding
-    surprises in a program that opens a file and gets descriptor 0.)
+    write to, the platform equivalent of /dev/null.  The former is to
+    ensure it will not hang if it tries to read user input (the
+    acceptance test should be entirely non-interactive), and the latter
+    is to avoid disrupting the minimizer progress reports it writes to
+    the console.
 
     This function waits for the spawned program to terminate.  It
     returns ACCEPT if the exit code is 0, INTERRUPTED if it was
@@ -67,12 +69,20 @@ class CheckAccept:
     SIGINT.)  If the user presses Ctrl-C a second time while waiting,
     the program is killed, in case it ignores SIGINT.
 
-    The program also counts as INTERRUPTED if it dies from SIGINT, even
-    if this process did not receive one.
+    The current SIGINT handler must have been installed by Python
+    (otherwise we would not be able to restore it).
+
+    The acceptance test program invocation is counted as INTERRUPTED if
+    it dies from SIGINT, even if this process did not receive one.
 
     If the program cannot be started (for example, because it does not
     exist), the exception from `subprocess.Popen` propagates.
     """
+
+    # Get the previous SIGINT handler, and insist it is something we can
+    # restore.
+    old_handler = signal.getsignal(signal.SIGINT)
+    assert old_handler != None, "SIGINT handler was not installed by Python"
 
     with open(self.input_file_name, "wb") as f:
       f.write(input_contents)
@@ -95,7 +105,8 @@ class CheckAccept:
     # no window where Ctrl-C would raise KeyboardInterrupt and orphan
     # it.  The program does not inherit the handler, since `exec`
     # resets caught signals to their default disposition.
-    old_handler = signal.signal(signal.SIGINT, on_sigint)
+    old_handler2 = signal.signal(signal.SIGINT, on_sigint)
+    assert old_handler2 == old_handler      # Just to be sure.
     try:
       proc = subprocess.Popen(
         self.acceptance_command,
@@ -106,11 +117,7 @@ class CheckAccept:
       )
       returncode = proc.wait()
     finally:
-      # `getsignal` returns None if the old handler was not installed by
-      # Python, in which case the default is the best approximation.
-      signal.signal(
-        signal.SIGINT,
-        signal.SIG_DFL if old_handler is None else old_handler)
+      signal.signal(signal.SIGINT, old_handler)
 
     if interrupt_count > 0 or returncode == -signal.SIGINT:
       return AcceptanceTestResult.INTERRUPTED
