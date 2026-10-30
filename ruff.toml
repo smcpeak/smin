@@ -23,12 +23,12 @@ lint.ignore = [
   "SIM201",
   "SIM202",
 
-  # Nested `if` is sometimes clearer, especiallly given the atrocious
+  # Nested `if` is sometimes clearer, especially given the atrocious
   # Python indentation rules.
   "SIM102",
 
   # This rule seems stupid.  How would an f-string solve the indentation
-  # problem that string join addresses?  From anther example I see they
+  # problem that string join addresses?  From another example I see they
   # have a much uglier alternative in mind.  No thanks.
   "FLY002",
 
@@ -38,7 +38,7 @@ lint.ignore = [
   # Complaining about nested `with` is not helpful IMO.
   "SIM117",
 
-  # Let me have my redudant "pass" statements!  Otherwise stuff looks
+  # Let me have my redundant "pass" statements!  Otherwise stuff looks
   # unfinished.
   "PIE790",
 
