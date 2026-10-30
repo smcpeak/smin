@@ -41,8 +41,12 @@ class _Console:
   # been printed yet).
   at_line_start: bool
 
+  # Previously printed start report, if any.
+  prev_ts_report: Optional[TestStartReport]
+
   def __init__(self) -> None:
     self.at_line_start = True
+    self.prev_ts_report = None
 
   def write(self, s: str) -> None:
     """Print `s` and flush, so partial lines are visible immediately."""
@@ -62,7 +66,14 @@ class _Console:
     self.write(s + "\n")
 
   def report_test_starting(self, report: TestStartReport) -> None:
+    # If we are beginning a new pass, print a blank line.  Otherwise it
+    # is unnecessarily difficult to spot the transition by eye.
+    if (self.prev_ts_report is not None and
+        self.prev_ts_report.pass_num < report.pass_num):
+      self.write("\n")
+
     self.write(report.to_console_string())
+    self.prev_ts_report = report
 
   def report_test_finished(
     self,

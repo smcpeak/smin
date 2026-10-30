@@ -141,9 +141,12 @@ class MainTest(unittest.TestCase):
       f"to 1 tokens (5 bytes).")
     self.assertRegex(lines[-1], r"^Elapsed time \(D:HH:MM:SS\): 0:00:00:\d\d$")
 
-    # Every test line has a result.
+    # Every test line has a result (aside from blank lines that separate
+    # passes).
     for line in lines[3:-2]:
-      self.assertRegex(line, r"^N=\d{6} .* \.\.\. (rejected|ACCEPTED)( \(memo\))?$")
+      if line != "":
+        self.assertRegex(line,
+          r"^N=\d{6} .* \.\.\. (rejected|ACCEPTED)( \(memo\))?$")
 
   def test_backup_overwritten(self) -> None:
     self.input_path.write_bytes(b"keep\n")
