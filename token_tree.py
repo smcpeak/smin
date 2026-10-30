@@ -76,6 +76,15 @@ class TTNode:
     """Return the concatenated text of all tokens under this node."""
     return b"".join(t.text for t in self.tokens())
 
+  def depth(self) -> int:
+    """
+    Return the number of edges on the longest path from this node down
+    to a leaf.
+    """
+    if not self.children:
+      return 0
+    return 1 + max(child.depth() for child in self.children)
+
   def self_check(self) -> None:
     """Assert data structure invariants."""
     if self.token is not None:

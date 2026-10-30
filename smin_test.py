@@ -14,15 +14,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from build_tree import build_tree
 from smin import (
   EXIT_INTERRUPTED,
   format_elapsed_time,
   main,
   parse_command_line,
-  tree_depth,
 )
-from tokenize_cpp import tokenize_cpp
 
 
 # Signals are only simulated on POSIX systems.
@@ -82,12 +79,6 @@ class ParseCommandLineTest(unittest.TestCase):
 
 
 class HelperTest(unittest.TestCase):
-  def test_tree_depth(self) -> None:
-    self.assertEqual(tree_depth(build_tree(tokenize_cpp(b""))), 0)
-    self.assertEqual(tree_depth(build_tree(tokenize_cpp(b"a b"))), 1)
-    # Root -> delimiter group -> delimiter group -> token.
-    self.assertEqual(tree_depth(build_tree(tokenize_cpp(b"f(g(x))"))), 3)
-
   def test_format_elapsed_time(self) -> None:
     self.assertEqual(format_elapsed_time(0), "0:00:00:00")
     self.assertEqual(format_elapsed_time(59.9), "0:00:00:59")

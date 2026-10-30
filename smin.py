@@ -26,7 +26,6 @@ from check_accept import CheckAccept
 from minimizer import Minimizer, TestStartReport
 from lang_cpp import CPPLanguage
 from language import Language
-from token_tree import TTNode
 
 
 # Exit status for a run that stopped because of Ctrl-C, following the
@@ -120,16 +119,6 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
   return args
 
 
-def tree_depth(node: TTNode) -> int:
-  """
-  Return the number of edges on the longest path from `node` down to a
-  leaf.
-  """
-  if not node.children:
-    return 0
-  return 1 + max(tree_depth(child) for child in node.children)
-
-
 def format_elapsed_time(seconds: float) -> str:
   """Format `seconds` as D:HH:MM:SS, truncating fractional seconds."""
   minutes, secs = divmod(int(seconds), 60)
@@ -169,7 +158,7 @@ def main(argv: list[str]) -> int:
 
   console.line(
     f"Initial {fname} has {orig_tok_count} tokens, {len(data)} bytes, "
-    f"and a maximum tree depth of {tree_depth(tree)}.")
+    f"and a maximum tree depth of {tree.depth()}.")
 
   if tree.text() != data:
     print(f"smin.py: internal error: rendering the token tree of "

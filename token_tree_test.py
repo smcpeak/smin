@@ -109,6 +109,13 @@ class TTNodeTest(unittest.TestCase):
     self.assertEqual(n.first_token().text, b"a")
     self.assertEqual(n.last_token().text, b"d")
 
+  def test_depth(self) -> None:
+    self.assertEqual(tok(b"a").depth(), 0)
+    self.assertEqual(TTNode.make_group([]).depth(), 0)
+    self.assertEqual(TTNode.make_group([tok(b"a")]).depth(), 1)
+    # Root -> statement group -> delimiter group -> token.
+    self.assertEqual(sample_tree().depth(), 3)
+
   def test_self_check_valid(self) -> None:
     sample_tree().self_check()
     tok(b"a").self_check()

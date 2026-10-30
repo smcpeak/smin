@@ -242,6 +242,12 @@ class BuildTreeTest(unittest.TestCase):
       ]
       """)
 
+  def test_depth(self) -> None:
+    self.assertEqual(build_tree(tokenize_cpp(b"")).depth(), 0)
+    self.assertEqual(build_tree(tokenize_cpp(b"a b")).depth(), 1)
+    # Root -> delimiter group -> delimiter group -> token.
+    self.assertEqual(build_tree(tokenize_cpp(b"f(g(x))")).depth(), 3)
+
 
 if __name__ == "__main__":
   unittest.main()
