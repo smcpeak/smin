@@ -315,10 +315,10 @@ was backed up before the main algorithm began).  Then the acceptance
 test program is run, its result stored in the memoization table, and
 that result returned to the invoking routine.
 
-When running the test program, close its stdin (so it can't hang due to
-trying to read user input), and redirect its stdout and stderr to the
-platform equivalent of /dev/null.  (Later we might add an option to save
-that output somewhere.)
+When running the test program, redirect its stdin from the platform
+equivalent of /dev/null (so it can't hang due to trying to read user
+input), and also redirect its stdout and stderr to the same.  (Later we
+might add an option to save that output somewhere.)
 
 TODO: It would be nice to have a way for the test program to communicate
 a short verdict phrase to include in the minimizer console output so
