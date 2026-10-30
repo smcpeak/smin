@@ -17,13 +17,11 @@ from pathlib import Path
 from build_tree import build_tree
 from smin import (
   EXIT_INTERRUPTED,
-  cpp_non_trivial_replacement,
   format_elapsed_time,
   main,
   parse_command_line,
   tree_depth,
 )
-from test_util import all_nodes
 from tokenize_cpp import tokenize_cpp
 
 
@@ -89,12 +87,6 @@ class HelperTest(unittest.TestCase):
     self.assertEqual(tree_depth(build_tree(tokenize_cpp(b"a b"))), 1)
     # Root -> delimiter group -> delimiter group -> token.
     self.assertEqual(tree_depth(build_tree(tokenize_cpp(b"f(g(x))"))), 3)
-
-  def test_cpp_non_trivial_replacement(self) -> None:
-    tree = build_tree(tokenize_cpp(b"int f(int x) { return x; }\n"))
-    replaced = [(n.text(), r) for n in all_nodes(tree)
-                if (r := cpp_non_trivial_replacement(n)) is not None]
-    self.assertEqual(replaced, [(b" { return x; }", b";")])
 
   def test_format_elapsed_time(self) -> None:
     self.assertEqual(format_elapsed_time(0), "0:00:00:00")

@@ -24,8 +24,9 @@ from acceptance_test_result import AcceptanceTestResult
 from build_tree import build_tree
 from check_accept import CheckAccept
 from minimizer import Minimizer, TestStartReport
+from lang_cpp import CPPLanguage
+from language import Language
 from token_tree import TTNode
-from tokenize_cpp import tokenize_cpp
 
 
 # Exit status for a run that stopped because of Ctrl-C, following the
@@ -129,19 +130,6 @@ def tree_depth(node: TTNode) -> int:
   return 1 + max(tree_depth(child) for child in node.children)
 
 
-def cpp_non_trivial_replacement(node: TTNode) -> Optional[bytes]:
-  """
-  The `NTReplacementFunc` for C++: a brace group, such as a function
-  body, can be replaced with ";".
-  """
-  if node.delim_group:
-    opener = node.children[0].token
-    assert opener is not None
-    if opener.delimiter_kind == -3:
-      return b";"
-  return None
-
-
 def format_elapsed_time(seconds: float) -> str:
   """Format `seconds` as D:HH:MM:SS, truncating fractional seconds."""
   minutes, secs = divmod(int(seconds), 60)
@@ -163,6 +151,10 @@ def main(argv: list[str]) -> int:
   fname: str = args.input_file
   test_command: list[str] = args.test_command
 
+  # All language-specific knowledge comes from this object.  (Later we
+  # might add an option to choose the language.)
+  language: Language = CPPLanguage()
+
   # ---- Startup ----
   try:
     with open(fname, "rb") as f:
@@ -172,7 +164,7 @@ def main(argv: list[str]) -> int:
           file=sys.stderr)
     return 1
 
-  tree = build_tree(tokenize_cpp(data))
+  tree = build_tree(language.make_tokenizer().tokenize(data))
   orig_tok_count = sum(1 for _ in tree.tokens())
 
   console.line(
@@ -219,7 +211,7 @@ def main(argv: list[str]) -> int:
     # ---- Minimization ----
     minimizer = Minimizer(
       tree,
-      cpp_non_trivial_replacement,
+      language.get_non_trivial_replacement_func(),
       checker.run_acceptance_test,
       console.report_test_starting,
       console.report_test_finished)
