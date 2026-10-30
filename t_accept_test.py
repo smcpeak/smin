@@ -37,8 +37,12 @@ class TAcceptTest(unittest.TestCase):
   def tearDown(self) -> None:
     self.temp_dir.cleanup()
 
-  def run_main(self, argv: list[str], contents: bytes | None = b"",
-               env: dict[str, str] | None = None) -> int:
+  def run_main(
+    self,
+    argv: list[str],
+    contents: bytes | None = b"",
+    env: dict[str, str] | None = None,
+  ) -> int:
     """
     Run `main(argv)` with INPUT naming a file containing `contents`
     (unless it is None, in which case the file does not exist), and
