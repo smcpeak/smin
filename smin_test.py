@@ -166,7 +166,7 @@ class MainTest(unittest.TestCase):
 
   def test_input_file_missing(self) -> None:
     status, out, err = self.run_main(self.KEEP_CODE)
-    self.assertEqual(status, 1)
+    self.assertEqual(status, 2)
     self.assertEqual(out, "")
     self.assertIn("cannot read", err)
 
@@ -177,7 +177,7 @@ class MainTest(unittest.TestCase):
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
       status = main([str(self.dir / "no-such-program"), "--",
                      str(self.input_path)])
-    self.assertEqual(status, 1)
+    self.assertEqual(status, 2)
     self.assertIn("cannot run", err.getvalue())
     self.assertEqual(self.input_path.read_bytes(), b"keep\n")
 

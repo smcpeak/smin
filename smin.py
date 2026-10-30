@@ -131,12 +131,27 @@ def main(argv: list[str]) -> int:
   """
   Run the minimizer with command line arguments `argv` (not including
   the program name), and return the exit status.
+
+  Exit codes:
+
+      0: Successful completed minimization.
+
+      1: Initial input was rejected by the acceptance test.
+
+      2: Ordinary error: input file not found, acceptance test could not
+         be executed, command line syntax error, etc.
+
+      4: Internal error; this program (smin) has a bug.
+
+    130: Minimization was interrupted by SIGINT / Ctrl-C.
   """
 
-  start_time = time.monotonic()
+  # Seconds since an arbitrary epoch.
+  start_time: float = time.monotonic()
+
   console = _Console()
 
-  args = parse_command_line(argv)
+  args: argparse.Namespace = parse_command_line(argv)
   fname: str = args.input_file
   test_command: list[str] = args.test_command
 
@@ -151,7 +166,7 @@ def main(argv: list[str]) -> int:
   except OSError as e:
     print(f"smin.py: error: cannot read {fname!r}: {e.strerror}",
           file=sys.stderr)
-    return 1
+    return 2
 
   tree = build_tree(language.make_tokenizer().tokenize(data))
   orig_tok_count = sum(1 for _ in tree.tokens())
@@ -163,7 +178,7 @@ def main(argv: list[str]) -> int:
   if tree.text() != data:
     print(f"smin.py: internal error: rendering the token tree of "
           f"{fname!r} does not reproduce its contents", file=sys.stderr)
-    return 1
+    return 4
 
   checker = CheckAccept(fname, test_command)
 
@@ -179,7 +194,7 @@ def main(argv: list[str]) -> int:
       console.end_line()
       print(f"smin.py: error: cannot run {test_command[0]!r}: "
             f"{e.strerror}", file=sys.stderr)
-      return 1
+      return 2
 
     if result == AcceptanceTestResult.INTERRUPTED:
       console.write("INTERRUPTED\n")
