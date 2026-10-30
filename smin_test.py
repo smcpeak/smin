@@ -1,0 +1,238 @@
+# smin_test.py
+"""
+Unit tests for smin.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import io
+import os
+import signal
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from build_tree import build_tree
+from smin import (
+  EXIT_INTERRUPTED,
+  cpp_non_trivial_replacement,
+  format_elapsed_time,
+  main,
+  parse_command_line,
+  tree_depth,
+)
+from test_util import all_nodes
+from tokenize_cpp import tokenize_cpp
+
+
+# Signals are only simulated on POSIX systems.
+POSIX = os.name == "posix"
+
+
+class ParseCommandLineTest(unittest.TestCase):
+  def check_error(self, argv: list[str]) -> None:
+    with contextlib.redirect_stderr(io.StringIO()):
+      with self.assertRaises(SystemExit) as cm:
+        parse_command_line(argv)
+    self.assertEqual(cm.exception.code, 2)
+
+  def test_program_only(self) -> None:
+    args = parse_command_line(["./test.sh", "--", "in.cc"])
+    self.assertEqual(args.test_command, ["./test.sh"])
+    self.assertEqual(args.input_file, "in.cc")
+
+  def test_program_args(self) -> None:
+    args = parse_command_line(["./test.sh", "-v", "x", "--", "in.cc"])
+    self.assertEqual(args.test_command, ["./test.sh", "-v", "x"])
+    self.assertEqual(args.input_file, "in.cc")
+
+  def test_program_args_contain_separator(self) -> None:
+    args = parse_command_line(["grep", "-q", "--", "-x", "--", "in.cc"])
+    self.assertEqual(args.test_command, ["grep", "-q", "--", "-x"])
+    self.assertEqual(args.input_file, "in.cc")
+
+  def test_missing_separator(self) -> None:
+    self.check_error(["./test.sh", "in.cc"])
+
+  def test_missing_input_file(self) -> None:
+    self.check_error(["./test.sh", "--"])
+
+  def test_missing_program(self) -> None:
+    self.check_error(["--", "in.cc"])
+
+  def test_empty(self) -> None:
+    self.check_error([])
+
+
+class HelperTest(unittest.TestCase):
+  def test_tree_depth(self) -> None:
+    self.assertEqual(tree_depth(build_tree(tokenize_cpp(b""))), 0)
+    self.assertEqual(tree_depth(build_tree(tokenize_cpp(b"a b"))), 1)
+    # Root -> delimiter group -> delimiter group -> token.
+    self.assertEqual(tree_depth(build_tree(tokenize_cpp(b"f(g(x))"))), 3)
+
+  def test_cpp_non_trivial_replacement(self) -> None:
+    tree = build_tree(tokenize_cpp(b"int f(int x) { return x; }\n"))
+    replaced = [(n.text(), r) for n in all_nodes(tree)
+                if (r := cpp_non_trivial_replacement(n)) is not None]
+    self.assertEqual(replaced, [(b" { return x; }", b";")])
+
+  def test_format_elapsed_time(self) -> None:
+    self.assertEqual(format_elapsed_time(0), "0:00:00:00")
+    self.assertEqual(format_elapsed_time(59.9), "0:00:00:59")
+    self.assertEqual(format_elapsed_time(3723), "0:01:02:03")
+    self.assertEqual(format_elapsed_time(2*86400 + 5), "2:00:00:05")
+
+
+class MainTest(unittest.TestCase):
+  def setUp(self) -> None:
+    self.temp_dir = tempfile.TemporaryDirectory()
+    self.dir = Path(self.temp_dir.name)
+    self.input_path = self.dir / "input.cc"
+    self.backup_path = self.dir / "input.cc.bak"
+
+    # `main` ignores SIGINT once it starts terminating.
+    self.old_sigint = signal.getsignal(signal.SIGINT)
+
+  def tearDown(self) -> None:
+    signal.signal(signal.SIGINT, self.old_sigint)
+    self.temp_dir.cleanup()
+
+  def run_main(self, code: str) -> tuple[int, str, str]:
+    """
+    Run `main` with Python `code` as the test program, returning the
+    exit status, stdout, and stderr.
+    """
+    out = io.StringIO()
+    err = io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+      status = main(
+        [sys.executable, "-c", code, "--", str(self.input_path)])
+    return status, out.getvalue(), err.getvalue()
+
+  # Accept an input that contains "keep".
+  KEEP_CODE = (
+    "import os, sys\n"
+    "sys.exit(0 if b'keep' in open(os.environ['INPUT'], 'rb').read() "
+    "else 1)\n")
+
+  def test_minimize(self) -> None:
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, err = self.run_main(self.KEEP_CODE)
+    self.assertEqual(status, 0)
+    self.assertEqual(err, "")
+    self.assertEqual(self.input_path.read_bytes(), b"\nkeep")
+    self.assertEqual(self.backup_path.read_bytes(),
+                     b"int a;\nint keep;\nint b;\n")
+
+    lines = out.splitlines()
+    fname = str(self.input_path)
+    self.assertEqual(lines[0],
+      f"Initial {fname} has 10 tokens, 24 bytes, "
+      f"and a maximum tree depth of 2.")
+    self.assertEqual(lines[1],
+      f"Checking {sys.executable} on initial {fname} ... accepted")
+    self.assertEqual(lines[2], f"Copied {fname} to {fname}.bak.")
+    self.assertTrue(lines[3].startswith("N=000001 S=10 "))
+    self.assertEqual(lines[-2],
+      f"Reduced file {fname} from 10 tokens (24 bytes) "
+      f"to 1 tokens (5 bytes).")
+    self.assertRegex(lines[-1], r"^Elapsed time \(D:HH:MM:SS\): 0:00:00:\d\d$")
+
+    # Every test line has a result.
+    for line in lines[3:-2]:
+      self.assertRegex(line, r"^N=\d{6} .* \.\.\. (rejected|ACCEPTED)$")
+
+  def test_backup_overwritten(self) -> None:
+    self.input_path.write_bytes(b"keep\n")
+    self.backup_path.write_bytes(b"old backup\n")
+    status, out, _ = self.run_main(self.KEEP_CODE)
+    self.assertEqual(status, 0)
+    self.assertIn(f"Copied {self.input_path} to {self.backup_path} "
+                  f"(which was overwritten).\n", out)
+    self.assertEqual(self.backup_path.read_bytes(), b"keep\n")
+
+  def test_initial_input_rejected(self) -> None:
+    self.input_path.write_bytes(b"int a;\n")
+    status, out, _ = self.run_main(self.KEEP_CODE)
+    self.assertEqual(status, 1)
+    self.assertTrue(out.endswith(
+      "... REJECTED\n"
+      "Stopping because the initial input was rejected.\n"))
+    self.assertEqual(self.input_path.read_bytes(), b"int a;\n")
+    self.assertFalse(self.backup_path.exists())
+
+  def test_input_file_missing(self) -> None:
+    status, out, err = self.run_main(self.KEEP_CODE)
+    self.assertEqual(status, 1)
+    self.assertEqual(out, "")
+    self.assertIn("cannot read", err)
+
+  def test_program_not_found(self) -> None:
+    self.input_path.write_bytes(b"keep\n")
+    out = io.StringIO()
+    err = io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+      status = main([str(self.dir / "no-such-program"), "--",
+                     str(self.input_path)])
+    self.assertEqual(status, 1)
+    self.assertIn("cannot run", err.getvalue())
+    self.assertEqual(self.input_path.read_bytes(), b"keep\n")
+
+  def ctrl_c_code(self, on_invocation: int) -> str:
+    """
+    Return the code of a test program that behaves like `KEEP_CODE`,
+    except that on invocation number `on_invocation` (counting the
+    initial test as 1), it simulates Ctrl-C by sending SIGINT to its
+    parent (the minimizer) and to itself.
+    """
+    count_file = str(self.dir / "count")
+    return (
+      "import os, signal, sys\n"
+      f"name = {count_file!r}\n"
+      "n = int(open(name).read()) + 1 if os.path.exists(name) else 1\n"
+      "open(name, 'w').write(str(n))\n"
+      f"if n == {on_invocation}:\n"
+      "  signal.signal(signal.SIGINT, signal.SIG_DFL)\n"
+      "  os.kill(os.getppid(), signal.SIGINT)\n"
+      "  os.kill(os.getpid(), signal.SIGINT)\n"
+      + self.KEEP_CODE)
+
+  @unittest.skipUnless(POSIX, "uses POSIX signals")
+  def test_ctrl_c_during_minimization(self) -> None:
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    # Test N=3 (invocation 4) removes "int b;" and is accepted.  Test
+    # N=4 is interrupted.
+    status, out, _ = self.run_main(self.ctrl_c_code(5))
+    self.assertEqual(status, EXIT_INTERRUPTED)
+    self.assertEqual(self.input_path.read_bytes(), b"int a;\nint keep;")
+
+    lines = out.splitlines()
+    self.assertRegex(lines[-5], r"^N=000003 .* ACCEPTED$")
+    self.assertRegex(lines[-4], r"^N=000004 .* interrupted$")
+    self.assertEqual(lines[-3], "Stopping early due to Ctrl-C.")
+    self.assertEqual(lines[-2],
+      f"Reduced file {self.input_path} from 10 tokens (24 bytes) "
+      f"to 6 tokens (16 bytes).")
+
+  @unittest.skipUnless(POSIX, "uses POSIX signals")
+  def test_ctrl_c_during_initial_test(self) -> None:
+    self.input_path.write_bytes(b"int keep;\n")
+    status, out, _ = self.run_main(self.ctrl_c_code(1))
+    self.assertEqual(status, EXIT_INTERRUPTED)
+    self.assertEqual(self.input_path.read_bytes(), b"int keep;\n")
+    self.assertFalse(self.backup_path.exists())
+    self.assertIn(
+      "... interrupted\n"
+      "Stopping early due to Ctrl-C.\n"
+      f"Reduced file {self.input_path} from 4 tokens (10 bytes) "
+      f"to 4 tokens (10 bytes).\n", out)
+
+
+if __name__ == "__main__":
+  unittest.main()
+
+
+# EOF

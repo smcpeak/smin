@@ -264,6 +264,19 @@ class Minimizer:
     return self.render_candidate({})
 
 
+  # TODO: This needs a unit test.
+  def current_tok_count(self) -> int:
+    """
+    Return the number of live tokens in the most recently accepted
+    input.  Unlike `live_tok_count`, this is computed from
+    `cur_replacement` alone, so it is accurate even if Ctrl-C
+    interrupted the update of `token_live`.
+    """
+    ctm: list[bytes | None] = [None] * len(self.tokens)
+    self._fill_ctm(self.tree_root, {}, ctm)
+    return ctm.count(None)
+
+
   def render_candidate(self, extra: dict[int, bytes]) -> bytes:
     """
     Render the input with the current replacements, plus those in
