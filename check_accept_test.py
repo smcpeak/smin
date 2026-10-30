@@ -168,13 +168,13 @@ class CheckAcceptTest(unittest.TestCase):
                    to_program: bool = True) -> None:
     """Check that a simulated Ctrl-C yields INTERRUPTED promptly."""
     thread = self.press_ctrl_c(times, to_program)
-    start = time.monotonic()
+    start: float = time.monotonic()
     result = self.run_code(self.program_that_waits(on_sigint))
-    elapsed = time.monotonic() - start
+    elapsed: float = time.monotonic() - start
     thread.join()
 
     self.assertEqual(result, INTERRUPTED)
-    self.assertLess(elapsed, 10)
+    self.assertLess(elapsed, 10)       # Less than 10 seconds.
 
   @unittest.skipUnless(POSIX, "uses POSIX signals")
   def test_ctrl_c_program_dies(self) -> None:
