@@ -240,6 +240,21 @@ class TAcceptTest(unittest.TestCase):
       log.read_text(),
       f"{self.input_path} {stamp} accept {captured}\n")
 
+  def test_input_log(self) -> None:
+    ilog = self.dir / "ilog.txt"
+    argv = ["--input-log", str(ilog), "--has-string", "a"]
+    self.check(argv, b"a\n", 0)
+    # The input need not end with a newline.
+    self.check(argv, b"b", 1)
+
+    dashes = "-" * 32
+    self.assertEqual(
+      ilog.read_bytes(),
+      f"\n{dashes} ACCEPT {dashes}\n"
+      f"a\n"
+      f"\n{dashes} reject {dashes}\n"
+      f"b".encode())
+
   # ---- Errors ----
 
   def test_input_not_set(self) -> None:

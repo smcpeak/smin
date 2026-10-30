@@ -54,6 +54,15 @@ Options:
     (accept or reject), and if --capture, the name of the captured input
     file.
 
+  --input-log <ilogfile>
+
+    After checking acceptance, append to <ilogfile>:
+
+    * A newline.
+    * A 72-character separator/header line with either " ACCEPT " or
+      " reject " centered between lines of dashes.
+    * The contents of the input file.
+
 It is an error (exit code 2) if INPUT is not set in the environment or
 the named file cannot be read.
 """
@@ -121,6 +130,11 @@ def main(argv: list[str]) -> int:
     with open(args.log, "a") as f:
       f.write(" ".join(fields) + "\n")
 
+  if args.input_log is not None:
+    label = " reject " if failure is not None else " ACCEPT "
+    with open(args.input_log, "ab") as f:
+      f.write(b"\n" + label.center(72, "-").encode() + b"\n" + data)
+
   return 1 if failure is not None else 0
 
 
@@ -158,6 +172,9 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
   parser.add_argument(
     "--log", metavar="LOGFILE",
     help="Append a line describing this invocation to LOGFILE.")
+  parser.add_argument(
+    "--input-log", metavar="ILOGFILE",
+    help="Append a verdict header line and the input to ILOGFILE.")
   return parser.parse_args(argv)
 
 
