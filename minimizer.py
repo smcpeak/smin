@@ -8,8 +8,9 @@ See minimization-algorithm.txt.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Optional
 
 from acceptance_test_result import AcceptanceTestResult
 from smin_token import SMToken

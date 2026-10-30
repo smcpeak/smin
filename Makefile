@@ -23,6 +23,9 @@ PYTHON = python3
 MYPY = mypy
 MYPY_OPTS = --strict
 
+# $ pipx install ruff
+RUFF = ruff
+
 
 PYTHON_SRCS :=
 PYTHON_SRCS += acceptance_test_result.py
@@ -67,9 +70,17 @@ out/mypy.ok: $(ALL_PYTHON_FILES)
 	touch $@
 
 
+all: out/ruff.ok
+
+out/ruff.ok: $(PYTHON_SRCS) $(PYTHON_TESTS) ruff.toml
+	$(CREATE_OUTPUT_DIRECTORY)
+	$(RUFF) check .
+	touch $@
+
+
 check: out/unittest.ok
 
-out/unittest.ok: out/mypy.ok $(ALL_PYTHON_FILES)
+out/unittest.ok: out/mypy.ok out/ruff.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	$(PYTHON) -m unittest -v -f $(PYTHON_TESTS)
 	touch $@

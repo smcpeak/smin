@@ -1,0 +1,57 @@
+# ruff.toml
+# Configuration for Ruff linter.
+
+# Suppress these rules:
+lint.ignore = [
+  # Import block sorting (I have my own style).
+  "I001",
+
+  # Ruff wants "X | None", I'm happy with Optional.
+  "UP045",
+
+  # I use f-strings without placeholders for consistency in
+  # concatenated multi-line messages, so allow them.
+  "F541",
+
+  # Some AI-generated tests do things like len("a2 newer".encode("utf-8")),
+  # and Ruff does not like that.  Understandable, but I don't want to
+  # flag the tests and it's not a problem in that context.
+  "UP012",
+
+  # I have tests that intentionally do "assert not x != y" since I want
+  # specifically to verify the "!=" operator.
+  "SIM201",
+  "SIM202",
+
+  # Nested `if` is sometimes clearer, especiallly given the atrocious
+  # Python indentation rules.
+  "SIM102",
+
+  # This rule seems stupid.  How would an f-string solve the indentation
+  # problem that string join addresses?  From anther example I see they
+  # have a much uglier alternative in mind.  No thanks.
+  "FLY002",
+
+  # I need to cast in default arguments because mypy is stupid.
+  "B008",
+
+  # Complaining about nested `with` is not helpful IMO.
+  "SIM117",
+
+  # Let me have my redudant "pass" statements!  Otherwise stuff looks
+  # unfinished.
+  "PIE790",
+
+  # I catch what I want, including Exception.
+  "BLE001",
+
+  # Sometimes I prefer if-continue, if-continue.  Python makes using
+  # "or" ugly since more parens are needed.
+  "SIM114",
+
+  # Allow `breakpoint` if uncommented.  My intention is to not check
+  # this in with it uncommented.
+  #"T100",
+]
+
+# EOF

@@ -5,7 +5,7 @@ Utilities shared by the tree-building phases.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from token_tree import TTNode
 

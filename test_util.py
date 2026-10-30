@@ -13,7 +13,7 @@ from token_tree import TTNode
 def dedent(s: str) -> str:
   """Dedent `s` and remove one leading newline, if present."""
   s = textwrap.dedent(s)
-  return s[1:] if s.startswith("\n") else s
+  return s.removeprefix("\n")
 
 
 def all_groups(node: TTNode) -> list[TTNode]:
