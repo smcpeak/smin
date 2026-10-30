@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from lang_cpp_delims import CPP_BRACE
 from minimizer import NTReplacementFunc
 from token_tree import TTNode
 from tokenize_cpp import CPPTokenizer
@@ -31,7 +32,7 @@ class CPPLanguage:
     if node.delim_group:
       opener = node.children[0].token
       assert opener is not None
-      if opener.delimiter_kind == -3:
+      if opener.delimiter_kind == -CPP_BRACE:
         return b";"
     return None
 

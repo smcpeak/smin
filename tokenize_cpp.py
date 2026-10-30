@@ -40,6 +40,7 @@ physical lines, so a line splice begins a new line for that purpose.
 
 from __future__ import annotations
 
+from lang_cpp_delims import CPP_DELIMITER_KINDS
 from smin_token import SMToken
 
 
@@ -96,14 +97,6 @@ _DQUOTE = ord("\"")
 _SQUOTE = ord("'")
 _LPAREN = ord("(")
 
-# Map from delimiter byte to its classification, as stored in
-# `SMToken.delimiter_kind`.
-_DELIMITER_KINDS: dict[int, int] = {
-  ord("("): -1, ord(")"): 1,
-  ord("["): -2, ord("]"): 2,
-  ord("{"): -3, ord("}"): 3,
-}
-
 
 def tokenize_cpp(data: bytes) -> list[SMToken]:
   """Partition C/C++ source `data` into tokens."""
@@ -148,7 +141,7 @@ def tokenize_cpp(data: bytes) -> list[SMToken]:
 
     tok_start = pos
     pos = _scan_token(data, pos, at_line_start)
-    kind = (_DELIMITER_KINDS.get(data[tok_start], 0)
+    kind = (CPP_DELIMITER_KINDS.get(data[tok_start], 0)
             if pos == tok_start + 1
             else 0)
     tokens.append(SMToken(
