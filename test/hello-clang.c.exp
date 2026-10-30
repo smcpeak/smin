@@ -1,0 +1,11 @@
+
+
+#include <stdio.h>
+
+int helper
+;
+
+int main()
+{
+  printf("%d\\n", helper );
+}

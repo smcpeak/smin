@@ -94,6 +94,41 @@ out/unittest.ok: out/mypy.ok out/ruff.ok $(ALL_PYTHON_FILES)
 	touch $@
 
 
+# Minimize hello.c using just delimiter balancing.
+out/m/hello-delim.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
+	$(CREATE_OUTPUT_DIRECTORY)
+	cp test/hello.c out/m/hello-delim.c
+	$(PYTHON) ./smin.py ./t_accept.py \
+	  --balanced-delim-counts \
+	  --before-after helper helper \
+	  --has-string printf \
+	  --input-log out/m/hello-delim.c.ilog \
+	  -- out/m/hello-delim.c
+	cmp out/m/hello-delim.c test/hello-delim.c.exp
+	touch $@
+
+check: out/m/hello-delim.c.ok
+
+
+# Minimize hello.c using clang to check syntax.
+out/m/hello-clang.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
+	$(CREATE_OUTPUT_DIRECTORY)
+	cp test/hello.c out/m/hello-clang.c
+	$(PYTHON) ./smin.py ./t_accept.py \
+	  --clang \
+	  --before-after helper helper \
+	  --has-string printf \
+	  --input-log out/m/hello-clang.c.ilog \
+	  -- out/m/hello-clang.c
+	cmp out/m/hello-clang.c test/hello-clang.c.exp
+	touch $@
+
+# Test only runs if we say we have clang.
+ifeq ($(USE_CLANG),1)
+check: out/m/hello-clang.c.ok
+endif
+
+
 check-clean:
 	$(RM) -r out
 
