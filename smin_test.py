@@ -211,7 +211,7 @@ class MainTest(unittest.TestCase):
 
     lines = out.splitlines()
     self.assertRegex(lines[-5], r"^N=000003 .* ACCEPTED$")
-    self.assertRegex(lines[-4], r"^N=000004 .* interrupted$")
+    self.assertRegex(lines[-4], r"^N=000004 .* INTERRUPTED$")
     self.assertEqual(lines[-3], "Stopping early due to Ctrl-C.")
     self.assertEqual(lines[-2],
       f"Reduced file {self.input_path} from 10 tokens (24 bytes) "
@@ -225,7 +225,7 @@ class MainTest(unittest.TestCase):
     self.assertEqual(self.input_path.read_bytes(), b"int keep;\n")
     self.assertFalse(self.backup_path.exists())
     self.assertIn(
-      "... interrupted\n"
+      "... INTERRUPTED\n"
       "Stopping early due to Ctrl-C.\n"
       f"Reduced file {self.input_path} from 4 tokens (10 bytes) "
       f"to 4 tokens (10 bytes).\n", out)

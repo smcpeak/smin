@@ -540,5 +540,8 @@ When stopping due to Ctrl-C, the above final message is preceded by:
 
   Stopping early due to Ctrl-C.
 
+When a test is interrupted by Ctrl-C, print its status as "INTERRUPTED"
+rather than "accepted" or "rejected".
+
 
 EOF

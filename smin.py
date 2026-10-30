@@ -69,7 +69,7 @@ class _Console:
     elif result == AcceptanceTestResult.REJECT:
       self.write(" rejected\n")
     else:
-      self.write(" interrupted\n")
+      self.write(" INTERRUPTED\n")
 
 
 def parse_command_line(argv: list[str]) -> argparse.Namespace:
@@ -190,7 +190,7 @@ def main(argv: list[str]) -> int:
       return 1
 
     if result == AcceptanceTestResult.INTERRUPTED:
-      console.write("interrupted\n")
+      console.write("INTERRUPTED\n")
       raise KeyboardInterrupt()
     if result == AcceptanceTestResult.REJECT:
       console.write("REJECTED\n")
