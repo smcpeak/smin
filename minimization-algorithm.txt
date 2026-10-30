@@ -333,13 +333,24 @@ equivalent of /dev/null (so it can't hang due to trying to read user
 input), and also redirect its stdout and stderr to the same.  (Later we
 might add an option to save that output somewhere.)
 
-Additionally, run the test program with the environment extended to have
-"SMIN_PROGRESS" set to the progress report text that is printed to the
-console before each candidate is tested, e.g., "N=000056 S=16 P=(6/7)
-G=02.1 F=06% R=07".  (This can then be captured by "t_accept.py
---input-log" to more easily follow the algorithm steps.)  For the
-initial test that is run before the main algorithm begins, SMIN_PROGRESS
-is set to "initial".
+When running the test program, set environment variables:
+
+* INPUT: The name of the input file.
+
+* INPUT_BEST: "$INPUT.best".
+
+* SMIN_PROGRESS: The progress report text that is printed to the console
+  before each candidate is tested, e.g., "N=000056 S=16 P=(6/7) G=02.1
+  F=06% R=07".  For the initial test that is run before the main
+  algorithm begins, SMIN_PROGRESS is set to "initial".
+
+Rationale: The latter two can be used by "t_accept.py --input-log" to
+more easily follow the algorithm steps.
+
+Whenever a new (not memoized) candidate is accepted, copy its contents
+to "$INPUT.best.tmp", then atomically move that file to "$INPUT.best".
+(Atomic movement means a curious user who cats that file should never
+see it in an incomplete state.)
 
 TODO: It would be nice to have a way for the test program to communicate
 a short verdict phrase to include in the minimizer console output so
@@ -526,6 +537,14 @@ or:
   Copied <fname> to <fname>.bak (which was overwritten).
 
 depending on which is applicable.
+
+Also copy the input file to "<fname>.best", and print:
+
+  Will continuously update <fname>.best.
+
+or:
+
+  Will continuously update <fname>.best (which was overwritten).
 
 Initialize the memoization table to record the acceptance of the initial
 input.  Then proceed with the minimization algorithm specified above.

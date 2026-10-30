@@ -203,6 +203,7 @@ def main(argv: list[str]) -> int:
   minimizer: Optional[Minimizer] = None
 
   try:
+    best_was_overwritten: bool = os.path.exists(checker.best_file_name)
     console.write(
       f"Checking {test_command[0]} on initial {fname} ... ")
     try:
@@ -222,12 +223,16 @@ def main(argv: list[str]) -> int:
       return 1
     console.write("accepted\n")
 
+    console.line(
+      f"Will continuously update {checker.best_file_name}" +
+      (" (which was overwritten)." if best_was_overwritten else "."))
+
     backup = fname + ".bak"
-    overwritten = os.path.exists(backup)
+    bak_was_overwritten: bool = os.path.exists(backup)
     shutil.copyfile(fname, backup)
     console.line(
       f"Copied {fname} to {backup}" +
-      (" (which was overwritten)." if overwritten else "."))
+      (" (which was overwritten)." if bak_was_overwritten else "."))
 
     # ---- Minimization ----
     minimizer = Minimizer(

@@ -92,6 +92,7 @@ class MainTest(unittest.TestCase):
     self.dir = Path(self.temp_dir.name)
     self.input_path = self.dir / "input.cc"
     self.backup_path = self.dir / "input.cc.bak"
+    self.best_path = self.dir / "input.cc.best"
 
     # `main` ignores SIGINT once it starts terminating.
     self.old_sigint = signal.getsignal(signal.SIGINT)
@@ -126,6 +127,8 @@ class MainTest(unittest.TestCase):
     self.assertEqual(self.input_path.read_bytes(), b"\nkeep")
     self.assertEqual(self.backup_path.read_bytes(),
                      b"int a;\nint keep;\nint b;\n")
+    self.assertEqual(self.best_path.read_bytes(), b"\nkeep")
+    self.assertFalse(Path(f"{self.best_path}.tmp").exists())
 
     lines = out.splitlines()
     fname = str(self.input_path)
@@ -134,8 +137,9 @@ class MainTest(unittest.TestCase):
       f"and a maximum tree depth of 2.")
     self.assertEqual(lines[1],
       f"Checking {sys.executable} on initial {fname} ... accepted")
-    self.assertEqual(lines[2], f"Copied {fname} to {fname}.bak.")
-    self.assertTrue(lines[3].startswith("N=000001 S=10 "))
+    self.assertEqual(lines[2], f"Will continuously update {fname}.best.")
+    self.assertEqual(lines[3], f"Copied {fname} to {fname}.bak.")
+    self.assertTrue(lines[4].startswith("N=000001 S=10 "))
     self.assertEqual(lines[-2],
       f"Reduced file {fname} from 10 tokens (24 bytes) "
       f"to 1 tokens (5 bytes).")
@@ -143,7 +147,7 @@ class MainTest(unittest.TestCase):
 
     # Every test line has a result (aside from blank lines that separate
     # passes).
-    for line in lines[3:-2]:
+    for line in lines[4:-2]:
       if line != "":
         self.assertRegex(line,
           r"^N=\d{6} .* \.\.\. (rejected|ACCEPTED)( \(memo\))?$")
@@ -156,6 +160,15 @@ class MainTest(unittest.TestCase):
     self.assertIn(f"Copied {self.input_path} to {self.backup_path} "
                   f"(which was overwritten).\n", out)
     self.assertEqual(self.backup_path.read_bytes(), b"keep\n")
+
+  def test_best_overwritten(self) -> None:
+    self.input_path.write_bytes(b"keep\n")
+    self.best_path.write_bytes(b"old best\n")
+    status, out, _ = self.run_main(self.KEEP_CODE)
+    self.assertEqual(status, 0)
+    self.assertIn(f"Will continuously update {self.best_path} "
+                  f"(which was overwritten).\n", out)
+    self.assertEqual(self.best_path.read_bytes(), b"keep")
 
   def test_initial_input_rejected(self) -> None:
     self.input_path.write_bytes(b"int a;\n")
@@ -211,6 +224,7 @@ class MainTest(unittest.TestCase):
     status, out, _ = self.run_main(self.ctrl_c_code(5))
     self.assertEqual(status, EXIT_INTERRUPTED)
     self.assertEqual(self.input_path.read_bytes(), b"int a;\nint keep;")
+    self.assertEqual(self.best_path.read_bytes(), b"int a;\nint keep;")
 
     lines = out.splitlines()
     self.assertRegex(lines[-5], r"^N=000003 .* ACCEPTED$")
@@ -227,6 +241,7 @@ class MainTest(unittest.TestCase):
     self.assertEqual(status, EXIT_INTERRUPTED)
     self.assertEqual(self.input_path.read_bytes(), b"int keep;\n")
     self.assertFalse(self.backup_path.exists())
+    self.assertFalse(self.best_path.exists())
     self.assertIn(
       "... INTERRUPTED\n"
       "Stopping early due to Ctrl-C.\n"

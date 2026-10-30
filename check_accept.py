@@ -36,6 +36,24 @@ class CheckAccept:
   acceptance_command: list[str]
 
 
+  @property
+  def best_file_name(self) -> str:
+    """Name of the file that holds the most recently accepted input."""
+    return self.input_file_name + ".best"
+
+
+  def write_best(self, contents: bytes) -> None:
+    """
+    Write `contents` to `best_file_name`, atomically, so that someone
+    reading it never sees it partially written.  It is first written to
+    a temporary file, which is then moved into place.
+    """
+    tmp_name = self.best_file_name + ".tmp"
+    with open(tmp_name, "wb") as f:
+      f.write(contents)
+    os.replace(tmp_name, self.best_file_name)
+
+
   def run_acceptance_test(
     self,
     input_contents: bytes,
@@ -48,16 +66,19 @@ class CheckAccept:
     Then, in the current directory, invoke `acceptance_command`.
 
     It is executed with envvar "INPUT" added to the environment with
-    value `input_file_name`, and envvar "SMIN_PROGRESS" set to the
-    progress report text of `report`.  If `report` is None (as for the
-    initial test, which has no progress report), SMIN_PROGRESS is
-    instead set to "initial".
+    value `input_file_name`, "INPUT_BEST" with value `best_file_name`,
+    and "SMIN_PROGRESS" set to the progress report text of `report`.
+    If `report` is None (as for the initial test, which has no progress
+    report), SMIN_PROGRESS is instead set to "initial".
 
     Its stdin reads from, and its stdout and stderr write to, the
     platform equivalent of /dev/null.  The former is to ensure it will
     not hang if it tries to read user input (the acceptance test should
     be entirely non-interactive), and the latter is to avoid disrupting
     the minimizer progress reports it writes to the console.
+
+    If the test accepts, `input_contents` is then written to
+    `best_file_name` (see `write_best`).
 
     This function waits for the spawned program to terminate.  It
     returns ACCEPT if the exit code is 0, INTERRUPTED if it was
@@ -98,6 +119,7 @@ class CheckAccept:
 
     env = dict(os.environ)
     env["INPUT"] = self.input_file_name
+    env["INPUT_BEST"] = self.best_file_name
     env["SMIN_PROGRESS"] = (
       "initial" if report is None
       else report.to_progress_string())
@@ -134,6 +156,7 @@ class CheckAccept:
     if interrupt_count > 0 or returncode == -signal.SIGINT:
       return AcceptanceTestResult.INTERRUPTED
     if returncode == 0:
+      self.write_best(input_contents)
       return AcceptanceTestResult.ACCEPT
     return AcceptanceTestResult.REJECT
 

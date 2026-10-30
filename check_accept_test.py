@@ -100,6 +100,43 @@ class CheckAcceptTest(unittest.TestCase):
     with mock.patch.dict(os.environ, {"SMIN_PROGRESS": "stale"}):
       self.assertEqual(self.run_code(code), ACCEPT)
 
+  def test_input_best_envvar(self) -> None:
+    expect = self.input_file_name + ".best"
+    code = (
+      "import os, sys\n"
+      f"sys.exit(0 if os.environ['INPUT_BEST'] == {expect!r} else 1)\n")
+    self.assertEqual(self.run_code(code), ACCEPT)
+
+  def test_best_updated_on_accept(self) -> None:
+    best = Path(self.input_file_name + ".best")
+    code = (
+      "import os, sys\n"
+      "sys.exit(0 if b'keep' in open(os.environ['INPUT'], 'rb').read() "
+      "else 1)\n")
+    checker = CheckAccept(self.input_file_name, python_command(code))
+
+    self.assertEqual(checker.run_acceptance_test(b"keep 1\n", None), ACCEPT)
+    self.assertEqual(best.read_bytes(), b"keep 1\n")
+
+    # A rejected candidate does not change it.
+    self.assertEqual(checker.run_acceptance_test(b"other\n", None), REJECT)
+    self.assertEqual(best.read_bytes(), b"keep 1\n")
+
+    self.assertEqual(checker.run_acceptance_test(b"keep 2\n", None), ACCEPT)
+    self.assertEqual(best.read_bytes(), b"keep 2\n")
+
+    # The temporary file has been moved into place.
+    self.assertFalse(Path(self.input_file_name + ".best.tmp").exists())
+
+  def test_write_best(self) -> None:
+    best = Path(self.input_file_name + ".best")
+    best.write_bytes(b"old contents, longer\n")
+    checker = CheckAccept(self.input_file_name, ["unused"])
+    self.assertEqual(checker.best_file_name, str(best))
+    checker.write_best(b"new\n")
+    self.assertEqual(best.read_bytes(), b"new\n")
+    self.assertFalse(Path(self.input_file_name + ".best.tmp").exists())
+
   def test_input_overwritten(self) -> None:
     Path(self.input_file_name).write_bytes(b"old contents, longer\n")
     self.run_code("pass", b"new\n")
