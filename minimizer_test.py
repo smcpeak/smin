@@ -315,6 +315,20 @@ class MinimizerTest(unittest.TestCase):
     self.assertEqual(list(m.memoized_accept.values()), [ACCEPT])
     self.assertEqual(m.render_candidate({}), src)
 
+  def test_current_tok_count(self) -> None:
+    rec = Recorder(lambda d: True)
+    root = build_tree(tokenize_cpp(b"int a;\nint b;\n"))
+    m = rec.make_minimizer(root)
+
+    # "int", "a", ";", "\nint", "b", ";", "\n".
+    self.assertEqual(m.current_tok_count(), 7)
+
+    # Replace a node by modifying `cur_replacement` directly, as if
+    # Ctrl-C interrupted `_commit` before it updated `token_live`.
+    m.cur_replacement[id(find_node(root, b"\nint b;"))] = b""
+    self.assertEqual(m.current_tok_count(), 4)
+    self.assertEqual(m.live_tok_count, 7)
+
   def test_result_is_accepted(self) -> None:
     # A larger input, where acceptance requires several scattered
     # pieces, and the delimiters to be balanced.

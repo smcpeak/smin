@@ -264,7 +264,6 @@ class Minimizer:
     return self.render_candidate({})
 
 
-  # TODO: This needs a unit test.
   def current_tok_count(self) -> int:
     """
     Return the number of live tokens in the most recently accepted
