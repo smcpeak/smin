@@ -30,7 +30,7 @@ class TAcceptTest(unittest.TestCase):
     self.dir = Path(self.temp_dir.name)
     self.input_path = self.dir / "input.cc"
 
-    # Output of the most recent `run`.
+    # Output of the most recent `run_main`.
     self.out = ""
     self.err = ""
 
