@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from diff_lines import ByteRange
+
 
 @dataclass(frozen=True)
 class TestStartReport:
@@ -46,6 +48,11 @@ class TestStartReport:
   # Number of tokens in the initial input.  This is the maximum value of
   # S, G, and R, so it determines how wide their fields are.
   initial_tok_count: int
+
+  # The range of bytes in the most recently accepted input that were
+  # modified to produce the candidate.  This is passed to the test
+  # program in the CHANGED_BYTE_RANGE envvar.
+  changed_byte_range: ByteRange
 
 
   def to_progress_string(self) -> str:

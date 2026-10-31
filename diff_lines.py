@@ -8,6 +8,21 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 import difflib
+from typing import Optional
+
+
+# TODO: Move this into its own module.
+@dataclass(frozen=True)
+class ByteRange:
+  """
+  Describes a contiguous sequence of bytes.
+  """
+
+  # 0-based index of the first byte.
+  start: int
+
+  # 0-based index of the byte after the last one.
+  stop: int
 
 
 @dataclass(frozen=True)
@@ -46,7 +61,11 @@ class _Change:
   new: _LineRange
 
 
-def diff_lines(old: list[bytes], new: list[bytes]) -> Iterator[bytes]:
+def diff_lines(
+  old: list[bytes],
+  new: list[bytes],
+  changed_byte_range: Optional[ByteRange] = None,
+) -> Iterator[bytes]:
   """
   Yield the lines of a unified diff from `old` to `new`, with three
   lines of context.
@@ -72,6 +91,13 @@ def diff_lines(old: list[bytes], new: list[bytes]) -> Iterator[bytes]:
 
   where N is the number of lines omitted and it says "inserted" for a
   run of added lines and "deleted" otherwise.
+
+  If `changed_byte_range` is provided, it is used to help determine the
+  unchanged common prefix and suffix.  Specifically, they are each as
+  large as possible without overlapping any byte in the given range.
+  This is helpful in cases where the "changed" region is ambiguous and
+  we want to ensure that what gets highlighted matches what the
+  minimizer was actually focused on.
   """
 
   # `SequenceMatcher` is very slow on large inputs with many repeated
@@ -81,13 +107,37 @@ def diff_lines(old: list[bytes], new: list[bytes]) -> Iterator[bytes]:
   # them, then form the hunks here, taking context lines from anywhere
   # in `old`.
   context = 3
+
+  # Byte offsets in `old` that the prefix may not extend past, and the
+  # suffix may not extend before.
+  if changed_byte_range is None:
+    prefix_limit = sum(map(len, old))
+    suffix_limit = 0
+  else:
+    prefix_limit = changed_byte_range.start
+    suffix_limit = changed_byte_range.stop
+
   limit = min(len(old), len(new))
+
+  # Number of lines in the common prefix, and the byte offset in `old`
+  # of its end.
+  #
+  # TODO: Adjust these variable names.
   prefix = 0
-  while prefix < limit and old[prefix] == new[prefix]:
+  prefix_end = 0
+  while (prefix < limit and old[prefix] == new[prefix] and
+         prefix_end + len(old[prefix]) <= prefix_limit):
+    prefix_end += len(old[prefix])
     prefix += 1
+
+  # Number of lines in the common suffix, and the byte offset in `old`
+  # of its start.
   suffix = 0
+  suffix_start = sum(map(len, old))
   while (suffix < limit - prefix and
-         old[-1 - suffix] == new[-1 - suffix]):
+         old[-1 - suffix] == new[-1 - suffix] and
+         suffix_start - len(old[-1 - suffix]) >= suffix_limit):
+    suffix_start -= len(old[-1 - suffix])
     suffix += 1
   matcher = difflib.SequenceMatcher(
     None, old[prefix:len(old)-suffix], new[prefix:len(new)-suffix],

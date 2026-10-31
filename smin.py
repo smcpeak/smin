@@ -120,7 +120,8 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
       invocation of the acceptance test.  SMIN_PROGRESS is set to a
       string that compactly describes where we are in the minimization
       process (it is part of the string that smin prints to the
-      console).
+      console).  CHANGED_BYTE_RANGE is set to "A-B", where the candidate
+      was produced from INPUT_BEST by modifying the byte range [A,B).
     """)
 
   parser.add_argument(

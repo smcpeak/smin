@@ -67,9 +67,11 @@ class CheckAccept:
 
     It is executed with envvar "INPUT" added to the environment with
     value `input_file_name`, "INPUT_BEST" with value `best_file_name`,
-    and "SMIN_PROGRESS" set to the progress report text of `report`.
-    If `report` is None (as for the initial test, which has no progress
-    report), SMIN_PROGRESS is instead set to "initial".
+    "SMIN_PROGRESS" set to the progress report text of `report`, and
+    "CHANGED_BYTE_RANGE" set to "A-B" where [A,B) is the changed byte
+    range of `report`.  If `report` is None (as for the initial test,
+    which has no progress report), SMIN_PROGRESS is instead set to
+    "initial" and CHANGED_BYTE_RANGE to "None".
 
     Its stdin reads from, and its stdout and stderr write to, the
     platform equivalent of /dev/null.  The former is to ensure it will
@@ -123,6 +125,10 @@ class CheckAccept:
     env["SMIN_PROGRESS"] = (
       "initial" if report is None
       else report.to_progress_string())
+    env["CHANGED_BYTE_RANGE"] = (
+      "None" if report is None
+      else f"{report.changed_byte_range.start}-"
+           f"{report.changed_byte_range.stop}")
 
     # Number of times SIGINT has been received while the program runs.
     interrupt_count = 0

@@ -94,7 +94,7 @@ import sys
 import time
 from typing import Optional
 
-from diff_lines import diff_lines
+from diff_lines import ByteRange, diff_lines
 
 
 # This function is called from t_accept_test.py (as well as below).
@@ -169,6 +169,10 @@ def _diff_from_best(data: bytes) -> bytes:
   """
   Return the diff, for --input-log, from the file named by $INPUT_BEST
   to `data`, or a note saying that file is not available.
+
+  If the envvar CHANGED_BYTE_RANGE is set to "A-B", then [A,B) is passed
+  to `diff_lines` as its `changed_byte_range` parameter.  If it is not
+  set or its value does not conform, it is ignored.
   """
   best_name = os.environ.get("INPUT_BEST")
   if best_name is None:
@@ -178,7 +182,23 @@ def _diff_from_best(data: bytes) -> bytes:
       best = f.read()
   except OSError:
     return b"(Cannot read INPUT_BEST, so there is no diff.)\n"
-  return b"".join(diff_lines(_split_lines(best), _split_lines(data)))
+  return b"".join(diff_lines(_split_lines(best), _split_lines(data),
+                             _changed_byte_range()))
+
+
+def _changed_byte_range() -> Optional[ByteRange]:
+  """
+  Return the range in the CHANGED_BYTE_RANGE envvar, or None if it is
+  not set or not of the form "A-B" with A <= B.
+  """
+  m = re.fullmatch(r"(\d+)-(\d+)",
+                   os.environ.get("CHANGED_BYTE_RANGE", ""), re.ASCII)
+  if m is None:
+    return None
+  start, stop = int(m.group(1)), int(m.group(2))
+  if start > stop:
+    return None
+  return ByteRange(start, stop)
 
 
 def _split_lines(data: bytes) -> list[bytes]:

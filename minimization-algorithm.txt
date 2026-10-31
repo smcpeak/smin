@@ -352,6 +352,10 @@ When running the test program, set environment variables:
   F=06% R=07".  For the initial test that is run before the main
   algorithm begins, SMIN_PROGRESS is set to "initial".
 
+* CHANGED_BYTE_RANGE: A string of the form "A-B" where the candidate was
+  created by modifying the byte range [A,B) from the most recently
+  accepted input.  For the initial test, it is "None".
+
 Rationale: The latter two can be used by "t_accept.py --input-log" to
 more easily follow the algorithm steps.
 

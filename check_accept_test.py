@@ -25,6 +25,7 @@ from unittest import mock
 
 from acceptance_test_result import AcceptanceTestResult
 from check_accept import CheckAccept
+from diff_lines import ByteRange
 from start_report import TestStartReport
 
 
@@ -83,7 +84,8 @@ class CheckAcceptTest(unittest.TestCase):
     report = TestStartReport(
       sequence_num=56, last_accepted_tok_count=16, pass_num=6,
       total_num_passes=7, granularity=2.1, completion_fraction=0.06,
-      removed_tok_count=7, initial_tok_count=67)
+      removed_tok_count=7, initial_tok_count=67,
+      changed_byte_range=ByteRange(10, 25))
     expect = "N=000056 S=16 P=(6/7) G=02.1 F=06% R=07"
     self.assertEqual(report.to_progress_string(), expect)
     code = (
@@ -91,6 +93,26 @@ class CheckAcceptTest(unittest.TestCase):
       f"sys.exit(0 if os.environ.get('SMIN_PROGRESS') == {expect!r} "
       "else 1)\n")
     self.assertEqual(self.run_code(code, report=report), ACCEPT)
+
+  def test_changed_byte_range_envvar(self) -> None:
+    report = TestStartReport(
+      sequence_num=1, last_accepted_tok_count=16, pass_num=1,
+      total_num_passes=5, granularity=16, completion_fraction=0,
+      removed_tok_count=16, initial_tok_count=16,
+      changed_byte_range=ByteRange(10, 25))
+    code = (
+      "import os, sys\n"
+      "sys.exit(0 if os.environ.get('CHANGED_BYTE_RANGE') == '10-25' "
+      "else 1)\n")
+    self.assertEqual(self.run_code(code, report=report), ACCEPT)
+
+  def test_initial_changed_byte_range_envvar(self) -> None:
+    code = (
+      "import os, sys;\n"
+      "sys.exit(0 if os.environ.get('CHANGED_BYTE_RANGE') == 'None' "
+      "else 1)\n")
+    with mock.patch.dict(os.environ, {"CHANGED_BYTE_RANGE": "1-2"}):
+      self.assertEqual(self.run_code(code), ACCEPT)
 
   def test_initial_progress_envvar(self) -> None:
     code = (

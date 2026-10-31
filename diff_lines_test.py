@@ -7,13 +7,18 @@ from __future__ import annotations
 
 import unittest
 
-from diff_lines import diff_lines
+from diff_lines import ByteRange, diff_lines
 
 
-def diff(old: bytes, new: bytes) -> str:
-  """Diff `old` and `new`, split into lines, returning the diff text."""
+def diff(old: bytes, new: bytes,
+         changed: ByteRange | None = None) -> str:
+  """
+  Diff `old` and `new`, split into lines, with changed byte range
+  `changed`, returning the diff text.
+  """
   return b"".join(diff_lines(old.splitlines(keepends=True),
-                             new.splitlines(keepends=True))).decode()
+                             new.splitlines(keepends=True),
+                             changed)).decode()
 
 
 def numbered(start: int, stop: int) -> bytes:
@@ -124,6 +129,39 @@ class DiffLinesTest(unittest.TestCase):
       "<omitting 3 deleted lines>\n"
       "-9\n-10\n-11\n-12\n-13\n"
       "+x\n+x\n+x\n")
+
+  def test_changed_byte_range(self) -> None:
+    # Deleting either "a\nb\n" yields the same result.  By default the
+    # common prefix is as long as possible, so the second is shown as
+    # deleted, but the range can specify that it was the first.
+    old = b"a\nb\na\nb\nc\n"
+    new = b"a\nb\nc\n"
+    self.assertEqual(diff(old, new),
+                     "@@ -1,5 +1,3 @@\n a\n b\n-a\n-b\n c\n")
+    self.assertEqual(diff(old, new, ByteRange(0, 4)),
+                     "@@ -1,5 +1,3 @@\n-a\n-b\n a\n b\n c\n")
+    self.assertEqual(diff(old, new, ByteRange(4, 8)),
+                     "@@ -1,5 +1,3 @@\n a\n b\n-a\n-b\n c\n")
+
+  def test_changed_byte_range_within_line(self) -> None:
+    # A line that overlaps the range is in neither the prefix nor the
+    # suffix, even if it is unchanged.  Here, the "b\n" being deleted
+    # could be either of them, and the range says it is the second.
+    old = b"a\nb\nb\nc\n"
+    new = b"a\nb\nc\n"
+    self.assertEqual(diff(old, new, ByteRange(4, 5)),
+                     "@@ -1,4 +1,3 @@\n a\n b\n-b\n c\n")
+    self.assertEqual(diff(old, new, ByteRange(3, 4)),
+                     "@@ -1,4 +1,3 @@\n a\n-b\n b\n c\n")
+
+  def test_changed_byte_range_empty(self) -> None:
+    # An empty range says where an insertion was made.
+    old = b"a\n"
+    new = b"a\na\n"
+    self.assertEqual(diff(old, new, ByteRange(0, 0)),
+                     "@@ -1,1 +1,2 @@\n+a\n a\n")
+    self.assertEqual(diff(old, new, ByteRange(2, 2)),
+                     "@@ -1,1 +1,2 @@\n a\n+a\n")
 
   def test_large_repetitive_input(self) -> None:
     # A localized change in a large input with many repeated lines is

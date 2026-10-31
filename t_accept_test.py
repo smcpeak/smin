@@ -276,16 +276,20 @@ class TAcceptTest(unittest.TestCase):
   NEW_BEST_LINE = "=" * 31 + " NEW BEST " + "=" * 31 + "\n"
 
   def run_input_log(self, best: bytes | None, contents: bytes,
-                    expect: int, new_best: bool = False) -> str:
+                    expect: int, new_best: bool = False,
+                    changed: str | None = None) -> str:
     """
     Run with --input-log, INPUT_BEST naming a file containing `best`
     (or not set, if None), and SMIN_PROGRESS set.  If `new_best`, also
-    pass --log-new-best.  The input is accepted if it contains "keep".
-    Return what was logged.
+    pass --log-new-best.  If `changed` is not None, set
+    CHANGED_BYTE_RANGE to it.  The input is accepted if it contains
+    "keep".  Return what was logged.
     """
     ilog = self.dir / "ilog.txt"
     ilog.unlink(missing_ok=True)
     env = {"SMIN_PROGRESS": "N=000001"}
+    if changed is not None:
+      env["CHANGED_BYTE_RANGE"] = changed
     if best is not None:
       best_path = self.dir / "input.cc.best"
       best_path.write_bytes(best)
@@ -345,6 +349,28 @@ class TAcceptTest(unittest.TestCase):
     # --log-new-best has no effect without --input-log.
     self.check(["--log-new-best", "--has-string", "a"], b"a\n", 0)
     self.assertEqual(list(self.dir.iterdir()), [self.input_path])
+
+  def test_input_log_changed_byte_range(self) -> None:
+    # Either "a\n" could be the one deleted, and CHANGED_BYTE_RANGE says
+    # which one it was.
+    best = b"keep\na\na\n"
+    header = "\n" + self.ACCEPT_LINE + "Progress: N=000001\n"
+    self.assertEqual(
+      self.run_input_log(best, b"keep\na\n", 0, changed="5-7"),
+      header + "@@ -1,3 +1,2 @@\n keep\n-a\n a\n")
+    self.assertEqual(
+      self.run_input_log(best, b"keep\na\n", 0, changed="7-9"),
+      header + "@@ -1,3 +1,2 @@\n keep\n a\n-a\n")
+
+  def test_input_log_bad_changed_byte_range(self) -> None:
+    # A malformed CHANGED_BYTE_RANGE is ignored.
+    best = b"keep\na\na\n"
+    expect = ("\n" + self.ACCEPT_LINE + "Progress: N=000001\n" +
+              "@@ -1,3 +1,2 @@\n keep\n a\n-a\n")
+    for changed in ["None", "", "5", "7-5", "5-7x", "-1-7", "a-b"]:
+      self.assertEqual(
+        self.run_input_log(best, b"keep\na\n", 0, changed=changed),
+        expect, changed)
 
   def test_input_log_no_change(self) -> None:
     self.assertEqual(

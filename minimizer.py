@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import Optional
 
 from acceptance_test_result import AcceptanceTestResult
+from diff_lines import ByteRange
 from smin_token import SMToken
 from start_report import TestStartReport
 from token_tree import TTNode
@@ -104,6 +105,9 @@ class Minimizer:
   # Number of True elements in `token_live`.
   live_tok_count: int
 
+  # Size in bytes of the most recently accepted input.
+  accepted_size: int
+
   # Map from the 16-byte MD5 digest of a candidate input to its outcome,
   # for a candidate that has already been tested.  The INTERRUPTED
   # outcome is never stored here.
@@ -168,8 +172,10 @@ class Minimizer:
       self.total_num_passes = min(self.total_num_passes, max_passes)
     self.pass_index = 0
 
+    initial_text = self.render_candidate({})
+    self.accepted_size = len(initial_text)
     self.memoized_accept = {
-      _digest(self.render_candidate({})): AcceptanceTestResult.ACCEPT,
+      _digest(initial_text): AcceptanceTestResult.ACCEPT,
     }
 
 
@@ -226,16 +232,40 @@ class Minimizer:
     `extra`, which maps a node's id() to its candidate replacement.
     The result ends with a newline if the original input did.
     """
+    return self.render_candidate_with_range(extra)[0]
+
+
+  def render_candidate_with_range(
+    self,
+    extra: dict[int, bytes],
+  ) -> tuple[bytes, Optional[ByteRange]]:
+    """
+    Render the candidate as `render_candidate` does, and also return
+    the range of bytes in the most recently accepted input that were
+    modified to produce it, or None if `extra` is empty.  The bytes
+    before and after that range are the same in the candidate.
+    """
 
     # Candidate token map: for each token, None if it is live, and
     # otherwise its replacement text.
     ctm: list[bytes | None] = [None] * len(self.tokens)
-    self._fill_ctm(self.tree_root, extra, ctm)
-    text = _render_ctm([t.text for t in self.tokens], ctm)
+    affected = self._fill_ctm(self.tree_root, extra, ctm)
+    text, offsets = _render_ctm([t.text for t in self.tokens], ctm,
+                                affected)
 
     if self.ends_with_newline and not text.endswith(b"\n"):
       text += b"\n"
-    return text
+
+    if offsets is None:
+      return text, None
+
+    # The candidate and the accepted input agree after `sync`, so the
+    # end of the modified range is that far from the end of the latter.
+    entry, sync = offsets
+    stop = (self.accepted_size if sync is None
+            else self.accepted_size - (len(text) - sync))
+    assert entry <= stop
+    return text, ByteRange(entry, stop)
 
 
   def node_size(self, node: TTNode) -> int:
@@ -265,13 +295,19 @@ class Minimizer:
     node: TTNode,
     extra: dict[int, bytes],
     ctm: list[bytes | None],
-  ) -> None:
+  ) -> Optional[tuple[int, int]]:
     """
     Record in `ctm` the replacements of `node` and its descendants.  A
     replacement on a node overrides any on its descendants.
+
+    Return the smallest range [start, end) of token indices that
+    contains every node replaced by `extra`, or None if there are none.
     """
     replacement = extra.get(id(node))
-    if replacement is None:
+    affected: Optional[tuple[int, int]] = None
+    if replacement is not None:
+      affected = self.node_span[id(node)]
+    else:
       replacement = self.cur_replacement.get(id(node))
 
     if replacement is not None:
@@ -282,7 +318,13 @@ class Minimizer:
           ctm[i] = b""
     else:
       for child in node.children:
-        self._fill_ctm(child, extra, ctm)
+        child_affected = self._fill_ctm(child, extra, ctm)
+        if child_affected is not None:
+          affected = child_affected if affected is None else (
+            min(affected[0], child_affected[0]),
+            max(affected[1], child_affected[1]))
+
+    return affected
 
 
   def _exceeds_half_granularity(self, size: int) -> bool:
@@ -393,11 +435,14 @@ class Minimizer:
     which replace `nodes`, to the current ones.  If it is accepted, make
     them current and return True.
     """
-    text: bytes = self.render_candidate(extra)
+    text: bytes
+    changed: Optional[ByteRange]
+    text, changed = self.render_candidate_with_range(extra)
+    assert changed is not None
     digest: bytes = _digest(text)
 
     self.sequence_num += 1
-    report = self._make_report(nodes)
+    report = self._make_report(nodes, changed)
     self.report_test_starting(report)
 
     result: Optional[AcceptanceTestResult] = self.memoized_accept.get(digest)
@@ -413,6 +458,7 @@ class Minimizer:
     if result != AcceptanceTestResult.ACCEPT:
       return False
 
+    self.accepted_size = len(text)
     self._commit(extra)
     return True
 
@@ -433,8 +479,15 @@ class Minimizer:
       raise _StopMinimization(AcceptanceTestResult.ACCEPT)
 
 
-  def _make_report(self, nodes: list[TTNode]) -> TestStartReport:
-    """Make the report for a test of the candidate replacing `nodes`."""
+  def _make_report(
+    self,
+    nodes: list[TTNode],
+    changed: ByteRange,
+  ) -> TestStartReport:
+    """
+    Make the report for a test of the candidate replacing `nodes`, which
+    modifies the `changed` bytes of the most recently accepted input.
+    """
 
     # `e` (called "E" in the spec) is the 1-based index, among the live
     # tokens, of the last live token in the candidate, or of the live
@@ -454,6 +507,7 @@ class Minimizer:
       completion_fraction=(num_live - e) / num_live,
       removed_tok_count=sum(self.node_size(n) for n in nodes),
       initial_tok_count=len(self.tokens),
+      changed_byte_range=changed,
     )
 
 
@@ -489,14 +543,34 @@ def _trail_indent(s: bytes) -> bytes:
   return _leading_ws(s[start:])
 
 
-def _render_ctm(texts: list[bytes], ctm: list[bytes | None]) -> bytes:
+# TODO: Define classes for `affected` and the return value.
+def _render_ctm(
+  texts: list[bytes],
+  ctm: list[bytes | None],
+  affected: Optional[tuple[int, int]] = None,
+) -> tuple[bytes, Optional[tuple[int, Optional[int]]]]:
   """
   Render the candidate where token i has original text `texts[i]`, and
   is live if `ctm[i]` is None, and otherwise replaced by `ctm[i]`.
 
   See minimization-algorithm.txt, "Candidate rendering".
+
+  If `affected` is not None, it is the range [start, end) of indices of
+  the tokens whose replacements differ from those of the accepted input.
+  Then also return (`entry`, `sync`), where `entry` is the size of the
+  output before rendering token `start`, and `sync` is the offset in
+  the output where the first live token at or after `end` has its text
+  after its leading whitespace, or None if there is no such token.  The
+  output before `entry` is the same as that of the accepted input, as
+  is the output starting at `sync`.  (The output does not necessarily
+  sync up at the end of the affected tokens, since the whitespace that
+  precedes the next live token depends on the preceding gap.)
   """
   out: list[bytes] = []
+
+  # Output offsets to return, once known.
+  entry: Optional[int] = None
+  sync: Optional[int] = None
 
   # True once a live token has been emitted, i.e., there is an "A".
   seen_live = False
@@ -509,7 +583,12 @@ def _render_ctm(texts: list[bytes], ctm: list[bytes | None]) -> bytes:
   # the last piece.
   trivial: list[bytes] = []
 
-  for text, replacement in zip(texts, ctm, strict=True):
+  for i, (text, replacement) in enumerate(zip(texts, ctm, strict=True)):
+    if affected is not None and i == affected[0]:
+      # We just crossed into the affected region, so record the size of
+      # what has been rendered so far to `out`.
+      entry = sum(map(len, out))
+
     if replacement is None:
       if not in_gap:
         out.append(text)
@@ -531,6 +610,12 @@ def _render_ctm(texts: list[bytes], ctm: list[bytes | None]) -> bytes:
 
       seen_live = True
 
+      if (affected is not None and sync is None and
+          i >= affected[1]):
+        # Only the whitespace emitted before this token's own
+        # non-whitespace text can differ from the accepted input.
+        sync = sum(map(len, out)) - (len(text) - len(_leading_ws(text)))
+
     else:
       in_gap = True
       if replacement:
@@ -543,7 +628,16 @@ def _render_ctm(texts: list[bytes], ctm: list[bytes | None]) -> bytes:
         trivial.append(text)
 
   # Any trivially replaced tokens at the end are discarded.
-  return b"".join(out)
+  text = b"".join(out)
+
+  if affected is None:
+    return text, None
+  if entry is None:
+    # TODO: Explain this case better.
+    #
+    # The affected range is empty, at the end.
+    entry = len(text)
+  return text, (entry, sync)
 
 
 # EOF

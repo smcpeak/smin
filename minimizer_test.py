@@ -67,9 +67,23 @@ class Recorder:
     self.starts: list[TestStartReport] = []
     self.finishes: list[tuple[AcceptanceTestResult, bool]] = []
 
+    # The minimizer made by `make_minimizer`.
+    self.minimizer: Minimizer | None = None
+
   def test(self, data: bytes, report: TestStartReport) -> AcceptanceTestResult:
     # The test receives the report issued just before it.
     assert report is self.starts[-1]
+
+    # Outside the changed range, the candidate is the same as the most
+    # recently accepted input.
+    assert self.minimizer is not None
+    best = self.minimizer.render_candidate({})
+    changed = report.changed_byte_range
+    assert 0 <= changed.start <= changed.stop <= len(best)
+    assert data[:changed.start] == best[:changed.start]
+    assert (data[len(data) - (len(best) - changed.stop):] ==
+            best[changed.stop:])
+
     self.tested.append(data)
     if len(self.tested) == self.interrupt_at:
       return INTERRUPTED
@@ -81,8 +95,9 @@ class Recorder:
     nt: NTReplacementFunc = no_replacement,
     max_passes: int | None = None,
   ) -> Minimizer:
-    return Minimizer(root, nt, self.test, self.starts.append,
-                     self.finish, max_passes)
+    self.minimizer = Minimizer(root, nt, self.test, self.starts.append,
+                               self.finish, max_passes)
+    return self.minimizer
 
   def finish(self, result: AcceptanceTestResult, memoized: bool) -> None:
     self.finishes.append((result, memoized))
@@ -98,6 +113,49 @@ class RenderCandidateTest(unittest.TestCase):
     m = Recorder(lambda d: True).make_minimizer(root)
     extra = {id(find_node(root, k)): v for k, v in replace.items()}
     return m.render_candidate(extra)
+
+  def changed_range(
+    self,
+    src: bytes,
+    replace: dict[bytes, bytes],
+  ) -> tuple[int, int] | None:
+    """
+    Like `render`, but return the changed byte range as a tuple, or
+    None if there is none.
+    """
+    root = build_tree(tokenize_cpp(src))
+    m = Recorder(lambda d: True).make_minimizer(root)
+    extra = {id(find_node(root, k)): v for k, v in replace.items()}
+    r = m.render_candidate_with_range(extra)[1]
+    return None if r is None else (r.start, r.stop)
+
+  def test_changed_range_none(self) -> None:
+    self.assertIsNone(self.changed_range(b"a;\n", {}))
+
+  def test_changed_range_delete_line(self) -> None:
+    # "a;\nb;\nc;\n" becomes "a;\nc;\n".  The range includes the
+    # newline before "c", the leading whitespace of the next live token,
+    # since that whitespace can change.
+    self.assertEqual(
+      self.changed_range(b"a;\nb;\nc;\n", {b"\nb;": b""}), (2, 6))
+
+  def test_changed_range_includes_next_whitespace(self) -> None:
+    # "a+b" becomes "a b", so the space added before "b" is part of the
+    # change, even though "b" itself is not replaced.
+    self.assertEqual(self.changed_range(b"a+b", {b"+": b""}), (1, 2))
+
+  def test_changed_range_non_trivial(self) -> None:
+    # The final newline token is entirely whitespace, so the range
+    # extends to the end.
+    self.assertEqual(
+      self.changed_range(b"f() {\n  x;\n}\n", {b" {\n  x;\n}": b";"}),
+      (3, 13))
+
+  def test_changed_range_at_end(self) -> None:
+    # Nothing live follows the change, so it extends to the end.
+    self.assertEqual(
+      self.changed_range(b"a;\nb;\n", {b"\nb;": b"", b"\n": b""}),
+      (2, 6))
 
   def test_no_replacements(self) -> None:
     src = b"int main()\n{\n  return 0;\n}\n"

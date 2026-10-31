@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import unittest
 
+from diff_lines import ByteRange
 from start_report import TestStartReport
 
 
@@ -19,6 +20,7 @@ def make_report(
   completion_fraction: float = 0,
   removed_tok_count: int = 1234,
   initial_tok_count: int = 1234,
+  changed_byte_range: ByteRange = ByteRange(0, 5000),
 ) -> TestStartReport:
   """Make a report, with defaults for a 1234-token input."""
   return TestStartReport(
@@ -30,6 +32,7 @@ def make_report(
     completion_fraction=completion_fraction,
     removed_tok_count=removed_tok_count,
     initial_tok_count=initial_tok_count,
+    changed_byte_range=changed_byte_range,
   )
 
 
