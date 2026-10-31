@@ -253,9 +253,9 @@ Output 2:
       [
         "\n  // Must be a named declaration."
         [
-          "\n  if "
+          "\n  if"
           [
-            "(!isa<clang::NamedDecl>"
+            " (!isa<clang::NamedDecl>"
             [
               "(dn.m_decl)"
             ]
@@ -285,9 +285,9 @@ Output 2:
           ]
         ]
         [
-          "\n  if "
+          "\n  if"
           [
-            "(!parent)"
+            " (!parent)"
           ]
           [
             " {"
