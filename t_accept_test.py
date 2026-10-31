@@ -265,24 +265,26 @@ class TAcceptTest(unittest.TestCase):
     return ilog.read_text()
 
   def test_input_log_reject(self) -> None:
-    # The diff has three lines of context, and no header.
+    # The diff has three lines of context.
     self.assertEqual(
       self.run_input_log(b"1\n2\n3\n4\nkeep\n6\n7\n8\n9\n",
                          b"1\n2\n3\n4\n6\n7\n8\n9\n", 1),
       "\n" + self.REJECT_LINE +
       "Progress: N=000001\n"
+      "@@ -2,7 +2,6 @@\n"
       " 2\n 3\n 4\n-keep\n 6\n 7\n 8\n")
 
   def test_input_log_accept(self) -> None:
-    # Hunks are separated by "@@", and the accepted input follows.
+    # Each hunk has a header, and the accepted input follows.
     best = b"keep\n" + b"".join(b"%d\n" % i for i in range(1, 11))
     contents = b"keep\n2\n3\n4\n5\n6\n7\n8\n9\nten\n"
     self.assertEqual(
       self.run_input_log(best, contents, 0),
       "\n" + self.ACCEPT_LINE +
       "Progress: N=000001\n"
+      "@@ -1,5 +1,4 @@\n"
       " keep\n-1\n 2\n 3\n 4\n"
-      "@@\n"
+      "@@ -8,4 +7,4 @@\n"
       " 7\n 8\n 9\n-10\n+ten\n" +
       self.NEW_BEST_LINE +
       contents.decode())
