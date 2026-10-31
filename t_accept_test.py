@@ -180,6 +180,36 @@ class TAcceptTest(unittest.TestCase):
     self.assertEqual(code, 2)
     self.assertIn("cannot run clang", self.err)
 
+  # ---- --reject ----
+
+  def test_reject_best_exists(self) -> None:
+    best = self.dir / "input.cc.best"
+    best.write_bytes(b"x\n")
+    code = self.run_main(["--reject"], b"x\n", {"INPUT_BEST": str(best)})
+    self.assertEqual(code, 1)
+    self.assertEqual(self.out, "reject: --reject, and INPUT_BEST exists\n")
+
+  def test_reject_best_missing(self) -> None:
+    # The first input is accepted, since INPUT_BEST does not exist yet.
+    best = self.dir / "input.cc.best"
+    code = self.run_main(["--reject"], b"x\n", {"INPUT_BEST": str(best)})
+    self.assertEqual(code, 0)
+
+  # The test invocation protocol requires INPUT_BEST, but for
+  # completness we will verify the behavior if it is unset.
+  def test_reject_best_not_set(self) -> None:
+    with mock.patch.dict(os.environ):
+      os.environ.pop("INPUT_BEST", None)
+      self.check(["--reject"], b"x\n", 0)
+
+  def test_reject_first_input_other_checks(self) -> None:
+    # Other checks still apply to the first input.
+    best = self.dir / "input.cc.best"
+    code = self.run_main(["--reject", "--has-string", "keep"], b"x\n",
+                         {"INPUT_BEST": str(best)})
+    self.assertEqual(code, 1)
+    self.assertEqual(self.out, "reject: no line contains 'keep'\n")
+
   # ---- --sleep ----
 
   def test_sleep(self) -> None:

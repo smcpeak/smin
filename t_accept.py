@@ -36,6 +36,11 @@ Options:
 
     Require that "clang -fsyntax-only -xc++ $INPUT" exit with code 0.
 
+  --reject
+
+    Reject all inputs except for the first, which is recognized by the
+    fact that the $INPUT_BEST file does not exist.
+
   --sleep <s>
 
     Sleep for <s> (a decimal number) seconds at the start, simulating a
@@ -210,6 +215,10 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
     "--clang", action="store_true",
     help='Require that "clang -fsyntax-only -xc++ $INPUT" succeeds.')
   parser.add_argument(
+    "--reject", action="store_true",
+    help="Reject every input except the first, which is recognized by "
+         "the INPUT_BEST file not existing.")
+  parser.add_argument(
     "--sleep", type=float, metavar="S",
     help="Sleep for S seconds at the start.")
   parser.add_argument(
@@ -256,6 +265,13 @@ def _first_failure(
   since it is the slowest.
   """
   lines = data.splitlines()
+
+  if args.reject:
+    # If INPUT_BEST is not set, there is no such file, so the input is
+    # treated as the first.
+    best_name = os.environ.get("INPUT_BEST")
+    if best_name is not None and os.path.exists(best_name):
+      return "--reject, and INPUT_BEST exists"
 
   for s in args.has_string:
     if not any(os.fsencode(s) in line for line in lines):

@@ -111,9 +111,16 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
     description="Minimize input_file, preserving the property that "
                 "test_program accepts it.",
     epilog="""
-      For convenience, the test program is run with the INPUT
-      environment variable set to input_file.  An exit status of 0 means
-      the candidate is accepted.
+      The test program indicates acceptance by exiting with code 0;
+      anything else means reject.  It is run with the INPUT envvar set
+      to <input_file> (the same string as was passed on the command
+      line).  INPUT_BEST is set to "<input_file>.best", which the
+      minimizer maintains as the most recently accepted input.
+      INPUT_BEST is set, but the file does not exist, on the very first
+      invocation of the acceptance test.  SMIN_PROGRESS is set to a
+      string that compactly describes where we are in the minimization
+      process (it is part of the string that smin prints to the
+      console).
     """)
 
   parser.add_argument(
@@ -323,10 +330,23 @@ def main(argv: list[str]) -> int:
   # passes.
   console.line("")
 
+  # There is a quirk here that shows up with "./t_accept.py --reject"
+  # and similar situations: if the whitespace at the end of the file is
+  # a single newline (which is typical), then that becomes its own
+  # token, which the core minimizer algorithm will attempt to remove.
+  # However, a newline is then added by the candidate renderer, since we
+  # don't want to test inputs without final newlines if the original
+  # wasn't that way.  Even with --reject or similar, the candidate with
+  # the final newline "removed" gets accepted because (after rendering)
+  # it exactly matches the original input and hence is in the
+  # memoization table.  Later, the "Reduced file" message claims a
+  # single token was removed, even though the file contents are
+  # unchanged.  For now, I just note the oddity.
   console.line(
     f"Reduced file {fname} from {orig_tok_count} tokens "
     f"({len(data)} bytes) to {final_tok_count} tokens "
     f"({len(final_data)} bytes).")
+
   console.line(
     f"Elapsed time (D:HH:MM:SS): "
     f"{format_elapsed_time(time.monotonic() - start_time)}")

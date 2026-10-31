@@ -181,6 +181,19 @@ out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	touch $@
 
 
+# Preprocessed output, limited to 2 passes and using --reject.
+out/m/hello-cpp-2pass-rej.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
+	$(CREATE_OUTPUT_DIRECTORY)
+	clang -E test/hello-cpp.cc -o out/m/hello-cpp-2pass-rej.ii
+	$(RM) out/m/hello-cpp-2pass-rej.ii.ilog
+	$(PYTHON) ./smin.py --max-passes 2 ./t_accept.py \
+	  --reject \
+	  --input-log out/m/hello-cpp-2pass-rej.ii.ilog \
+	  -- out/m/hello-cpp-2pass-rej.ii
+	@# No expected output here, I just want to see it run.
+	touch $@
+
+
 # These tests require clang, which might not be installed, and even
 # when it is, they are somewhat slow, taking ~10 seconds.
 ifeq ($(USE_CLANG),1)
@@ -189,6 +202,8 @@ check: out/m/hello-cpp.cc.ok
 
 # This one is currently very slow.  I'm working on improving it.
 #check: out/m/hello-cpp.ii.ok
+
+check: out/m/hello-cpp-2pass-rej.ii.ok
 endif
 
 
