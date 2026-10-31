@@ -1,0 +1,11 @@
+
+
+#include <iostream>
+
+int helper
+;
+
+int main()
+{
+  std::cout << helper << "\n";
+}

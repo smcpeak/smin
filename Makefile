@@ -128,9 +128,24 @@ out/m/hello-clang.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
 	cmp out/m/hello-clang.c test/hello-clang.c.exp
 	touch $@
 
+# Same idea but using C++ syntax.
+out/m/hello-cpp.cc.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
+	$(CREATE_OUTPUT_DIRECTORY)
+	cp test/hello-cpp.cc out/m/hello-cpp.cc
+	$(RM) out/m/hello-cpp.cc.ilog
+	$(PYTHON) ./smin.py ./t_accept.py \
+	  --clang \
+	  --before-after helper helper \
+	  --has-string std::cout \
+	  --input-log out/m/hello-cpp.cc.ilog \
+	  -- out/m/hello-cpp.cc
+	cmp out/m/hello-cpp.cc test/hello-cpp.cc.exp
+	touch $@
+
 # Test only runs if we say we have clang.
 ifeq ($(USE_CLANG),1)
 check: out/m/hello-clang.c.ok
+check: out/m/hello-cpp.cc.ok
 endif
 
 
