@@ -117,6 +117,9 @@ check: out/m/hello-delim.c.ok
 
 
 # Minimize hello.c using clang to check syntax.
+#
+# This one uses --log-new-best, whereas the others don't, mainly so I
+# have at least one end-to-end test that exercises it.
 out/m/hello-clang.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	cp test/hello.c out/m/hello-clang.c
@@ -126,6 +129,7 @@ out/m/hello-clang.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
 	  --before-after helper helper \
 	  --has-string printf \
 	  --input-log out/m/hello-clang.c.ilog \
+	  --log-new-best \
 	  -- out/m/hello-clang.c
 	cmp out/m/hello-clang.c test/hello-clang.c.exp
 	touch $@

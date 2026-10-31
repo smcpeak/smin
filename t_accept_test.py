@@ -246,11 +246,12 @@ class TAcceptTest(unittest.TestCase):
   NEW_BEST_LINE = "=" * 31 + " NEW BEST " + "=" * 31 + "\n"
 
   def run_input_log(self, best: bytes | None, contents: bytes,
-                    expect: int) -> str:
+                    expect: int, new_best: bool = False) -> str:
     """
     Run with --input-log, INPUT_BEST naming a file containing `best`
-    (or not set, if None), and SMIN_PROGRESS set.  The input is
-    accepted if it contains "keep".  Return what was logged.
+    (or not set, if None), and SMIN_PROGRESS set.  If `new_best`, also
+    pass --log-new-best.  The input is accepted if it contains "keep".
+    Return what was logged.
     """
     ilog = self.dir / "ilog.txt"
     ilog.unlink(missing_ok=True)
@@ -259,8 +260,10 @@ class TAcceptTest(unittest.TestCase):
       best_path = self.dir / "input.cc.best"
       best_path.write_bytes(best)
       env["INPUT_BEST"] = str(best_path)
-    code = self.run_main(
-      ["--input-log", str(ilog), "--has-string", "keep"], contents, env)
+    argv = ["--input-log", str(ilog), "--has-string", "keep"]
+    if new_best:
+      argv.append("--log-new-best")
+    code = self.run_main(argv, contents, env)
     self.assertEqual(code, expect)
     return ilog.read_text()
 
@@ -275,11 +278,12 @@ class TAcceptTest(unittest.TestCase):
       " 2\n 3\n 4\n-keep\n 6\n 7\n 8\n")
 
   def test_input_log_accept(self) -> None:
-    # Each hunk has a header, and the accepted input follows.
+    # Each hunk has a header, and with --log-new-best, the accepted
+    # input follows.
     best = b"keep\n" + b"".join(b"%d\n" % i for i in range(1, 11))
     contents = b"keep\n2\n3\n4\n5\n6\n7\n8\n9\nten\n"
     self.assertEqual(
-      self.run_input_log(best, contents, 0),
+      self.run_input_log(best, contents, 0, new_best=True),
       "\n" + self.ACCEPT_LINE +
       "Progress: N=000001\n"
       "@@ -1,5 +1,4 @@\n"
@@ -289,9 +293,32 @@ class TAcceptTest(unittest.TestCase):
       self.NEW_BEST_LINE +
       contents.decode())
 
+  def test_input_log_accept_without_new_best(self) -> None:
+    # Without --log-new-best, the accepted input is not logged.
+    self.assertEqual(
+      self.run_input_log(b"keep\nx\n", b"keep\n", 0),
+      "\n" + self.ACCEPT_LINE +
+      "Progress: N=000001\n"
+      "@@ -1,2 +1,1 @@\n"
+      " keep\n-x\n")
+
+  def test_input_log_reject_with_new_best(self) -> None:
+    # A rejected input is not logged, even with --log-new-best.
+    self.assertEqual(
+      self.run_input_log(b"keep\n", b"other\n", 1, new_best=True),
+      "\n" + self.REJECT_LINE +
+      "Progress: N=000001\n"
+      "@@ -1,1 +1,1 @@\n"
+      "-keep\n+other\n")
+
+  def test_log_new_best_without_input_log(self) -> None:
+    # --log-new-best has no effect without --input-log.
+    self.check(["--log-new-best", "--has-string", "a"], b"a\n", 0)
+    self.assertEqual(list(self.dir.iterdir()), [self.input_path])
+
   def test_input_log_no_change(self) -> None:
     self.assertEqual(
-      self.run_input_log(b"keep\n", b"keep\n", 0),
+      self.run_input_log(b"keep\n", b"keep\n", 0, new_best=True),
       "\n" + self.ACCEPT_LINE +
       "Progress: N=000001\n" +
       self.NEW_BEST_LINE +

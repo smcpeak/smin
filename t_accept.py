@@ -63,14 +63,23 @@ Options:
       " reject " centered between lines of dashes.
     * A line: "Progress: $SMIN_PROGRESS".
     * A unified diff of $INPUT_BEST versus $INPUT showing the change
-      under consideration.
-    * If the verdict is acceptance, a separator line with " NEW BEST "
-      centered between lines of equals-signs, then the contents of
-      the input file.
+      under consideration.  Long runs of deletions are summarized.
+
+  --log-new-best
+
+    With --input-log, if the verdict is acceptance, add a separator line
+    with " NEW BEST " centered between lines of equals-signs, then the
+    contents of the input file.
 
 It is an error (exit code 2) if INPUT is not set in the environment or
 the named file cannot be read.
 """
+
+# It is somewhat redundant to have the options documented in both the
+# module docstring and the --help text produced by argparse.  I do this
+# because my current workflow is that I modify the docstring, then ask
+# Claude to implement my change.  So the docstring acts as the
+# specification, and the --help output is part of the implementation.
 
 import argparse
 import os
@@ -144,7 +153,7 @@ def main(argv: list[str]) -> int:
       f.write(b"\n" + label.center(72, "-").encode() + b"\n")
       f.write((f"Progress: {progress}\n").encode())
       f.write(_diff_from_best(data))
-      if failure is None:
+      if failure is None and args.log_new_best:
         f.write(" NEW BEST ".center(72, "=").encode() + b"\n")
         f.write(data)
 
@@ -211,9 +220,12 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
     help="Append a line describing this invocation to LOGFILE.")
   parser.add_argument(
     "--input-log", metavar="ILOGFILE",
-    help="Append a verdict header line, minimizer progress status, a "
-         "diff describing the change in the candidate, and upon "
-         "acceptance, the new best input; all to ILOGFILE.")
+    help="Append a verdict header line, minimizer progress status, and "
+         "a diff describing the change in the candidate to ILOGFILE.")
+  parser.add_argument(
+    "--log-new-best", action="store_true",
+    help="With --input-log, upon acceptance, also append the new best "
+         "input.")
   return parser.parse_args(argv)
 
 
