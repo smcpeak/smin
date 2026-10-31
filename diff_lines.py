@@ -11,7 +11,7 @@ import difflib
 
 
 @dataclass(frozen=True)
-class _Range:
+class _LineRange:
   """
   Describes a contiguous sequence of lines.
   """
@@ -40,10 +40,10 @@ class _Change:
   """
 
   # Lines removed.
-  old: _Range
+  old: _LineRange
 
   # Lines added.
-  new: _Range
+  new: _LineRange
 
 
 def diff_lines(old: list[bytes], new: list[bytes]) -> Iterator[bytes]:
@@ -95,8 +95,8 @@ def diff_lines(old: list[bytes], new: list[bytes]) -> Iterator[bytes]:
 
   # Copy the data from `matcher` into our own format.
   changes: list[_Change] = [
-    _Change(_Range(i1 + prefix, i2 + prefix),
-            _Range(j1 + prefix, j2 + prefix))
+    _Change(_LineRange(i1 + prefix, i2 + prefix),
+            _LineRange(j1 + prefix, j2 + prefix))
     for tag, i1, i2, j1, j2 in matcher.get_opcodes()
     if tag != "equal"
   ]
@@ -127,15 +127,15 @@ def diff_lines(old: list[bytes], new: list[bytes]) -> Iterator[bytes]:
   for hunk in hunks:
     # Let `old_range` be the lines covered by this hunk, expanded to
     # include up to `context` lines of context.
-    first:     _Change = hunk[0]
-    last:      _Change = hunk[-1]
-    old_start: int     = max(0, first.old.start - context)
-    old_stop:  int     = min(len(old), last.old.stop + context)
-    old_range: _Range  = _Range(old_start, old_stop)
+    first:     _Change     = hunk[0]
+    last:      _Change     = hunk[-1]
+    old_start: int         = max(0, first.old.start - context)
+    old_stop:  int         = min(len(old), last.old.stop + context)
+    old_range: _LineRange  = _LineRange(old_start, old_stop)
 
     # Corresponding range in the new data, expanded by the same amount
     # on each end that `old_range` was.
-    new_range: _Range = _Range(
+    new_range: _LineRange = _LineRange(
       first.new.start - (first.old.start - old_start),
       last.new.stop + (old_stop - last.old.stop))
 
