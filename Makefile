@@ -142,10 +142,29 @@ out/m/hello-cpp.cc.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	cmp out/m/hello-cpp.cc test/hello-cpp.cc.exp
 	touch $@
 
-# Test only runs if we say we have clang.
+# Minimize preprocessed output.
+out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
+	$(CREATE_OUTPUT_DIRECTORY)
+	clang -E test/hello-cpp.cc -o out/m/hello-cpp.ii
+	$(RM) out/m/hello-cpp.ii.ilog
+	$(PYTHON) ./smin.py ./t_accept.py \
+	  --clang \
+	  --before-after helper helper \
+	  --has-string std::cout \
+	  --input-log out/m/hello-cpp.ii.ilog \
+	  -- out/m/hello-cpp.ii
+	cmp out/m/hello-cpp.ii test/hello-cpp.ii.exp
+	touch $@
+
+
+# These tests require clang, which might not be installed, and even
+# when it is, they are somewhat slow, taking ~10 seconds.
 ifeq ($(USE_CLANG),1)
 check: out/m/hello-clang.c.ok
 check: out/m/hello-cpp.cc.ok
+
+# This one is currently very slow.  I'm working on improving it.
+#check: out/m/hello-cpp.ii.ok
 endif
 
 
