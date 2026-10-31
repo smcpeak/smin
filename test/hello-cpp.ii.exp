@@ -1,0 +1,79 @@
+
+
+namespace __attribute__ ((__visibility__ ("default")))
+{
+  template<class >
+    struct char_traits;
+
+
+
+
+
+}
+
+namespace std __attribute__ ((__visibility__ ("default")))
+{
+
+  template<typename _CharT, typename = char_traits<_CharT> >
+    class basic_ostream;
+
+
+  typedef basic_ostream<char> ostream;
+}
+
+
+namespace __attribute__ ((__visibility__ ("default")))
+{
+  class ios_base
+  {
+
+  };
+
+
+
+}
+
+
+
+namespace std __attribute__ ((__visibility__ ("default")))
+{
+  template<typename , typename >
+    class basic_ios : ios_base
+    {
+    };
+
+
+}
+
+namespace std __attribute__ ((__visibility__ ("default")))
+{
+  template<typename _CharT, typename _Traits>
+    class basic_ostream : basic_ios<_CharT, _Traits>
+    {
+    public:
+      typedef basic_ostream< _Traits> __ostream_type;
+
+      __ostream_type
+      operator<<(bool )
+      ;
+    };
+
+
+
+}
+
+namespace std __attribute__ ((__visibility__ ("default")))
+{
+  ostream cout;
+
+
+
+}
+
+int helper
+;
+
+int main()
+{
+  std::cout << helper << "\n";
+}
