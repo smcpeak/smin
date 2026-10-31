@@ -5,8 +5,45 @@ diff_lines: compute a unified diff between two lists of lines.
 
 from __future__ import annotations
 
-import difflib
 from collections.abc import Iterator
+from dataclasses import dataclass
+import difflib
+
+
+@dataclass(frozen=True)
+class _Range:
+  """
+  Describes a contiguous sequence of lines.
+  """
+
+  # 0-based index of the first line in the range.
+  start: int
+
+  # 0-based index of the last-plus-one line in the range.
+  stop: int
+
+  def format(self) -> bytes:
+    """
+    Format this range for a hunk header.  As is conventional, an empty
+    range is described by the line number of the line before it.
+    """
+    length = self.stop - self.start
+    first = self.start + 1 if length > 0 else self.start
+    return b"%d,%d" % (first, length)
+
+
+@dataclass(frozen=True)
+class _Change:
+  """
+  One change described in a diff, consisting of a contiguous sequence of
+  "old" lines being replaced by a contiguous sequence of "new" lines.
+  """
+
+  # Lines removed.
+  old: _Range
+
+  # Lines added.
+  new: _Range
 
 
 def diff_lines(old: list[bytes], new: list[bytes]) -> Iterator[bytes]:
@@ -56,59 +93,83 @@ def diff_lines(old: list[bytes], new: list[bytes]) -> Iterator[bytes]:
     None, old[prefix:len(old)-suffix], new[prefix:len(new)-suffix],
     autojunk=False)
 
-  # Each change is (i1, i2, j1, j2), meaning `old[i1:i2]` is replaced
-  # by `new[j1:j2]`.
-  changes = [(i1 + prefix, i2 + prefix, j1 + prefix, j2 + prefix)
-             for tag, i1, i2, j1, j2 in matcher.get_opcodes()
-             if tag != "equal"]
+  # Copy the data from `matcher` into our own format.
+  changes: list[_Change] = [
+    _Change(_Range(i1 + prefix, i2 + prefix),
+            _Range(j1 + prefix, j2 + prefix))
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes()
+    if tag != "equal"
+  ]
 
-  # Group the changes into hunks.  Changes separated by at most twice
-  # the context length go in the same hunk, since their context lines
-  # would otherwise overlap or abut.
-  hunks: list[list[tuple[int, int, int, int]]] = []
+  # A "hunk" is a sequence of changes close enough together that they
+  # share the invervening context.
+  Hunk = list[_Change]
+
+  # Group the changes into hunks.
+  hunks: list[Hunk] = []
+  change: _Change
   for change in changes:
-    if hunks and change[0] - hunks[-1][-1][1] <= 2 * context:
-      hunks[-1].append(change)
-    else:
-      hunks.append([change])
+    if hunks:
+      last_hunk: Hunk = hunks[-1]
+      prev_change: _Change = last_hunk[-1]
+      if change.old.start - prev_change.old.stop <= 2 * context:
+        # Expand the last hunk to include `change` since the trailing
+        # context of one overlaps with or touches the leading context of
+        # the next.
+        hunks[-1].append(change)
+        continue
 
+    # Start a new hunk.
+    hunks.append([change])
+
+  # Emit the hunks one by one.
+  hunk: Hunk
   for hunk in hunks:
-    # Lines `old[o1:o2]` and `new[n1:n2]` are covered by this hunk.
-    # Outside the changes, the lines of `old` and `new` correspond with
-    # a fixed offset.
-    first_i1, _, first_j1, _ = hunk[0]
-    _, last_i2, _, last_j2 = hunk[-1]
-    o1 = max(0, first_i1 - context)
-    o2 = min(len(old), last_i2 + context)
-    n1 = first_j1 - (first_i1 - o1)
-    n2 = last_j2 + (o2 - last_i2)
-    yield (b"@@ -" + _format_range(o1, o2) +
-           b" +" + _format_range(n1, n2) + b" @@\n")
+    # Let `old_range` be the lines covered by this hunk, expanded to
+    # include up to `context` lines of context.
+    first:     _Change = hunk[0]
+    last:      _Change = hunk[-1]
+    old_start: int     = max(0, first.old.start - context)
+    old_stop:  int     = min(len(old), last.old.stop + context)
+    old_range: _Range  = _Range(old_start, old_stop)
 
-    pos = o1
-    for i1, i2, j1, j2 in hunk:
-      for line in old[pos:i1]:
+    # Corresponding range in the new data, expanded by the same amount
+    # on each end that `old_range` was.
+    new_range: _Range = _Range(
+      first.new.start - (first.old.start - old_start),
+      last.new.stop + (old_stop - last.old.stop))
+
+    # Emit the hunk header.
+    yield (b"@@ -" + old_range.format() +
+           b" +" + new_range.format() + b" @@\n")
+
+    # Emit the hunk body.
+    pos: int = old_range.start
+    for change in hunk:
+      # Unchanged lines between the previous change and `change`.
+      for line in old[pos:change.old.start]:
         yield _diff_line(b" ", line)
-      yield from _diff_run(b"-", old[i1:i2], b"deleted")
-      yield from _diff_run(b"+", new[j1:j2], b"inserted")
-      pos = i2
-    for line in old[pos:o2]:
+
+      # Removeed lines.
+      yield from _diff_run(b"-", old[change.old.start:change.old.stop],
+                           b"deleted")
+
+      # Added lines.
+      yield from _diff_run(b"+", new[change.new.start:change.new.stop],
+                           b"inserted")
+
+      pos = change.old.stop
+
+    # Unchanged lines at the end of the hunk.
+    for line in old[pos:old_range.stop]:
       yield _diff_line(b" ", line)
 
 
-def _format_range(start: int, stop: int) -> bytes:
-  """
-  Format the 0-based half-open line range [`start`,`stop`) for a hunk
-  header.  As is conventional, an empty range is described by the line
-  number of the line before it.
-  """
-  length = stop - start
-  first = start + 1 if length > 0 else start
-  return b"%d,%d" % (first, length)
-
-
-def _diff_run(prefix: bytes, lines: list[bytes],
-              verb: bytes) -> Iterator[bytes]:
+def _diff_run(
+  prefix: bytes,
+  lines: list[bytes],
+  verb: bytes,
+) -> Iterator[bytes]:
   """
   Yield `lines`, a run of insertions or deletions, each with `prefix`.
   If the run is long, summarize its middle, describing the omitted
@@ -117,13 +178,21 @@ def _diff_run(prefix: bytes, lines: list[bytes],
   # A run longer than `2*keep+1` is summarized.  (Summarizing a run of
   # exactly `2*keep+1` lines would not make it shorter.)
   keep = 5
+
   if len(lines) <= 2 * keep + 1:
+    # The run is short enough to not summarize.
     for line in lines:
       yield _diff_line(prefix, line)
     return
+
+  # Unsummarized run start.
   for line in lines[:keep]:
     yield _diff_line(prefix, line)
+
+  # Summary.
   yield b"<omitting %d %s lines>\n" % (len(lines) - 2 * keep, verb)
+
+  # Unsummarized run end.
   for line in lines[-keep:]:
     yield _diff_line(prefix, line)
 
