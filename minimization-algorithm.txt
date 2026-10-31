@@ -17,6 +17,8 @@ Input:
   acceptance test must return true when passed the entire original input
   (halt with error otherwise).
 
+* An optional --max-passes limit on the number of passes.
+
 Output:
 
 * A minimized input byte sequence that passes the acceptance test and is
@@ -89,6 +91,9 @@ up incidentally being candidates, depending on the context, as explained
 below.)  Consequently, the final pass tries to remove all nodes with
 size 1, i.e., individual tokens (and groups that only contain one live
 token).
+
+The --max-passes option can be used to limit the number of passes, so in
+that case the final G may be greater than or equal to 2.
 
 The algorithm core is the recursive function minimize_node, which takes
 as input a tree node (and G), and modifies the associated subtree,
@@ -209,6 +214,9 @@ attributes:
 Brief justification of Pm formula: For S=4, G=[4, 2, 1], log_2(S)=2, so
 Pm=3, which is right.  For S=5, G=[5, 2.5, 1.25], log_2(S) is about 2.3,
 so again Pm=3.
+
+If the --max-passes N option is used, Pm is N if that is smaller than
+the formula shown here.
 
 This is rendered as a <status> string as:
 

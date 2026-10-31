@@ -79,9 +79,10 @@ class Recorder:
     self,
     root: TTNode,
     nt: NTReplacementFunc = no_replacement,
+    max_passes: int | None = None,
   ) -> Minimizer:
     return Minimizer(root, nt, self.test, self.starts.append,
-                     self.finish)
+                     self.finish, max_passes)
 
   def finish(self, result: AcceptanceTestResult, memoized: bool) -> None:
     self.finishes.append((result, memoized))
@@ -234,6 +235,21 @@ class MinimizerTest(unittest.TestCase):
     self.assertEqual(len(rec.tested), 7)
     self.assertEqual(rec.tested[0], b"\n")
     self.check_reports(rec, m)
+
+  def test_max_passes(self) -> None:
+    src = b"int a;\nint keep;\nint b;\n"
+    rec = Recorder(lambda d: b"keep" in d)
+    m = rec.make_minimizer(build_tree(tokenize_cpp(src)), max_passes=2)
+    self.assertEqual(m.total_num_passes, 2)
+    self.assertEqual(m.run_minimizer(), ACCEPT)
+    self.assertEqual(m.get_minimized_test_input(), b"\nint keep;\n")
+    self.assertEqual(max(r.pass_num for r in rec.starts), 2)
+    self.check_reports(rec, m)
+
+    # A limit above the usual number of passes has no effect.
+    rec = Recorder(lambda d: b"keep" in d)
+    m = rec.make_minimizer(build_tree(tokenize_cpp(src)), max_passes=5)
+    self.assertEqual(m.total_num_passes, 4)
 
   def test_non_trivial_replacement(self) -> None:
     # Removing the function body is rejected, but replacing it with ";"

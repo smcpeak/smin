@@ -7,6 +7,14 @@ Usage:
 
   smin.py [options] test_program [test_prog_args...] -- input_file
 
+Options:
+
+  --max-passes N
+
+    Limit the number of passes to at most N, limiting the removal
+    granularity.  Without this, minimization runs as many passes as
+    needed to eventually try removing individual tokens.
+
 See minimization-algorithm.txt, especially "Startup" and "Termination".
 """
 
@@ -92,8 +100,9 @@ class _Console:
 def parse_command_line(argv: list[str]) -> argparse.Namespace:
   """
   Parse the command line arguments `argv` (not including the program
-  name).  The result has attributes `test_command` (the test program and
-  its arguments) and `input_file`.  On error, exit with status 2.
+  name).  The result has attributes `max_passes` (None if not
+  specified), `test_command` (the test program and its arguments), and
+  `input_file`.  On error, exit with status 2.
   """
 
   parser = argparse.ArgumentParser(
@@ -105,6 +114,13 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
       For convenience, the test program is run with the INPUT
       environment variable set to input_file.  An exit status of 0 means
       the candidate is accepted.
+    """)
+
+  parser.add_argument(
+    "--max-passes", type=_positive_int, metavar="N",
+    help="""
+      Make at most N passes, limiting how finely the input is divided
+      when trying removals.
     """)
 
   # The test command, separator, and input file are all collected into
@@ -134,6 +150,17 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
   args.test_command = cmd_and_input[:sep]
   args.input_file = cmd_and_input[-1]
   return args
+
+
+def _positive_int(s: str) -> int:
+  """Parse `s` as a positive integer, for argparse."""
+  try:
+    n = int(s)
+  except ValueError:
+    n = 0
+  if n < 1:
+    raise argparse.ArgumentTypeError(f"not a positive integer: {s!r}")
+  return n
 
 
 def format_elapsed_time(seconds: float) -> str:
@@ -254,7 +281,8 @@ def main(argv: list[str]) -> int:
       language.get_non_trivial_replacement_func(),
       checker.run_acceptance_test,
       console.report_test_starting,
-      console.report_test_finished)
+      console.report_test_finished,
+      args.max_passes)
     result = minimizer.run_minimizer()
 
   except KeyboardInterrupt:

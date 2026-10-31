@@ -8,6 +8,7 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import re
 import signal
 import sys
 import tempfile
@@ -47,6 +48,20 @@ class ParseCommandLineTest(unittest.TestCase):
     args = parse_command_line(["./test.sh", "-h", "--x", "--", "in.cc"])
     self.assertEqual(args.test_command, ["./test.sh", "-h", "--x"])
     self.assertEqual(args.input_file, "in.cc")
+
+  def test_max_passes(self) -> None:
+    args = parse_command_line(["./test.sh", "--", "in.cc"])
+    self.assertIsNone(args.max_passes)
+    args = parse_command_line(
+      ["--max-passes", "3", "./test.sh", "--max-passes", "--", "in.cc"])
+    self.assertEqual(args.max_passes, 3)
+    # Options after the program name belong to the program.
+    self.assertEqual(args.test_command, ["./test.sh", "--max-passes"])
+
+  def test_max_passes_invalid(self) -> None:
+    for n in ["0", "-1", "x", ""]:
+      self.check_error(["--max-passes", n, "./test.sh", "--", "in.cc"])
+    self.check_error(["--max-passes"])
 
   def test_help(self) -> None:
     out = io.StringIO()
@@ -101,16 +116,18 @@ class MainTest(unittest.TestCase):
     signal.signal(signal.SIGINT, self.old_sigint)
     self.temp_dir.cleanup()
 
-  def run_main(self, code: str) -> tuple[int, str, str]:
+  def run_main(self, code: str,
+               options: tuple[str, ...] = ()) -> tuple[int, str, str]:
     """
-    Run `main` with Python `code` as the test program, returning the
-    exit status, stdout, and stderr.
+    Run `main` with smin `options` and Python `code` as the test
+    program, returning the exit status, stdout, and stderr.
     """
     out = io.StringIO()
     err = io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
       status = main(
-        [sys.executable, "-c", code, "--", str(self.input_path)])
+        [*options, sys.executable, "-c", code, "--",
+         str(self.input_path)])
     return status, out.getvalue(), err.getvalue()
 
   # Accept an input that contains "keep".
@@ -151,6 +168,31 @@ class MainTest(unittest.TestCase):
       if line != "":
         self.assertRegex(line,
           r"^N=\d{6} .* \.\.\. (rejected|ACCEPTED)( \(memo\))?$")
+
+  def progress_passes(self, out: str) -> list[str]:
+    """The "P=(..)" field of each progress line in `out`."""
+    return re.findall(r"^N=\d+ .*(P=\(\d+/\d+\))", out, re.MULTILINE)
+
+  def test_max_passes(self) -> None:
+    # With two passes, the granularity does not get fine enough to
+    # remove "int".
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, _ = self.run_main(self.KEEP_CODE, ("--max-passes", "2"))
+    self.assertEqual(status, 0)
+    self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
+    self.assertEqual(self.progress_passes(out),
+                     ["P=(1/2)"] + ["P=(2/2)"] * 4)
+    self.assertIn("to 3 tokens (11 bytes).", out)
+
+  def test_max_passes_more_than_needed(self) -> None:
+    # A limit above the usual number of passes has no effect.
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, _ = self.run_main(self.KEEP_CODE, ("--max-passes", "9"))
+    self.assertEqual(status, 0)
+    self.assertEqual(self.input_path.read_bytes(), b"\nkeep\n")
+    passes = self.progress_passes(out)
+    self.assertEqual(passes[0], "P=(1/4)")
+    self.assertEqual(passes[-1], "P=(4/4)")
 
   def test_backup_overwritten(self) -> None:
     self.input_path.write_bytes(b"keep\n")

@@ -133,9 +133,11 @@ class Minimizer:
     test_acceptance: AcceptanceTestFunc,
     report_test_starting: TestStartReportFunc,
     report_test_finished: TestFinishedReportFunc,
+    max_passes: Optional[int] = None,
   ) -> None:
     """
-    Prepare to minimize the input represented by `tree_root`.
+    Prepare to minimize the input represented by `tree_root`.  If
+    `max_passes` is not None, make at most that many passes.
 
     Requires that the acceptance test has already accepted that input.
     """
@@ -162,6 +164,8 @@ class Minimizer:
 
     # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
     self.total_num_passes = len(self.tokens).bit_length()
+    if max_passes is not None:
+      self.total_num_passes = min(self.total_num_passes, max_passes)
     self.pass_index = 0
 
     self.memoized_accept = {

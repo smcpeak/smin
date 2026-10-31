@@ -116,6 +116,24 @@ out/m/hello-delim.c.ok: test/hello.c $(ALL_PYTHON_FILES)
 check: out/m/hello-delim.c.ok
 
 
+# Exercise --max-passes end to end.
+out/m/hello-delim-3pass.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
+	$(CREATE_OUTPUT_DIRECTORY)
+	cp test/hello.c out/m/hello-delim-3pass.c
+	$(RM) out/m/hello-delim-3pass.c.ilog
+	$(PYTHON) ./smin.py --max-passes 3 \
+	  ./t_accept.py \
+	    --balanced-delim-counts \
+	    --before-after helper helper \
+	    --has-string printf \
+	    --input-log out/m/hello-delim-3pass.c.ilog \
+	    -- out/m/hello-delim-3pass.c
+	cmp out/m/hello-delim.c test/hello-delim-3pass.c.exp
+	touch $@
+
+check: out/m/hello-delim-3pass.c.ok
+
+
 # Minimize hello.c using clang to check syntax.
 #
 # This one uses --log-new-best, whereas the others don't, mainly so I
