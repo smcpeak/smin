@@ -287,6 +287,31 @@ class TAcceptTest(unittest.TestCase):
       self.NEW_BEST_LINE +
       contents.decode())
 
+  def test_input_log_merged_hunks(self) -> None:
+    # Changes separated by six unchanged lines are in a single hunk.
+    best = b"keep\n" + b"".join(b"%d\n" % i for i in range(1, 9))
+    contents = b"keep\n2\n3\n4\n5\n6\n7\n" + b"eight\n"
+    self.assertEqual(
+      self.run_input_log(best, contents, 0),
+      "\n" + self.ACCEPT_LINE +
+      "Progress: N=000001\n"
+      " keep\n-1\n 2\n 3\n 4\n 5\n 6\n 7\n-8\n+eight\n" +
+      self.NEW_BEST_LINE +
+      contents.decode())
+
+  def test_input_log_ambiguous_change(self) -> None:
+    # The inserted blank line could be aligned anywhere in the run of
+    # blank lines, but the hunk still gets three trailing context lines.
+    best = b"keep\na\n\n\nb\nc\nd\n"
+    contents = b"keep\na\n\n\n\nb\nc\nd\n"
+    self.assertEqual(
+      self.run_input_log(best, contents, 0),
+      "\n" + self.ACCEPT_LINE +
+      "Progress: N=000001\n"
+      " a\n \n \n+\n b\n c\n d\n" +
+      self.NEW_BEST_LINE +
+      contents.decode())
+
   def test_input_log_no_final_newline(self) -> None:
     self.assertEqual(
       self.run_input_log(b"keep\nx\n", b"keep\nx", 0),
