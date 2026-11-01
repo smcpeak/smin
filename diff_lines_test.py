@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import unittest
 
-from diff_lines import ByteRange, diff_lines
+from byte_range import ByteRange
+from diff_lines import diff_lines
 
 
 def diff(old: bytes, new: bytes,

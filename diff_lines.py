@@ -10,19 +10,7 @@ from dataclasses import dataclass
 import difflib
 from typing import Optional
 
-
-# TODO: Move this into its own module.
-@dataclass(frozen=True)
-class ByteRange:
-  """
-  Describes a contiguous sequence of bytes.
-  """
-
-  # 0-based index of the first byte.
-  start: int
-
-  # 0-based index of the byte after the last one.
-  stop: int
+from byte_range import ByteRange
 
 
 @dataclass(frozen=True)

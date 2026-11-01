@@ -24,8 +24,8 @@ from typing import Optional
 from unittest import mock
 
 from acceptance_test_result import AcceptanceTestResult
+from byte_range import ByteRange
 from check_accept import CheckAccept
-from diff_lines import ByteRange
 from start_report import TestStartReport
 
 

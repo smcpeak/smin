@@ -12,7 +12,7 @@ from collections.abc import Callable
 from typing import Optional
 
 from acceptance_test_result import AcceptanceTestResult
-from diff_lines import ByteRange
+from byte_range import ByteRange
 from smin_token import SMToken
 from start_report import TestStartReport
 from token_tree import TTNode

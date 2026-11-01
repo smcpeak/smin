@@ -94,7 +94,8 @@ import sys
 import time
 from typing import Optional
 
-from diff_lines import ByteRange, diff_lines
+from byte_range import ByteRange
+from diff_lines import diff_lines
 
 
 # This function is called from t_accept_test.py (as well as below).

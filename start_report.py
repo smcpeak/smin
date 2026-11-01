@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from diff_lines import ByteRange
+from byte_range import ByteRange
 
 
 @dataclass(frozen=True)

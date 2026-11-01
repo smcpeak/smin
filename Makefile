@@ -31,6 +31,7 @@ PYTHON_SRCS :=
 PYTHON_SRCS += acceptance_test_result.py
 PYTHON_SRCS += build_tree.py
 PYTHON_SRCS += build_tree_util.py
+PYTHON_SRCS += byte_range.py
 PYTHON_SRCS += check_accept.py
 PYTHON_SRCS += diff_lines.py
 PYTHON_SRCS += group_delimiters.py

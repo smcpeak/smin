@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import unittest
 
-from diff_lines import ByteRange
+from byte_range import ByteRange
 from start_report import TestStartReport
 
 
