@@ -106,50 +106,82 @@ def diff_lines(
   # strip the common prefix and suffix, compare only the lines between
   # them, then form the hunks here, taking context lines from anywhere
   # in `old`.
-  context = 3
 
-  # Byte offsets in `old` that the prefix may not extend past, and the
-  # suffix may not extend before.
-  if changed_byte_range is None:
-    prefix_limit = sum(map(len, old))
-    suffix_limit = 0
-  else:
-    prefix_limit = changed_byte_range.start
-    suffix_limit = changed_byte_range.stop
+  def get_changes() -> list[_Change]:
+    """
+    Compute the common prefix and suffix, run the diff algorithm on what
+    is between them, and return the resulting changes.
+    """
 
-  limit = min(len(old), len(new))
+    # Byte offset in `old` that the prefix may not extend past.
+    prefix_limit_byte: int
 
-  # Number of lines in the common prefix, and the byte offset in `old`
-  # of its end.
-  #
-  # TODO: Adjust these variable names.
-  prefix = 0
-  prefix_end = 0
-  while (prefix < limit and old[prefix] == new[prefix] and
-         prefix_end + len(old[prefix]) <= prefix_limit):
-    prefix_end += len(old[prefix])
-    prefix += 1
+    # Byte offset in `old` that the suffix must not extend before.
+    suffix_limit_byte: int
 
-  # Number of lines in the common suffix, and the byte offset in `old`
-  # of its start.
-  suffix = 0
-  suffix_start = sum(map(len, old))
-  while (suffix < limit - prefix and
-         old[-1 - suffix] == new[-1 - suffix] and
-         suffix_start - len(old[-1 - suffix]) >= suffix_limit):
-    suffix_start -= len(old[-1 - suffix])
-    suffix += 1
-  matcher = difflib.SequenceMatcher(
-    None, old[prefix:len(old)-suffix], new[prefix:len(new)-suffix],
-    autojunk=False)
+    # Compute `prefix_limit_byte` and `suffix_limit_byte`.
+    if changed_byte_range is None:
+      prefix_limit_byte = sum(map(len, old))
+      suffix_limit_byte = 0
+    else:
+      prefix_limit_byte = changed_byte_range.start
+      suffix_limit_byte = changed_byte_range.stop
 
-  # Copy the data from `matcher` into our own format.
-  changes: list[_Change] = [
-    _Change(_LineRange(i1 + prefix, i2 + prefix),
-            _LineRange(j1 + prefix, j2 + prefix))
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes()
-    if tag != "equal"
-  ]
+    # Maximum allowable sum of `prefix` and `suffix`.
+    max_affix_lines: int = min(len(old), len(new))
+
+    # Number of lines in the common prefix.
+    prefix_len_lines: int = 0
+
+    # The byte offset in `old` of its end.
+    prefix_end_byte: int = 0
+
+    # Compute `prefix_len_bytes` and `prefix_end_byte` by expanding the
+    # prefix they denote forward as much as possible.
+    while (prefix_len_lines < max_affix_lines and
+           old[prefix_len_lines] == new[prefix_len_lines] and
+           prefix_end_byte + len(old[prefix_len_lines]) <= prefix_limit_byte):
+      prefix_end_byte += len(old[prefix_len_lines])
+      prefix_len_lines += 1
+
+    # Number of lines in the common suffix.
+    suffix_len_lines: int = 0
+
+    # Byte offset in `old` of its start.
+    suffix_start_byte: int = sum(map(len, old))
+
+    # Compute `suffix_len_lines` and `suffix_start_byte` by expanding
+    # the suffix they denote backwards as much as possible.
+    while (prefix_len_lines + suffix_len_lines < max_affix_lines  and
+           old[-1 - suffix_len_lines] == new[-1 - suffix_len_lines] and
+           suffix_start_byte - len(old[-1 - suffix_len_lines]) >= suffix_limit_byte):
+      suffix_start_byte -= len(old[-1 - suffix_len_lines])
+      suffix_len_lines += 1
+
+    # Build a difflib matcher that will compare the parts of the input
+    # that are not covered by the common prefix and suffix.
+    matcher = difflib.SequenceMatcher(
+      isjunk   = None,
+      a        = old[prefix_len_lines : len(old)-suffix_len_lines],
+      b        = new[prefix_len_lines : len(new)-suffix_len_lines],
+      autojunk = False)
+
+    # Run the matching algorithm (by calling `get_opcodes()` for the first
+    # time), then copy the data it produces into our own format.
+    return [
+      _Change(_LineRange(i1 + prefix_len_lines, i2 + prefix_len_lines),
+              _LineRange(j1 + prefix_len_lines, j2 + prefix_len_lines))
+      for tag, i1, i2, j1, j2 in matcher.get_opcodes()
+      if tag != "equal"
+    ]
+
+  # Get the diff.  (A nested function is used here in order to create a
+  # lexical scope that encapsulates its internal logic.)
+  changes: list[_Change] = get_changes()
+
+  # Desired number of unchanged lines of context to emit surrounding
+  # each change.
+  desired_context_lines = 3
 
   # A "hunk" is a sequence of changes close enough together that they
   # share the invervening context.
@@ -162,7 +194,7 @@ def diff_lines(
     if hunks:
       last_hunk: Hunk = hunks[-1]
       prev_change: _Change = last_hunk[-1]
-      if change.old.start - prev_change.old.stop <= 2 * context:
+      if change.old.start - prev_change.old.stop <= 2 * desired_context_lines:
         # Expand the last hunk to include `change` since the trailing
         # context of one overlaps with or touches the leading context of
         # the next.
@@ -176,11 +208,11 @@ def diff_lines(
   hunk: Hunk
   for hunk in hunks:
     # Let `old_range` be the lines covered by this hunk, expanded to
-    # include up to `context` lines of context.
+    # include up to `desired_context_lines` lines of context.
     first:     _Change     = hunk[0]
     last:      _Change     = hunk[-1]
-    old_start: int         = max(0, first.old.start - context)
-    old_stop:  int         = min(len(old), last.old.stop + context)
+    old_start: int         = max(0, first.old.start - desired_context_lines)
+    old_stop:  int         = min(len(old), last.old.stop + desired_context_lines)
     old_range: _LineRange  = _LineRange(old_start, old_stop)
 
     # Corresponding range in the new data, expanded by the same amount
