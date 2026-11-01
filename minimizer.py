@@ -71,21 +71,24 @@ class _AffectedByteRange:
   acceptance test program.
   """
 
-  # TODO: Improve these field names.
+  # The field names here are not the usual plain "start" and "stop"
+  # because their semantics are a bit more complicated than with most
+  # range classes.
 
-  # Byte offset in the rendered candidate at the point we begin rendering
-  # the first token in the affected token range.  The rendered candidate
-  # before `entry` is the same as that of the last accepted input.
-  entry: int
+  # Byte offset in the rendered candidate at the point we begin
+  # rendering the first token in the affected token range.  The rendered
+  # candidate before `abr_start` is the same as that of the last
+  # accepted input.
+  abr_start: int
 
   # Byte offset in the rendered candidate where the first live token
   # after the affected token range has its first non-whitespace
   # character; or None if there is no such token.  The rendered
-  # candidate after `sync` is the same as that of the last accepted
+  # candidate after `abr_stop` is the same as that of the last accepted
   # input.  (The candidate does not necessarily sync up at the end of
   # the affected tokens, since the whitespace that precedes the next
   # live token depends on the preceding gap.)
-  sync: Optional[int]
+  abr_stop: Optional[int]
 
 
 class Minimizer:
@@ -306,12 +309,13 @@ class Minimizer:
     if affected_byte_range is None:
       return text, None
 
-    # The candidate and the accepted input agree after `sync`, so the
-    # end of the modified range is that far from the end of the latter.
+    # The candidate and the last accepted input agree after `abr_stop`,
+    # so the end of the modified range is that far from the end of the
+    # latter.
     stop: int = (
-      self.accepted_size if affected_byte_range.sync is None
-      else self.accepted_size - (len(text) - affected_byte_range.sync))
-    return text, ByteRange(affected_byte_range.entry, stop)
+      self.accepted_size if affected_byte_range.abr_stop is None
+      else self.accepted_size - (len(text) - affected_byte_range.abr_stop))
+    return text, ByteRange(affected_byte_range.abr_start, stop)
 
 
   def node_size(self, node: TTNode) -> int:
@@ -632,8 +636,8 @@ def _render_ctm(
       # We just crossed into the affected region, so record the size of
       # what has been rendered so far to `candidate`.
       affected_byte_range = _AffectedByteRange(
-        entry = sum(map(len, candidate)),
-        sync  = None)
+        abr_start = sum(map(len, candidate)),
+        abr_stop  = None)
 
     if replacement is None:
       if not in_gap:
@@ -661,7 +665,7 @@ def _render_ctm(
         # We should have already created the ABR.
         assert affected_byte_range is not None
 
-        if affected_byte_range.sync is None:
+        if affected_byte_range.abr_stop is None:
           # Current `candidate` length.
           candidate_len_bytes: int = sum(map(len, candidate))
 
@@ -671,7 +675,7 @@ def _render_ctm(
 
           # Only the whitespace emitted before this token's own
           # non-whitespace text can differ from the last accepted input.
-          affected_byte_range.sync = candidate_len_bytes - len_after_ws
+          affected_byte_range.abr_stop = candidate_len_bytes - len_after_ws
 
     else:
       in_gap = True
@@ -708,8 +712,8 @@ def _render_ctm(
     # We never crossed into the affected range, so return an effectively
     # empty byte range.
     affected_byte_range = _AffectedByteRange(
-      entry = len(text),
-      sync  = None)
+      abr_start = len(text),
+      abr_stop  = None)
 
   return text, affected_byte_range
 
