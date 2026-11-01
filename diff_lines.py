@@ -10,27 +10,24 @@ from dataclasses import dataclass
 import difflib
 from typing import Optional
 
+from abstract_range import AbstractRange
 from byte_range import ByteRange
 
 
-@dataclass(frozen=True)
-class _LineRange:
+class _LineRange(AbstractRange):
   """
   Describes a contiguous sequence of lines.
   """
 
-  # 0-based index of the first line in the range.
-  start: int
+  # Reminder: AbstractRange has `start` and `stop` members.
 
-  # 0-based index of the last-plus-one line in the range.
-  stop: int
 
   def format(self) -> bytes:
     """
     Format this range for a hunk header.  As is conventional, an empty
     range is described by the line number of the line before it.
     """
-    length = self.stop - self.start
+    length = self.length()
     first = self.start + 1 if length > 0 else self.start
     return b"%d,%d" % (first, length)
 
