@@ -11,6 +11,7 @@ import hashlib
 from collections.abc import Callable
 from typing import Optional
 
+from abstract_range import AbstractRange
 from acceptance_test_result import AcceptanceTestResult
 from byte_range import ByteRange
 from smin_token import SMToken
@@ -51,6 +52,15 @@ TestStartReportFunc = Callable[[TestStartReport], None]
 TestFinishedReportFunc = Callable[[AcceptanceTestResult, bool], None]
 
 
+class _TokenRange(AbstractRange):
+  """
+  Describes a contiguous sequence of tokens, identified by their indices
+  into `Minimizer.tokens`.
+  """
+
+  # Reminder: AbstractRange has `start` and `stop` members.
+
+
 class Minimizer:
   """Minimize a token tree w.r.t. a given acceptance test."""
 
@@ -81,9 +91,9 @@ class Minimizer:
   # rendered candidate does too.
   ends_with_newline: bool
 
-  # Map from the id() of each node to the half-open range [start, end)
-  # of indices in `tokens` of the tokens it contains.
-  node_span: dict[int, tuple[int, int]]
+  # Map from the id() of each node to the range of the tokens it
+  # contains.
+  node_span: dict[int, _TokenRange]
 
   # ---- Mutable algorithm data ----
   # Map from the id() of a TTNode to its replacement text.  (The key is
@@ -246,8 +256,9 @@ class Minimizer:
     before and after that range are the same in the candidate.
     """
 
-    # Candidate token map: for each token, None if it is live, and
-    # otherwise its replacement text.
+    # Candidate Token Map (CTM): for each token, None if it is live, and
+    # otherwise its replacement text.  (See minimization-algorithm.txt,
+    # "Candidate rendering".)
     ctm: list[bytes | None] = [None] * len(self.tokens)
     affected = self._fill_ctm(self.tree_root, extra, ctm)
     text, offsets = _render_ctm([t.text for t in self.tokens], ctm,
@@ -270,8 +281,8 @@ class Minimizer:
 
   def node_size(self, node: TTNode) -> int:
     """Return the number of live tokens in `node`."""
-    start, end = self.node_span[id(node)]
-    return sum(self.token_live[start:end])
+    span = self.node_span[id(node)]
+    return sum(self.token_live[span.start : span.stop])
 
 
   def _compute_spans(self, node: TTNode, start: int) -> int:
@@ -286,7 +297,7 @@ class Minimizer:
       end = start
       for child in node.children:
         end = self._compute_spans(child, end)
-    self.node_span[id(node)] = (start, end)
+    self.node_span[id(node)] = _TokenRange(start, end)
     return end
 
 
@@ -295,34 +306,33 @@ class Minimizer:
     node: TTNode,
     extra: dict[int, bytes],
     ctm: list[bytes | None],
-  ) -> Optional[tuple[int, int]]:
+  ) -> Optional[_TokenRange]:
     """
     Record in `ctm` the replacements of `node` and its descendants.  A
     replacement on a node overrides any on its descendants.
 
-    Return the smallest range [start, end) of token indices that
-    contains every node replaced by `extra`, or None if there are none.
+    Return the smallest range of tokens that contains every node
+    replaced by `extra`, or None if there are none.
     """
     replacement = extra.get(id(node))
-    affected: Optional[tuple[int, int]] = None
+    affected: Optional[_TokenRange] = None
     if replacement is not None:
       affected = self.node_span[id(node)]
     else:
       replacement = self.cur_replacement.get(id(node))
 
     if replacement is not None:
-      start, end = self.node_span[id(node)]
-      if start < end:
-        ctm[start] = replacement
-        for i in range(start+1, end):
+      span = self.node_span[id(node)]
+      if span.start < span.stop:
+        ctm[span.start] = replacement
+        for i in range(span.start+1, span.stop):
           ctm[i] = b""
     else:
       for child in node.children:
         child_affected = self._fill_ctm(child, extra, ctm)
         if child_affected is not None:
-          affected = child_affected if affected is None else (
-            min(affected[0], child_affected[0]),
-            max(affected[1], child_affected[1]))
+          affected = (child_affected if affected is None
+                      else affected.union(child_affected))
 
     return affected
 
@@ -468,8 +478,8 @@ class Minimizer:
     self.cur_replacement.update(extra)
 
     for key in extra:
-      start, end = self.node_span[key]
-      for i in range(start, end):
+      span = self.node_span[key]
+      for i in range(span.start, span.stop):
         if self.token_live[i]:
           self.token_live[i] = False
           self.live_tok_count -= 1
@@ -493,7 +503,7 @@ class Minimizer:
     # tokens, of the last live token in the candidate, or of the live
     # token to its left if it has none.  Either way, it is the number of
     # live tokens before the end of the rightmost node.
-    end = max(self.node_span[id(n)][1] for n in nodes)
+    end = max(self.node_span[id(n)].stop for n in nodes)
     e = sum(self.token_live[:end])
 
     num_live = self.live_tok_count
@@ -543,11 +553,11 @@ def _trail_indent(s: bytes) -> bytes:
   return _leading_ws(s[start:])
 
 
-# TODO: Define classes for `affected` and the return value.
+# TODO: Define a class for the return value.
 def _render_ctm(
   texts: list[bytes],
   ctm: list[bytes | None],
-  affected: Optional[tuple[int, int]] = None,
+  affected: Optional[_TokenRange] = None,
 ) -> tuple[bytes, Optional[tuple[int, Optional[int]]]]:
   """
   Render the candidate where token i has original text `texts[i]`, and
@@ -555,16 +565,18 @@ def _render_ctm(
 
   See minimization-algorithm.txt, "Candidate rendering".
 
-  If `affected` is not None, it is the range [start, end) of indices of
-  the tokens whose replacements differ from those of the accepted input.
-  Then also return (`entry`, `sync`), where `entry` is the size of the
-  output before rendering token `start`, and `sync` is the offset in
-  the output where the first live token at or after `end` has its text
-  after its leading whitespace, or None if there is no such token.  The
-  output before `entry` is the same as that of the accepted input, as
-  is the output starting at `sync`.  (The output does not necessarily
-  sync up at the end of the affected tokens, since the whitespace that
-  precedes the next live token depends on the preceding gap.)
+  If `affected` is not None, it is the range of the tokens whose
+  replacements differ from those of the accepted input.
+
+  Also return (`entry`, `sync`), where `entry` is the size of the output
+  before rendering token `affected.start`, and `sync` is the offset in
+  the output where the first live token at or after `affected.stop` has
+  its text after its leading whitespace, or None if there is no such
+  token.  The output before `entry` is the same as that of the accepted
+  input, as is the output starting at `sync`.  (The output does not
+  necessarily sync up at the end of the affected tokens, since the
+  whitespace that precedes the next live token depends on the preceding
+  gap.)
   """
   out: list[bytes] = []
 
@@ -584,7 +596,7 @@ def _render_ctm(
   trivial: list[bytes] = []
 
   for i, (text, replacement) in enumerate(zip(texts, ctm, strict=True)):
-    if affected is not None and i == affected[0]:
+    if affected is not None and i == affected.start:
       # We just crossed into the affected region, so record the size of
       # what has been rendered so far to `out`.
       entry = sum(map(len, out))
@@ -610,8 +622,9 @@ def _render_ctm(
 
       seen_live = True
 
-      if (affected is not None and sync is None and
-          i >= affected[1]):
+      if (affected is not None and
+          sync is None and
+          i >= affected.stop):
         # Only the whitespace emitted before this token's own
         # non-whitespace text can differ from the accepted input.
         sync = sum(map(len, out)) - (len(text) - len(_leading_ws(text)))
