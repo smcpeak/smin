@@ -613,11 +613,9 @@ def _render_ctm(
   if affected_token_range is not None:
     assert affected_token_range.start <= affected_token_range.stop
 
-  # Rendered output as a sequence of token texts.  Like the tokens in
+  # Rendered candidate as a sequence of token texts.  Like the tokens in
   # the token tree, the token texts here may have leading whitespace.
-  #
-  # TODO: Rename this to `candidate`.
-  out: list[bytes] = []
+  candidate: list[bytes] = []
 
   # Affected candidate offsets to return, once known.
   affected_byte_range: Optional[_AffectedByteRange] = None
@@ -637,27 +635,27 @@ def _render_ctm(
     if (affected_token_range is not None and
         i == affected_token_range.start):
       # We just crossed into the affected region, so record the size of
-      # what has been rendered so far to `out`.
+      # what has been rendered so far to `candidate`.
       affected_byte_range = _AffectedByteRange(
-        entry = sum(map(len, out)),
+        entry = sum(map(len, candidate)),
         sync  = None)
 
     if replacement is None:
       if not in_gap:
-        out.append(text)
+        candidate.append(text)
 
       else:
         # This is B, the end of the last piece of the gap.
         ws = _leading_ws(text)
         indent = _trail_indent(b"".join(trivial))
         if _NEWLINE in ws:
-          out.append(text)
+          candidate.append(text)
         elif indent:
-          out.append(indent + text[len(ws):])
+          candidate.append(indent + text[len(ws):])
         elif not ws and seen_live:
-          out.append(b" " + text)
+          candidate.append(b" " + text)
         else:
-          out.append(text)
+          candidate.append(text)
         trivial = []
         in_gap = False
 
@@ -669,8 +667,8 @@ def _render_ctm(
         assert affected_byte_range is not None
 
         if affected_byte_range.sync is None:
-          # Current `out` length.
-          out_len_bytes: int = sum(map(len, out))
+          # Current `candidate` length.
+          candidate_len_bytes: int = sum(map(len, candidate))
 
           # Length of after-first-whitespace byte sequence that was just
           # added for the current token.
@@ -678,13 +676,13 @@ def _render_ctm(
 
           # Only the whitespace emitted before this token's own
           # non-whitespace text can differ from the last accepted input.
-          affected_byte_range.sync = out_len_bytes - len_after_ws
+          affected_byte_range.sync = candidate_len_bytes - len_after_ws
 
     else:
       in_gap = True
       if replacement:
         # End of a piece with a non-trivial replacement.
-        out.append(
+        candidate.append(
           _trail_indent(b"".join(trivial) + _leading_ws(text)) +
           replacement)
         trivial = []
@@ -692,7 +690,7 @@ def _render_ctm(
         trivial.append(text)
 
   # Any trivially replaced tokens at the end are discarded.
-  text = b"".join(out)
+  text = b"".join(candidate)
 
   if affected_token_range is None:
     return text, None
