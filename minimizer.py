@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Optional
 
 from abstract_range import AbstractRange
@@ -59,6 +60,32 @@ class _TokenRange(AbstractRange):
   """
 
   # Reminder: AbstractRange has `start` and `stop` members.
+
+
+@dataclass
+class _AffectedByteRange:
+  """
+  Describes the range of bytes in the rendered candidate that are
+  potentially different from those in the last accepted input.  This is
+  used to compute the CHANGED_BYTE_RANGE that is passed to the candidate
+  acceptance test program.
+  """
+
+  # TODO: Improve these field names.
+
+  # Byte offset in the rendered candidate at the point we begin rendering
+  # the first token in the affected token range.  The rendered candidate
+  # before `entry` is the same as that of the last accepted input.
+  entry: int
+
+  # Byte offset in the rendered candidate where the first live token
+  # after the affected token range has its first non-whitespace
+  # character; or None if there is no such token.  The rendered
+  # candidate after `sync` is the same as that of the last accepted
+  # input.  (The candidate does not necessarily sync up at the end of
+  # the affected tokens, since the whitespace that precedes the next
+  # live token depends on the preceding gap.)
+  sync: Optional[int]
 
 
 class Minimizer:
@@ -259,24 +286,33 @@ class Minimizer:
     # Candidate Token Map (CTM): for each token, None if it is live, and
     # otherwise its replacement text.  (See minimization-algorithm.txt,
     # "Candidate rendering".)
-    ctm: list[bytes | None] = [None] * len(self.tokens)
-    affected = self._fill_ctm(self.tree_root, extra, ctm)
-    text, offsets = _render_ctm([t.text for t in self.tokens], ctm,
-                                affected)
+    ctm: list[Optional[bytes]] = [None] * len(self.tokens)
+    affected_token_range: Optional[_TokenRange] = (
+      self._fill_ctm(self.tree_root, extra, ctm))
 
+    # Render the candidate using the CTM.
+    text: bytes
+    affected_byte_range: Optional[_AffectedByteRange]
+    text, affected_byte_range = (
+      _render_ctm([t.text for t in self.tokens],
+                  ctm,
+                  affected_token_range))
+
+    # Ensure the candidate ends with a newline (if the original did)
+    # since working with files that do not is annoying.
     if self.ends_with_newline and not text.endswith(b"\n"):
       text += b"\n"
 
-    if offsets is None:
+    if affected_byte_range is None:
       return text, None
 
     # The candidate and the accepted input agree after `sync`, so the
     # end of the modified range is that far from the end of the latter.
-    entry, sync = offsets
-    stop = (self.accepted_size if sync is None
-            else self.accepted_size - (len(text) - sync))
-    assert entry <= stop
-    return text, ByteRange(entry, stop)
+    stop: int = (
+      self.accepted_size if affected_byte_range.sync is None
+      else self.accepted_size - (len(text) - affected_byte_range.sync))
+    assert affected_byte_range.entry <= stop  # TODO: Obviate with AbstractRange assertion.
+    return text, ByteRange(affected_byte_range.entry, stop)
 
 
   def node_size(self, node: TTNode) -> int:
@@ -553,36 +589,38 @@ def _trail_indent(s: bytes) -> bytes:
   return _leading_ws(s[start:])
 
 
-# TODO: Define a class for the return value.
 def _render_ctm(
   texts: list[bytes],
   ctm: list[bytes | None],
-  affected: Optional[_TokenRange] = None,
-) -> tuple[bytes, Optional[tuple[int, Optional[int]]]]:
+  affected_token_range: Optional[_TokenRange],
+) -> tuple[bytes, Optional[_AffectedByteRange]]:
   """
   Render the candidate where token i has original text `texts[i]`, and
   is live if `ctm[i]` is None, and otherwise replaced by `ctm[i]`.
 
   See minimization-algorithm.txt, "Candidate rendering".
 
-  If `affected` is not None, it is the range of the tokens whose
-  replacements differ from those of the accepted input.
+  If `affected_token_range` is not None, it is the range of the tokens
+  whose replacements differ from those of the accepted input, and this
+  function computes and return the corresponding range of affected
+  bytes.
 
-  Also return (`entry`, `sync`), where `entry` is the size of the output
-  before rendering token `affected.start`, and `sync` is the offset in
-  the output where the first live token at or after `affected.stop` has
-  its text after its leading whitespace, or None if there is no such
-  token.  The output before `entry` is the same as that of the accepted
-  input, as is the output starting at `sync`.  (The output does not
-  necessarily sync up at the end of the affected tokens, since the
-  whitespace that precedes the next live token depends on the preceding
-  gap.)
+  If (and only if) `affected_token_range` is None, the second returned
+  element is also None.
   """
+
+  # TODO: Turn this into an assertion in the AbstractRange ctor.
+  if affected_token_range is not None:
+    assert affected_token_range.start <= affected_token_range.stop
+
+  # Rendered output as a sequence of token texts.  Like the tokens in
+  # the token tree, the token texts here may have leading whitespace.
+  #
+  # TODO: Rename this to `candidate`.
   out: list[bytes] = []
 
-  # Output offsets to return, once known.
-  entry: Optional[int] = None
-  sync: Optional[int] = None
+  # Affected candidate offsets to return, once known.
+  affected_byte_range: Optional[_AffectedByteRange] = None
 
   # True once a live token has been emitted, i.e., there is an "A".
   seen_live = False
@@ -596,10 +634,13 @@ def _render_ctm(
   trivial: list[bytes] = []
 
   for i, (text, replacement) in enumerate(zip(texts, ctm, strict=True)):
-    if affected is not None and i == affected.start:
+    if (affected_token_range is not None and
+        i == affected_token_range.start):
       # We just crossed into the affected region, so record the size of
       # what has been rendered so far to `out`.
-      entry = sum(map(len, out))
+      affected_byte_range = _AffectedByteRange(
+        entry = sum(map(len, out)),
+        sync  = None)
 
     if replacement is None:
       if not in_gap:
@@ -622,12 +663,22 @@ def _render_ctm(
 
       seen_live = True
 
-      if (affected is not None and
-          sync is None and
-          i >= affected.stop):
-        # Only the whitespace emitted before this token's own
-        # non-whitespace text can differ from the accepted input.
-        sync = sum(map(len, out)) - (len(text) - len(_leading_ws(text)))
+      if (affected_token_range is not None and
+          i >= affected_token_range.stop):
+        # We should have already created the ABR.
+        assert affected_byte_range is not None
+
+        if affected_byte_range.sync is None:
+          # Current `out` length.
+          out_len_bytes: int = sum(map(len, out))
+
+          # Length of after-first-whitespace byte sequence that was just
+          # added for the current token.
+          len_after_ws: int = len(text) - len(_leading_ws(text))
+
+          # Only the whitespace emitted before this token's own
+          # non-whitespace text can differ from the last accepted input.
+          affected_byte_range.sync = out_len_bytes - len_after_ws
 
     else:
       in_gap = True
@@ -643,14 +694,19 @@ def _render_ctm(
   # Any trivially replaced tokens at the end are discarded.
   text = b"".join(out)
 
-  if affected is None:
+  if affected_token_range is None:
     return text, None
-  if entry is None:
-    # TODO: Explain this case better.
-    #
-    # The affected range is empty, at the end.
-    entry = len(text)
-  return text, (entry, sync)
+
+  # TODO: Can this assertion ever fail?
+  assert affected_byte_range is not None
+  if affected_byte_range is None:
+    # We never crossed into the affected range, so return an effectively
+    # empty byte range.
+    affected_byte_range = _AffectedByteRange(
+      entry = len(text),
+      sync  = None)
+
+  return text, affected_byte_range
 
 
 # EOF
