@@ -26,8 +26,14 @@ class AbstractRange:
   start: int
 
   # 0-based index of the element after the last one.
+  #
+  # Constraint: start <= end
   stop: int
 
+
+  def __post_init__(self) -> None:
+    assert self.start <= self.stop, (
+      f"Bad range: start={self.start} stop={self.stop}")
 
   def length(self) -> int:
     """Return the number of elements in the range."""

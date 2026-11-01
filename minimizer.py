@@ -311,7 +311,6 @@ class Minimizer:
     stop: int = (
       self.accepted_size if affected_byte_range.sync is None
       else self.accepted_size - (len(text) - affected_byte_range.sync))
-    assert affected_byte_range.entry <= stop  # TODO: Obviate with AbstractRange assertion.
     return text, ByteRange(affected_byte_range.entry, stop)
 
 
@@ -608,10 +607,6 @@ def _render_ctm(
   If (and only if) `affected_token_range` is None, the second returned
   element is also None.
   """
-
-  # TODO: Turn this into an assertion in the AbstractRange ctor.
-  if affected_token_range is not None:
-    assert affected_token_range.start <= affected_token_range.stop
 
   # Rendered candidate as a sequence of token texts.  Like the tokens in
   # the token tree, the token texts here may have leading whitespace.

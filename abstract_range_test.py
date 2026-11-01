@@ -53,6 +53,14 @@ class AbstractRangeTest(unittest.TestCase):
     self.assertEqual(r.length(), 2)
     self.assertIs(type(r.union(AbstractRange(5, 6))), AbstractRange)
 
+  def test_constraint(self) -> None:
+    AbstractRange(3, 3)
+    AbstractRange(3, 4)
+    AbstractRange(4, 4)
+    with self.assertRaisesRegex(AssertionError,
+           "Bad range: start=4 stop=3"):
+      AbstractRange(4, 3)
+
   def test_union(self) -> None:
     u = AppleRange(2, 5).union(AppleRange(4, 9))
     self.assertEqual(u, AppleRange(2, 9))
