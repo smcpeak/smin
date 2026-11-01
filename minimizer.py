@@ -697,8 +697,20 @@ def _render_ctm(
   if affected_token_range is None:
     return text, None
 
-  # TODO: Can this assertion ever fail?
+  # In the current code, I believe this cannot fail.  We would need to
+  # have been given an empty token range that starts at the end of the
+  # file, but _fill_ctm gets the seed token ranges from `node_span`,
+  # which describes the original tree, which (due to how it is built)
+  # never has nodes that do not contain any tokens.
+  #
+  # See doc/affected-byte-range-assertion.txt for even more analysis.
+  #
+  # Fow now I'll hold off on strengthening assertions elsewhere since
+  # this isn't particularly important, other than for checking my
+  # understanding of how the code in this function operates.
   assert affected_byte_range is not None
+
+  # The "impossible" condition isn't difficult to handle if necessary.
   if affected_byte_range is None:
     # We never crossed into the affected range, so return an effectively
     # empty byte range.

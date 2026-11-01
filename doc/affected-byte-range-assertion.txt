@@ -1,0 +1,81 @@
+This file has additional commentary on the assertion:
+
+  assert affected_byte_range is not None
+
+at the end of _render_ctm.
+
+
+I asked Claude about it when the state was as in commit 22c7769881:
+
+  I've now factored the _render_ctm return value, along with some other
+  clarity improvements.  At the end of _render_ctm, there was a check
+  for (what is now expressed as) affected_byte_range is None, but as far
+  as I can tell, that condition is never true.  That is because a
+  non-None affected_token_range comes from _fill_ctm "affected =
+  self.node_span[id(node)]", so as long as every node has a non-empty
+  node span, affected_token_range will not be empty, and therefore
+  affected_byte_range will be set to non-None when we cross into the
+  affected token range in _render_ctm.  Do you see a case where "assert
+  affected_byte_range is not None" at the end of _render_ctm could fail?
+  (It does not fail when I run "USE_CLANG=1 make check".)
+
+I decided to save Claude's answer (which I have reformatted, but
+otherwise not edited) because its analysis is somewhat interesting:
+
+  No, I don't see a way for that assertion to fail with the trees the
+  code builds today. I checked by reading the code; I didn't run
+  anything new.
+
+  What would have to happen for it to fail: At the end of the loop,
+  affected_byte_range is None only if the loop never reaches i ==
+  affected_token_range.start. Since i runs from 0 to len(texts) - 1,
+  that means affected_token_range.start >= len(tokens). A span from
+  _compute_spans can only start at len(tokens) if it is empty and sits
+  after the last token. So the assertion fails only when a node in extra
+  has an empty span at the very end of the input.
+
+  Why that doesn't happen: A node has an empty span only if it is a
+  group with no descendant tokens. None of the code that creates groups
+  ever makes one:
+
+  - group_delimiters: each group includes its two delimiter tokens.
+
+  - group_lines: makes a group only when end > i, so at least 2 nodes.
+
+  - group_paragraphs._flush and group_indentation._close_top: make a
+    group only when there are at least 2 nodes.
+
+  - recursively_group_sequences: rebuilds a group from children it got
+    by regrouping existing nodes, so it keeps at least the tokens it
+    started with.
+
+  The one exception is the root when the input is empty, but the root is
+  never put in extra, because _minimize_node only offers children.
+
+  Cases that look risky but aren't:
+
+  - A node with no live tokens (all its descendants already replaced,
+    but the node itself not in cur_replacement). _minimize_node can
+    offer it, since its node_size is�0. But affected_token_range comes
+    from node_span, which counts all tokens, dead or alive, so the span
+    is still non-empty.
+
+  - An empty span somewhere other than the end wouldn't break the
+    assertion either. The loop would still hit i == start and set entry.
+    Only an empty span at the end can fail.
+
+  - A node in extra whose ancestor has a replacement in cur_replacement.
+    _fill_ctm never visits it and returns None, so _render_ctm returns
+    early at affected_token_range is None.
+
+  The assumption it rests on: The assertion holds because every node the
+  minimizer might replace has at least one token. It's a property of how
+  the trees are built, not something _render_ctm enforces. If you want
+  it written down, two options are a comment by the assert, or an assert
+  in _compute_spans that every non-root node has start < end. If an
+  empty-group node ever appeared somewhere other than the end, that
+  _compute_spans assert would also flag it, even though _render_ctm
+  would handle it fine.
+
+
+EOF
