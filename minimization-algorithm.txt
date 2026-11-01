@@ -244,6 +244,10 @@ tested can be calculated as S-R.
 When the test completes, print either "rejected" or "ACCEPTED", then
 a newline.
 
+In the case of "ACCEPTED", follow it with " (removed N)" where N is the
+number of tokens removed (or replaced), i.e., the R number in the
+preceding progress report.
+
 If this progress report was issued for a candidate that was not actually
 run due to a hit in the memoization table, then write " (memo)" after
 the verdict.

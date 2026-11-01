@@ -167,7 +167,9 @@ class MainTest(unittest.TestCase):
     for line in lines[4:-2]:
       if line != "":
         self.assertRegex(line,
-          r"^N=\d{6} .* \.\.\. (rejected|ACCEPTED)( \(memo\))?$")
+          r"^N=\d{6} .* \.\.\. (rejected|ACCEPTED)"
+          r"( \(removed \d+\))?"
+          r"( \(memo\))?$")
 
   def progress_passes(self, out: str) -> list[str]:
     """The "P=(..)" field of each progress line in `out`."""
@@ -270,7 +272,7 @@ class MainTest(unittest.TestCase):
     self.assertEqual(self.best_path.read_bytes(), b"int a;\nint keep;\n")
 
     lines = out.splitlines()
-    self.assertRegex(lines[-6], r"^N=000003 .* ACCEPTED$")
+    self.assertRegex(lines[-6], r"^N=000003 .* ACCEPTED \(removed 3\)$")
     self.assertRegex(lines[-5], r"^N=000004 .* INTERRUPTED$")
     self.assertEqual(lines[-4], "Stopping early due to Ctrl-C.")
     self.assertEqual(lines[-3], "")

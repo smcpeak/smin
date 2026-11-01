@@ -90,10 +90,16 @@ class _Console:
   ) -> None:
     if result == AcceptanceTestResult.ACCEPT:
       verdict = " ACCEPTED"
+      if self.prev_ts_report is not None:
+        n: int = self.prev_ts_report.removed_tok_count
+        verdict += f" (removed {n})"
+
     elif result == AcceptanceTestResult.REJECT:
       verdict = " rejected"
+
     else:
       verdict = " INTERRUPTED"
+
     self.write(verdict + (" (memo)" if memoized else "") + "\n")
 
 
