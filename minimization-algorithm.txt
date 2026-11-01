@@ -227,6 +227,9 @@ number of digits as $Pm.  $G and $R have leading zeroes to keep their
 length consistent, taking into account the maximum value of S.  $F is
 printed with two digits (which is sufficient due to the cap).
 
+2026-11-01: The output of G is disabled now since it isn't very useful
+and causes lines to exceed 80 columns when minimizing large files.
+
 As the minimizer runs, it prints status lines to the console.  Prior to
 testing a candidate, it prints:
 

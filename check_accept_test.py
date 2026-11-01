@@ -86,7 +86,7 @@ class CheckAcceptTest(unittest.TestCase):
       total_num_passes=7, granularity=2.1, completion_fraction=0.06,
       removed_tok_count=7, initial_tok_count=67,
       changed_byte_range=ByteRange(10, 25))
-    expect = "N=000056 S=16 P=(6/7) G=02.1 F=06% R=07"
+    expect = "N=000056 S=16 P=(6/7) F=06% R=07"
     self.assertEqual(report.to_progress_string(), expect)
     code = (
       "import os, sys\n"

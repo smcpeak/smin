@@ -66,7 +66,7 @@ class TestStartReport:
     tok_width = len(str(self.initial_tok_count))
 
     # The granularity is printed with one digit after the decimal point.
-    g_width = tok_width + 2
+    #g_width = tok_width + 2
 
     p_width = len(str(self.total_num_passes))
 
@@ -76,7 +76,8 @@ class TestStartReport:
 
     status = (
       f"P=({self.pass_num:0{p_width}d}/{self.total_num_passes}) "
-      f"G={self.granularity:0{g_width}.1f} "
+      # G is disabled for now.
+      #f"G={self.granularity:0{g_width}.1f} "
       f"F={f_percent:02d}% "
       f"R={self.removed_tok_count:0{tok_width}d}")
 

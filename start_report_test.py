@@ -40,13 +40,13 @@ class TestStartReportTest(unittest.TestCase):
   def test_first_report(self) -> None:
     self.assertEqual(
       make_report().to_console_string(),
-      "N=000001 S=1234 P=(01/11) G=1234.0 F=00% R=1234 ...")
+      "N=000001 S=1234 P=(01/11) F=00% R=1234 ...")
 
   def test_progress_string(self) -> None:
     # The same, without the trailing " ...".
     self.assertEqual(
       make_report().to_progress_string(),
-      "N=000001 S=1234 P=(01/11) G=1234.0 F=00% R=1234")
+      "N=000001 S=1234 P=(01/11) F=00% R=1234")
 
   def test_padding(self) -> None:
     self.assertEqual(
@@ -54,7 +54,7 @@ class TestStartReportTest(unittest.TestCase):
                   pass_num=4, granularity=154.25,
                   completion_fraction=0.5, removed_tok_count=8)
         .to_console_string(),
-      "N=000042 S=0567 P=(04/11) G=0154.2 F=50% R=0008 ...")
+      "N=000042 S=0567 P=(04/11) F=50% R=0008 ...")
 
   def test_wide_fields(self) -> None:
     # N grows beyond 6 digits rather than being truncated.
@@ -63,7 +63,7 @@ class TestStartReportTest(unittest.TestCase):
                   granularity=1234 / 1024, completion_fraction=0.07,
                   removed_tok_count=1)
         .to_console_string(),
-      "N=1234567 S=1234 P=(11/11) G=0001.2 F=07% R=0001 ...")
+      "N=1234567 S=1234 P=(11/11) F=07% R=0001 ...")
 
   def test_completion_fraction_capped(self) -> None:
     # Truncation keeps a fraction just below 1 at 99%, and the cap
@@ -77,7 +77,7 @@ class TestStartReportTest(unittest.TestCase):
       make_report(last_accepted_tok_count=1, total_num_passes=1,
                   granularity=1, removed_tok_count=1,
                   initial_tok_count=1).to_console_string(),
-      "N=000001 S=1 P=(1/1) G=1.0 F=00% R=1 ...")
+      "N=000001 S=1 P=(1/1) F=00% R=1 ...")
 
 
 if __name__ == "__main__":
