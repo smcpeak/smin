@@ -133,6 +133,9 @@ class MainTest(unittest.TestCase):
     return (f"{self.tsv_path} has 2 rows of well-formed data out of "
             f"3 rows in total.\n")
 
+  def waiting_line(self) -> str:
+    return "Per --show, running gnuplot and waiting for it ...\n"
+
   # The script for `tsv_path`.  The title has no path information, and
   # the first reltime is "0.0" since it is computed as "100.0 - 100.0".
   EXPECTED_SCRIPT = (
@@ -186,7 +189,7 @@ class MainTest(unittest.TestCase):
   def test_show(self) -> None:
     env = self.make_fake_gnuplot()
     self.assertEqual(self.run_main(["--show", str(self.tsv_path)], env), 0)
-    self.assertEqual(self.out, self.summary_line())
+    self.assertEqual(self.out, self.summary_line() + self.waiting_line())
     self.assertEqual((self.dir / "stdin.gp").read_text(),
                      self.EXPECTED_SCRIPT)
 
@@ -196,13 +199,13 @@ class MainTest(unittest.TestCase):
     gp = self.dir / "plot.gp"
     self.assertEqual(
       self.run_main(["--show", "-o", str(gp), str(self.tsv_path)], env), 0)
-    self.assertEqual(self.out, self.summary_line())
+    self.assertEqual(self.out, self.summary_line() + self.waiting_line())
     self.assertEqual(gp.read_text(), (self.dir / "stdin.gp").read_text())
 
   @unittest.skipUnless(POSIX, "uses a shell script")
   def test_show_gnuplot_fails(self) -> None:
     env = self.make_fake_gnuplot(status=3)
-    self.assertEqual(self.run_main(["--show", str(self.tsv_path)], env), 1)
+    self.assertEqual(self.run_main(["--show", str(self.tsv_path)], env), 2)
     self.assertIn("gnuplot exited with code 3", self.err)
 
   def test_show_gnuplot_not_found(self) -> None:

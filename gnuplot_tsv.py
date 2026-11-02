@@ -82,9 +82,9 @@ _SIZE_COL = 3
 def main(argv: list[str]) -> int:
   """
   Parse the command line `argv` (which excludes the program name),
-  perform the functions described in the module docstring, and return
-  the exit code: 0 on success, 1 if gnuplot fails, and 2 on a usage
-  error or if <tsvfile> cannot be read.
+  perform the functions described in the module docstring.
+
+  Return the exit code: 0 for success, 2 for error.
   """
   try:
     args = _parse_command_line(argv)
@@ -94,6 +94,8 @@ def main(argv: list[str]) -> int:
 
   tsv_name: str = args.tsvfile
   try:
+    # 'errors="replace"' means malformed UTF-8 is replaced rather than
+    # failing the decode operation, making this script more tolerant.
     with open(tsv_name, "r", encoding="utf-8", errors="replace") as f:
       text = f.read()
   except OSError as e:
@@ -113,6 +115,7 @@ def main(argv: list[str]) -> int:
 
   if args.show:
     try:
+      print("Per --show, running gnuplot and waiting for it ...")
       proc = subprocess.run(["gnuplot", "-"], input=script, text=True,
                             check=False)
     except FileNotFoundError:
@@ -121,7 +124,7 @@ def main(argv: list[str]) -> int:
     if proc.returncode != 0:
       print(f"gnuplot_tsv.py: gnuplot exited with code {proc.returncode}",
             file=sys.stderr)
-      return 1
+      return 2
 
   if not args.show and args.output is None:
     print("Run with --show to see it, or --output to save the gnuplot "
@@ -180,6 +183,8 @@ def make_script(title: str, points: list[tuple[Decimal, int]]) -> str:
     # S only changes when a candidate is accepted, so it is drawn as
     # a step function.
     "plot $data using 1:2 with steps",
+
+    # Tell gnuplot to wait for the user to close the plot window.
     "pause mouse close",
   ]
   return "".join(line + "\n" for line in lines)
