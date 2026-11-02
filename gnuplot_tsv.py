@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Use gnuplot to visualize a TSV created by ./t_accept.py --tsv-log.
+Use gnuplot to visualize TSVs created by ./t_accept.py --tsv-log.
 
 Usage:
 
-  $ ./gnuplot_tsv.py [options] <tsvfile>
+  $ ./gnuplot_tsv.py [options] <tsvfile> [<tsvfile>...]
 
 Options:
 
@@ -19,10 +19,10 @@ Options:
 
 Behavior:
 
-  Read <tsvfile> and construct a gnuplot script in memory.
+  Read <tsvfile>s and construct a gnuplot script in memory.
 
-  The <tsvfile> is expected to have these tab-separated columns (with no
-  preceding label row):
+  Each <tsvfile> is expected to have these tab-separated columns (with
+  no preceding label row):
 
     * timestamp: unix time of invocation as a decimal number
     * verdict: TRUE or FALSE
@@ -37,15 +37,21 @@ Behavior:
   fields.  Ignore rows that do not have enough fields, or where those
   two are improperly formatted.  Don't validate the other columns.
 
+  Each <tsvfile> contributes its own data line, with its Y data labeled
+  with the name of its <tsvfile>, omitting path information.
+
   The X axis of the plot is "reltime", the difference between the
-  timestamp for that row and the first timestamp on a non-ignored row.
+  timestamp for that row and the first timestamp on a non-ignored row
+  in its <tsvfile>.
+
   The plot's X axis is labeled "reltime (s)".
 
   The Y axis is "S", and is labeled "size (tokens)".
 
-  The title of the plot is <tsvfile>, but with path information removed.
+  The title of the plot is "Accepted Size vs. Time".
 
-  After generating the gnuplot script in memory, write to stdout:
+  After generating the gnuplot script in memory, write to stdout one
+  line for each <tsvfile>:
 
     <tsvfile> has <n> rows of well-formed data out of <t> rows in total.
 
@@ -96,22 +102,31 @@ def main(argv: list[str]) -> int:
     # argparse exits on error (status 2) and for --help (status 0).
     return e.code if isinstance(e.code, int) else 2
 
-  tsv_name: str = args.tsvfile
-  try:
-    # 'errors="replace"' means malformed UTF-8 is replaced rather than
-    # failing the decode operation, making this script more tolerant.
-    with open(tsv_name, "r", encoding="utf-8", errors="replace") as f:
-      text = f.read()
-  except OSError as e:
-    print(f"gnuplot_tsv.py: error: cannot read {tsv_name!r}: {e.strerror}",
-          file=sys.stderr)
-    return 2
+  tsv_names: list[str] = args.tsvfile
 
-  points, total_rows = parse_tsv(text)
-  script = make_script(os.path.basename(tsv_name), points)
+  # For each element of `tsv_names`, its well-formed (reltime, S) pairs
+  # and its total number of rows.
+  parsed: list[tuple[list[tuple[Decimal, int]], int]] = []
 
-  print(f"{tsv_name} has {len(points)} rows of well-formed data out of "
-        f"{total_rows} rows in total.")
+  for tsv_name in tsv_names:
+    try:
+      # 'errors="replace"' means malformed UTF-8 is replaced rather than
+      # failing the decode operation, making this script more tolerant.
+      with open(tsv_name, "r", encoding="utf-8", errors="replace") as f:
+        text = f.read()
+    except OSError as e:
+      print(f"gnuplot_tsv.py: error: cannot read {tsv_name!r}: "
+            f"{e.strerror}", file=sys.stderr)
+      return 2
+    parsed.append(parse_tsv(text))
+
+  script = make_script([
+    (os.path.basename(tsv_name), points)
+    for tsv_name, (points, _) in zip(tsv_names, parsed, strict=True)])
+
+  for tsv_name, (points, total_rows) in zip(tsv_names, parsed, strict=True):
+    print(f"{tsv_name} has {len(points)} rows of well-formed data out of "
+          f"{total_rows} rows in total.")
 
   if args.output is not None:
     with open(args.output, "w", encoding="utf-8") as f:
@@ -168,29 +183,44 @@ def parse_tsv(text: str) -> tuple[list[tuple[Decimal, int]], int]:
   return points, len(rows)
 
 
-def make_script(title: str, points: list[tuple[Decimal, int]]) -> str:
+def make_script(
+  datasets: list[tuple[str, list[tuple[Decimal, int]]]],
+) -> str:
   """
-  Return a gnuplot script that plots `points`, (reltime, S) pairs, with
-  `title`.  The data is embedded in the script, and the script waits for
-  the plot window to be closed before exiting.
+  Return a gnuplot script that plots each of `datasets`, a (label,
+  points) pair where `points` are (reltime, S) pairs, as its own line
+  labeled with `label` in the legend.  The data is embedded in the
+  script, and the script waits for the plot window to be closed before
+  exiting.
+
+  Requires that `datasets` is not empty.
   """
+  assert datasets
+
   lines = [
-    # The title is not "enhanced" so that, e.g., "_" in a file name is
-    # not treated as a subscript marker.
-    f"set title {_quote(title)} noenhanced",
+    "set title 'Accepted Size vs. Time'",
     "set xlabel 'reltime (s)'",
     "set ylabel 'size (tokens)'",
-    "set key off",
-    "$data << EOD",
-    *(f"{reltime}\t{size}" for reltime, size in points),
-    "EOD",
-    # S only changes when a candidate is accepted, so it is drawn as
-    # a step function.
-    "plot $data using 1:2 with steps",
-
-    # Tell gnuplot to wait for the user to close the plot window.
-    "pause mouse close",
   ]
+
+  # One data block per dataset, named "$data1", "$data2", etc.
+  for i, (_, points) in enumerate(datasets, start=1):
+    lines.append(f"$data{i} << EOD")
+    lines.extend(f"{reltime}\t{size}" for reltime, size in points)
+    lines.append("EOD")
+
+  # S only changes when a candidate is accepted, so each is drawn as a
+  # step function.  The labels are not "enhanced" so that, e.g., "_" in
+  # a file name is not treated as a subscript marker.  (gnuplot skips a
+  # data block with no points, with a warning.)
+  plot_elements = [
+    f"$data{i} using 1:2 with steps title {_quote(label)} noenhanced"
+    for i, (label, _) in enumerate(datasets, start=1)]
+  lines.append("plot " + ", \\\n     ".join(plot_elements))
+
+  # Tell gnuplot to wait for the user to close the plot window.
+  lines.append("pause mouse close")
+
   return "".join(line + "\n" for line in lines)
 
 
@@ -206,7 +236,7 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
   parser = argparse.ArgumentParser(
     prog="gnuplot_tsv.py",
     description="Use gnuplot to plot candidate size versus time from a "
-                "TSV file created by t_accept.py --tsv-log.")
+                "TSV files created by t_accept.py --tsv-log.")
   parser.add_argument(
     "--show", action="store_true",
     help="Run gnuplot to show the plot, and wait for it to exit.")
@@ -214,8 +244,8 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
     "--output", "-o", metavar="FNAME.gp",
     help="Write the gnuplot script to FNAME.gp.")
   parser.add_argument(
-    "tsvfile",
-    help="TSV file to read.")
+    "tsvfile", nargs="+",
+    help="TSV file to read.  Each is plotted as its own line.")
   return parser.parse_args(argv)
 
 

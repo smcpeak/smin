@@ -78,24 +78,49 @@ class ParseTsvTest(unittest.TestCase):
 
 
 class MakeScriptTest(unittest.TestCase):
-  def test_script(self) -> None:
-    script = make_script("log.tsv", [(Decimal(0), 10),
-                                     (Decimal("0.25"), 6)])
+  def test_one_dataset(self) -> None:
+    script = make_script([("log.tsv", [(Decimal(0), 10),
+                                       (Decimal("0.25"), 6)])])
     self.assertEqual(script,
-      "set title 'log.tsv' noenhanced\n"
+      "set title 'Accepted Size vs. Time'\n"
       "set xlabel 'reltime (s)'\n"
       "set ylabel 'size (tokens)'\n"
-      "set key off\n"
-      "$data << EOD\n"
+      "$data1 << EOD\n"
       "0\t10\n"
       "0.25\t6\n"
       "EOD\n"
-      "plot $data using 1:2 with steps\n"
+      "plot $data1 using 1:2 with steps title 'log.tsv' noenhanced\n"
       "pause mouse close\n")
 
-  def test_title_quoted(self) -> None:
-    script = make_script("it's.tsv", [])
-    self.assertIn("set title 'it''s.tsv' noenhanced\n", script)
+  def test_multiple_datasets(self) -> None:
+    # Each dataset has its own data block and plot element.  A dataset
+    # with no points is still included.
+    script = make_script([
+      ("a.tsv", [(Decimal(0), 10)]),
+      ("b.tsv", []),
+      ("c.tsv", [(Decimal(0), 7), (Decimal(3), 5)]),
+    ])
+    self.assertEqual(script,
+      "set title 'Accepted Size vs. Time'\n"
+      "set xlabel 'reltime (s)'\n"
+      "set ylabel 'size (tokens)'\n"
+      "$data1 << EOD\n"
+      "0\t10\n"
+      "EOD\n"
+      "$data2 << EOD\n"
+      "EOD\n"
+      "$data3 << EOD\n"
+      "0\t7\n"
+      "3\t5\n"
+      "EOD\n"
+      "plot $data1 using 1:2 with steps title 'a.tsv' noenhanced, \\\n"
+      "     $data2 using 1:2 with steps title 'b.tsv' noenhanced, \\\n"
+      "     $data3 using 1:2 with steps title 'c.tsv' noenhanced\n"
+      "pause mouse close\n")
+
+  def test_label_quoted(self) -> None:
+    script = make_script([("it's.tsv", [])])
+    self.assertIn(" title 'it''s.tsv' noenhanced\n", script)
 
 
 class MainTest(unittest.TestCase):
@@ -136,18 +161,17 @@ class MainTest(unittest.TestCase):
   def waiting_line(self) -> str:
     return "Per --show, running gnuplot and waiting for it ...\n"
 
-  # The script for `tsv_path`.  The title has no path information, and
+  # The script for `tsv_path`.  The label has no path information, and
   # the first reltime is "0.0" since it is computed as "100.0 - 100.0".
   EXPECTED_SCRIPT = (
-    "set title 'run_1.tsv' noenhanced\n"
+    "set title 'Accepted Size vs. Time'\n"
     "set xlabel 'reltime (s)'\n"
     "set ylabel 'size (tokens)'\n"
-    "set key off\n"
-    "$data << EOD\n"
+    "$data1 << EOD\n"
     "0.0\t10\n"
     "1.5\t4\n"
     "EOD\n"
-    "plot $data using 1:2 with steps\n"
+    "plot $data1 using 1:2 with steps title 'run_1.tsv' noenhanced\n"
     "pause mouse close\n")
 
   HINT_LINE = ("Run with --show to see it, or --output to save the "
@@ -165,8 +189,52 @@ class MainTest(unittest.TestCase):
         self.run_main([option, str(gp), str(self.tsv_path)]), 0)
       self.assertEqual(self.out, self.summary_line())
 
-      # The title has no path information.
       self.assertEqual(gp.read_text(), self.EXPECTED_SCRIPT)
+
+  def test_multiple_files(self) -> None:
+    # A second file, in another directory, with different timestamps.
+    other_dir = self.dir / "other"
+    other_dir.mkdir()
+    other = other_dir / "run_2.tsv"
+    other.write_text(row("500", "8") + row("503", "5") + row("504", "2"))
+
+    gp = self.dir / "plot.gp"
+    self.assertEqual(
+      self.run_main(["-o", str(gp), str(self.tsv_path), str(other)]), 0)
+
+    # One summary line per file, in command line order, with paths.
+    self.assertEqual(self.out,
+      self.summary_line() +
+      f"{other} has 3 rows of well-formed data out of 3 rows in total.\n")
+
+    # Each file's reltime is measured from its own first timestamp, and
+    # its label has no path information.
+    self.assertEqual(gp.read_text(),
+      "set title 'Accepted Size vs. Time'\n"
+      "set xlabel 'reltime (s)'\n"
+      "set ylabel 'size (tokens)'\n"
+      "$data1 << EOD\n"
+      "0.0\t10\n"
+      "1.5\t4\n"
+      "EOD\n"
+      "$data2 << EOD\n"
+      "0\t8\n"
+      "3\t5\n"
+      "4\t2\n"
+      "EOD\n"
+      "plot $data1 using 1:2 with steps title 'run_1.tsv' noenhanced, \\\n"
+      "     $data2 using 1:2 with steps title 'run_2.tsv' noenhanced\n"
+      "pause mouse close\n")
+
+  def test_one_of_multiple_files_missing(self) -> None:
+    # Nothing is printed or written, even for the readable file.
+    missing = self.dir / "missing.tsv"
+    gp = self.dir / "plot.gp"
+    code = self.run_main(["-o", str(gp), str(self.tsv_path), str(missing)])
+    self.assertEqual(code, 2)
+    self.assertIn("cannot read", self.err)
+    self.assertEqual(self.out, "")
+    self.assertFalse(gp.exists())
 
   def make_fake_gnuplot(self, status: int = 0) -> dict[str, str]:
     """
