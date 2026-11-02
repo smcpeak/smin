@@ -2,6 +2,11 @@
 """
 Data and functions related to whitespace recognition in the minimizer.
 
+It is intended for use when looking at bytes that came from the input
+file we are trying to minimize.  In contrast, for example, the _Console
+class has code keeps track of whether the last message we printed had a
+newline; that should *not* use this module.
+
 This module is intended to encapsulate the mostly language independent
 whitespace decisions the minimizer makes.  The language-specific
 tokenizers do not use it.
