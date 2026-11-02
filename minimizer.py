@@ -104,6 +104,9 @@ class Minimizer:
   # The root of the token tree representing the original input.
   tree_root: TTNode
 
+  # True to use Minimization Algorithm 2 (MA2) rather than MA1.
+  use_ma2_alg: bool
+
   # ---- Primary input and output callback ----
   # Check if a given candidate is accepted.  In normal operation, this
   # will spawn and wait for a child process.
@@ -172,11 +175,6 @@ class Minimizer:
   # check that that function is only invoked once.
   minimizer_invoked: bool
 
-  # True to use Minimization Algorithm 2 (MA2) rather than MA1.
-  #
-  # TODO: Move where this is declared.
-  use_ma2_alg: bool
-
   # ---- Progress data ----
   # Number of candidates reported so far, including those whose verdict
   # was found in the memoization table.
@@ -214,13 +212,13 @@ class Minimizer:
     self,
     *,
     tree_root: TTNode,
+    use_ma2_alg: bool = False,
     test_acceptance: AcceptanceTestFunc,
     get_non_trivial_replacement: NTReplacementFunc,
     should_stop: Optional[StopQueryFunc] = None,
     report_test_starting: TestStartReportFunc,
     report_test_finished: TestFinishedReportFunc,
     max_passes: Optional[int] = None,
-    use_ma2_alg: bool = False,
   ) -> None:
     """
     Prepare to minimize the input represented by `tree_root`.
@@ -233,6 +231,7 @@ class Minimizer:
     """
 
     self.tree_root = tree_root
+    self.use_ma2_alg = use_ma2_alg
     self.test_acceptance = test_acceptance
     self.get_non_trivial_replacement = get_non_trivial_replacement
     self.should_stop = should_stop
@@ -250,7 +249,6 @@ class Minimizer:
     self.token_live = [True] * len(self.tokens)
     self.live_tok_count = len(self.tokens)
     self.minimizer_invoked = False
-    self.use_ma2_alg = use_ma2_alg
 
     self.sequence_num = 0
 

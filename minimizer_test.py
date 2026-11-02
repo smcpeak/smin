@@ -94,20 +94,20 @@ class Recorder:
     self,
     root: TTNode,
     *,
+    use_ma2_alg: bool = False,
     nt: NTReplacementFunc = no_replacement,
     should_stop: StopQueryFunc | None = None,
     max_passes: int | None = None,
-    use_ma2_alg: bool = False,
   ) -> Minimizer:
     self.minimizer = Minimizer(
       tree_root                   = root,
       test_acceptance             = self.test,
+      use_ma2_alg                 = use_ma2_alg,
       get_non_trivial_replacement = nt,
       should_stop                 = should_stop,
       report_test_starting        = self.starts.append,
       report_test_finished        = self.finish,
       max_passes                  = max_passes,
-      use_ma2_alg                 = use_ma2_alg,
     )
     return self.minimizer
 
