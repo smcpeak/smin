@@ -7,7 +7,12 @@ from __future__ import annotations
 
 import unittest
 
-from whitespace import count_indentation, leading_whitespace, only_indentation
+from whitespace import (
+  contains_newline,
+  count_indentation,
+  leading_whitespace,
+  only_indentation,
+)
 
 
 class LeadingWhitespaceTest(unittest.TestCase):
@@ -74,6 +79,18 @@ class CountIndentationTest(unittest.TestCase):
     self.assertEqual(count_indentation(b"\r\f\v\nx"), 0)
     self.assertEqual(count_indentation(b" \f\t\r x"), 3)
     self.assertEqual(count_indentation(b"a b\tc"), 2)
+
+
+class ContainsNewlineTest(unittest.TestCase):
+  def test_basics(self) -> None:
+    self.assertEqual(contains_newline(b""), False)
+    self.assertEqual(contains_newline(b"x"), False)
+    self.assertEqual(contains_newline(b"\rx"), False)
+
+    self.assertEqual(contains_newline(b"\n"), True)
+    self.assertEqual(contains_newline(b"\r\n"), True)
+    self.assertEqual(contains_newline(b"x\r\n"), True)
+    self.assertEqual(contains_newline(b"\r\nx"), True)
 
 
 if __name__ == "__main__":

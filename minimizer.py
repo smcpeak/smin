@@ -18,10 +18,7 @@ from byte_range import ByteRange
 from smin_token import SMToken
 from start_report import TestStartReport
 from token_tree import TTNode
-from whitespace import leading_whitespace
-
-
-_NEWLINE: int = ord("\n")
+from whitespace import contains_newline, leading_whitespace
 
 
 # Signature of a function that can specify non-trivial replacement text
@@ -807,7 +804,7 @@ def _render_ctm(
         # This is B, the end of the last piece of the gap.
         ws = leading_whitespace(text)
         indent = _trail_indent(b"".join(trivial))
-        if _NEWLINE in ws:
+        if contains_newline(ws):
           candidate.append(text)
         elif indent:
           candidate.append(indent + text[len(ws):])

@@ -19,6 +19,8 @@ WHITESPACE: frozenset[int] = frozenset(b" \t\r\f\v\n")
 # Bytes counted as indentation.
 INDENTATION: frozenset[int] = frozenset(b" \t")
 
+NEWLINE: int = ord("\n")
+
 
 def leading_whitespace(text: bytes) -> bytes:
   """
@@ -43,6 +45,13 @@ def count_indentation(text: bytes) -> int:
   Number of bytes in `text` that count as indentation.
   """
   return sum(1 for c in text if c in INDENTATION)
+
+
+def contains_newline(text: bytes) -> bool:
+  """
+  True if `text` contains a newline character.
+  """
+  return NEWLINE in text
 
 
 # EOF
