@@ -16,12 +16,21 @@ from token_tree import TTNode
 _WHITESPACE: frozenset[int] = frozenset(b" \t\r\f\v\n")
 
 
-def group_paragraphs(node: TTNode) -> TTNode:
+def group_paragraphs(node: TTNode, skip_toplevel: bool = False) -> TTNode:
   """
   Perform Phase 5, grouping paragraphs, on the tree rooted at `node`.
   Return the root of a new tree; the input tree is not modified,
   although the new tree shares its `SMToken` objects.
+
+  If `skip_toplevel`, then grouping is only done within the children of
+  `node`, so none of those children are grouped together.
   """
+  if skip_toplevel and node.token is None:
+    return TTNode.make_group(
+      [recursively_group_sequences(c, _group_paragraph_sequence)
+       for c in node.children],
+      delim_group=node.delim_group)
+
   return recursively_group_sequences(node, _group_paragraph_sequence)
 
 

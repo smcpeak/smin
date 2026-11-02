@@ -14,6 +14,8 @@ from group_paragraphs import group_paragraphs
 from smin_token import SMToken
 from token_tree import TTNode
 
+import os
+
 
 def build_tree(tokens: list[SMToken]) -> TTNode:
   """
@@ -24,8 +26,13 @@ def build_tree(tokens: list[SMToken]) -> TTNode:
   needed as a separate pass, since the grouping phases do not create
   redundant groups (see `recursively_group_sequences`).
   """
-  return group_paragraphs(group_indentation(group_lines(
-    group_delimiters(tokens))))
+
+  # For experimentation, optionally disable paragraphing at top level.
+  skip_toplevel: bool = (os.environ.get("SKIP_TOP_PARA", "") == "1")
+
+  return group_paragraphs(
+    group_indentation(group_lines(group_delimiters(tokens))),
+    skip_toplevel = skip_toplevel)
 
 
 # EOF

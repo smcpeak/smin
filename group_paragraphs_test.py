@@ -22,17 +22,18 @@ def delim_group_texts(node: TTNode) -> list[bytes]:
 
 
 class GroupParagraphsTest(unittest.TestCase):
-  def check_bytes(self, data: bytes, expect: str) -> TTNode:
+  def check_bytes(self, data: bytes, expect: str,
+                  skip_toplevel: bool = False) -> TTNode:
     """
     Check that grouping `data` into paragraphs, after the earlier
-    phases, yields a tree whose debug string is `expect` (dedented).
-    Return the tree.
+    phases, and passing `skip_toplevel`, yields a tree whose debug
+    string is `expect` (dedented).  Return the tree.
     """
     input_tree = group_indentation(group_lines(group_delimiters(
       tokenize_cpp(data))))
     input_debug = input_tree.to_debug_string()
 
-    tree = group_paragraphs(input_tree)
+    tree = group_paragraphs(input_tree, skip_toplevel=skip_toplevel)
 
     self.assertEqual(tree.to_debug_string(), dedent(expect))
     self.assertEqual(tree.text(), data)
@@ -52,9 +53,11 @@ class GroupParagraphsTest(unittest.TestCase):
 
     return tree
 
-  def check(self, src: str, expect: str) -> TTNode:
+  def check(self, src: str, expect: str,
+            skip_toplevel: bool = False) -> TTNode:
     """Like `check_bytes`, but with `src` dedented and encoded."""
-    return self.check_bytes(dedent(src).encode("utf-8"), expect)
+    return self.check_bytes(dedent(src).encode("utf-8"), expect,
+                            skip_toplevel)
 
   def test_empty(self) -> None:
     self.check("", """
@@ -373,6 +376,55 @@ class GroupParagraphsTest(unittest.TestCase):
         ]
       ]
       """)
+
+  def test_skip_toplevel(self) -> None:
+    # Same input as `test_delimiters_excluded`, but the root's children
+    # are not grouped into paragraphs.  The lines inside the braces
+    # still are.
+    self.check("""
+      x;
+
+      f()
+      {
+        a;
+        b;
+      }
+      """, r"""
+      [
+        [
+          "x"
+          ";"
+        ]
+        [
+          "\n\nf"
+          [
+            "("
+            ")"
+          ]
+        ]
+        [
+          "\n{"
+          [
+            [
+              "\n  a"
+              ";"
+            ]
+            [
+              "\n  b"
+              ";"
+            ]
+          ]
+          "\n}"
+        ]
+        "\n"
+      ]
+      """, skip_toplevel=True)
+
+  def test_skip_toplevel_empty(self) -> None:
+    self.check("", """
+      [
+      ]
+      """, skip_toplevel=True)
 
 
 if __name__ == "__main__":
