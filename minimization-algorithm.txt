@@ -353,8 +353,9 @@ As pseudocode, the algorithm is:
          it as unreplaced for uniformity.
 
     Set `granularity` to `len(children)` if `node` is a delimiter group,
-    and `len(children)//2` otherwise.  This is the number of child nodes
-    we are currently trying to remove at once.
+    and `len(children)//2` otherwise.  Then clamp to at least 1
+    (otherwise we'd be in an infinite loop).  This is the number of
+    child nodes we are currently trying to remove at once.
 
       Rationale: For a node that is not a delimiter group, we just tried
       (and failed) to delete it in its entirety in the caller.  The only

@@ -529,7 +529,7 @@ class Minimizer:
     # Number of children we are currently trying to remove at once.  If
     # `node` is not a delimiter group, removing all of its children is
     # the same as removing `node`, which the caller just tried, so start
-    # with half.  (Clamp to 1 so a lone surviving child is still tried.)
+    # with half.  Clamp to 1 so a lone surviving child is still tried.
     granularity: int = (
       len(children) if node.delim_group else len(children) // 2)
     granularity = max(1, granularity)
