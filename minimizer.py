@@ -158,7 +158,7 @@ class Minimizer:
   minimizer_invoked: bool
 
   # True to use Minimization Algorithm 2 (MA2) rather than MA1.
-  ma2: bool
+  use_ma2_alg: bool
 
   # ---- Progress data ----
   # Number of candidates reported so far, including those whose verdict
@@ -185,12 +185,12 @@ class Minimizer:
     report_test_starting: TestStartReportFunc,
     report_test_finished: TestFinishedReportFunc,
     max_passes: Optional[int] = None,
-    ma2: bool = False,
+    use_ma2_alg: bool = False,
   ) -> None:
     """
     Prepare to minimize the input represented by `tree_root`.  If
-    `max_passes` is not None, make at most that many passes.  If `ma2`,
-    use Minimization Algorithm 2.
+    `max_passes` is not None, make at most that many passes.  If
+    `use_ma2_alg`, use Minimization Algorithm 2.
 
     Requires that the acceptance test has already accepted that input.
     """
@@ -212,11 +212,11 @@ class Minimizer:
     self.token_live = [True] * len(self.tokens)
     self.live_tok_count = len(self.tokens)
     self.minimizer_invoked = False
-    self.ma2 = ma2
+    self.use_ma2_alg = use_ma2_alg
 
     self.sequence_num = 0
 
-    if ma2:
+    if use_ma2_alg:
       # MA2 makes one pass per level of the tree.
       self.total_num_passes = tree_root.depth()
     else:
@@ -250,7 +250,7 @@ class Minimizer:
     try:
       for k in range(self.total_num_passes):
         self.pass_index = k
-        if self.ma2:
+        if self.use_ma2_alg:
           self._ma2_min_node(self.tree_root, k+1)
         else:
           self._minimize_node(self.tree_root)
@@ -636,7 +636,7 @@ class Minimizer:
       pass_num=self.pass_index + 1,
       total_num_passes=self.total_num_passes,
       granularity=(
-        float(self.ma2_granularity) if self.ma2
+        float(self.ma2_granularity) if self.use_ma2_alg
         else len(self.tokens) / (1 << self.pass_index)),
       completion_fraction=(num_live - e) / num_live,
       removed_tok_count=sum(self.node_size(n) for n in nodes),

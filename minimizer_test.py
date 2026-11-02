@@ -94,10 +94,10 @@ class Recorder:
     root: TTNode,
     nt: NTReplacementFunc = no_replacement,
     max_passes: int | None = None,
-    ma2: bool = False,
+    use_ma2_alg: bool = False,
   ) -> Minimizer:
     self.minimizer = Minimizer(root, nt, self.test, self.starts.append,
-                               self.finish, max_passes, ma2)
+                               self.finish, max_passes, use_ma2_alg)
     return self.minimizer
 
   def finish(self, result: AcceptanceTestResult, memoized: bool) -> None:
@@ -253,7 +253,7 @@ class ReportCheckingTestCase(unittest.TestCase):
     for i, r in enumerate(rec.starts):
       self.assertEqual(r.sequence_num, i + 1)
       self.assertEqual(r.total_num_passes, m.total_num_passes)
-      if m.ma2:
+      if m.use_ma2_alg:
         # The granularity is a number of nodes.
         self.assertEqual(r.granularity, int(r.granularity))
         self.assertGreaterEqual(r.granularity, 1)
@@ -448,7 +448,7 @@ class MA2Test(ReportCheckingTestCase):
     """
     rec = Recorder(accept)
     m = rec.make_minimizer(build_tree(tokenize_cpp(src)), nt,
-                           max_passes, ma2=True)
+                           max_passes, use_ma2_alg=True)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertTrue(accept(m.get_minimized_test_input()))
     self.check_reports(rec, m)
@@ -574,7 +574,8 @@ class MA2Test(ReportCheckingTestCase):
   def test_interrupted(self) -> None:
     rec = Recorder(lambda d: b"keep" in d, interrupt_at=3)
     m = rec.make_minimizer(
-      build_tree(tokenize_cpp(b"int a;\nint keep;\nint b;\n")), ma2=True)
+      build_tree(tokenize_cpp(b"int a;\nint keep;\nint b;\n")),
+                 use_ma2_alg=True)
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
     self.assertEqual(rec.finishes[-1], (INTERRUPTED, False))
 
