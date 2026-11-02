@@ -51,6 +51,10 @@ Behavior:
 
   (where <tsvfile> does include its path info).
 
+  If --show, print:
+
+    Per --show, running gnuplot and waiting for it ...
+
   If neither --show or --output is passed, also print:
 
     Run with --show to see it, or --output to save the gnuplot script.
