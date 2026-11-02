@@ -486,6 +486,29 @@ class Minimizer:
       i = j
 
 
+  def _get_surviving_nondelim_children(
+    self,
+    node: TTNode,
+  ) -> list[TTNode]:
+    """
+    Return the children of `node` that are not replaced, excluding the
+    delimiters if `node` is a delimiter group.
+    """
+
+    all_children: list[TTNode] = node.children
+
+    # Range of non-delimiter children.
+    lo, hi = ((1, len(all_children)-1) if node.delim_group
+              else (0, len(all_children)))
+
+    # Filter the range for having not been replaced.
+    return [
+      c
+      for c in all_children[lo:hi]
+      if id(c) not in self.cur_replacement
+    ]
+
+
   def _ma2_min_node(self, node: TTNode, max_depth: int) -> None:
     """
     Try to replace the children of `node`, working backward from the
@@ -501,11 +524,7 @@ class Minimizer:
       return
 
     # The surviving children, excluding delimiters.
-    all_children = node.children
-    lo, hi = ((1, len(all_children)-1) if node.delim_group
-              else (0, len(all_children)))
-    children: list[TTNode] = [
-      c for c in all_children[lo:hi] if id(c) not in self.cur_replacement]
+    children: list[TTNode] = self._get_surviving_nondelim_children(node)
 
     # Number of children we are currently trying to remove at once.  If
     # `node` is not a delimiter group, removing all of its children is
