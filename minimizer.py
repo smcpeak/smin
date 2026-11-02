@@ -200,8 +200,7 @@ class Minimizer:
   ) -> None:
     """
     Prepare to minimize the input represented by `tree_root`.  If
-    `max_passes` is not None, make at most that many passes.  If
-    `use_ma2_alg`, use Minimization Algorithm 2.
+    `max_passes` is not None, make at most that many passes.
 
     Requires that the acceptance test has already accepted that input.
     """
