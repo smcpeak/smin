@@ -177,7 +177,7 @@ out/m/hello-cpp.cc.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	$(RM) out/m/hello-cpp.ii.*
-	clang -E test/hello-cpp.cc -o out/m/hello-cpp.ii
+	clang -E -P test/hello-cpp.cc -o out/m/hello-cpp.ii
 	$(PYTHON) ./smin.py \
 	  ./t_accept.py \
 	    --clang \
@@ -194,7 +194,7 @@ out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 out/m/hello-cpp-ma2.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	$(RM) out/m/hello-cpp-ma2.ii.*
-	clang -E test/hello-cpp.cc -o out/m/hello-cpp-ma2.ii
+	clang -E -P test/hello-cpp.cc -o out/m/hello-cpp-ma2.ii
 	$(PYTHON) ./smin.py \
 	  --max-seconds 100 \
 	  --ma2 \
