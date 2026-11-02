@@ -12,6 +12,7 @@ from whitespace import (
   count_indentation,
   leading_whitespace,
   only_indentation,
+  trail_indent,
 )
 
 
@@ -81,8 +82,8 @@ class CountIndentationTest(unittest.TestCase):
     self.assertEqual(count_indentation(b"a b\tc"), 2)
 
 
-class ContainsNewlineTest(unittest.TestCase):
-  def test_basics(self) -> None:
+class OtherTests(unittest.TestCase):
+  def test_contains_newline(self) -> None:
     self.assertEqual(contains_newline(b""), False)
     self.assertEqual(contains_newline(b"x"), False)
     self.assertEqual(contains_newline(b"\rx"), False)
@@ -91,6 +92,24 @@ class ContainsNewlineTest(unittest.TestCase):
     self.assertEqual(contains_newline(b"\r\n"), True)
     self.assertEqual(contains_newline(b"x\r\n"), True)
     self.assertEqual(contains_newline(b"\r\nx"), True)
+
+  def test_trail_indent(self) -> None:
+    self.assertEqual(trail_indent(b""),     b"")
+    self.assertEqual(trail_indent(b" "),    b"")
+    self.assertEqual(trail_indent(b"x"),    b"")
+    self.assertEqual(trail_indent(b" x"),   b"")
+
+    self.assertEqual(trail_indent(b"\n"),     b"\n")
+    self.assertEqual(trail_indent(b"\n "),    b"\n ")
+    self.assertEqual(trail_indent(b"\n  "),   b"\n  ")
+    self.assertEqual(trail_indent(b"\nx"),    b"\n")
+    self.assertEqual(trail_indent(b"\n x"),   b"\n ")
+    self.assertEqual(trail_indent(b"\n  x"),  b"\n  ")
+
+    self.assertEqual(trail_indent(b"\n\n"),     b"\n")
+    self.assertEqual(trail_indent(b"\n\n "),    b"\n ")
+    self.assertEqual(trail_indent(b"\n\nx"),    b"\n")
+    self.assertEqual(trail_indent(b"\n\n x"),   b"\n ")
 
 
 if __name__ == "__main__":

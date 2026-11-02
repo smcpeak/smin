@@ -60,4 +60,15 @@ def contains_newline(text: bytes) -> bool:
   return NEWLINE_BYTE in text
 
 
+def trail_indent(s: bytes) -> bytes:
+  """
+  Return the last newline in `s` followed by the whitespace that
+  immediately follows it, or the empty sequence if `s` has no newline.
+  """
+  start = s.rfind(b"\n")
+  if start < 0:
+    return b""
+  return leading_whitespace(s[start:])
+
+
 # EOF

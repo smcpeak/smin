@@ -18,7 +18,11 @@ from byte_range import ByteRange
 from smin_token import SMToken
 from start_report import TestStartReport
 from token_tree import TTNode
-from whitespace import contains_newline, leading_whitespace
+from whitespace import (
+  contains_newline,
+  leading_whitespace,
+  trail_indent,
+)
 
 
 # Signature of a function that can specify non-trivial replacement text
@@ -738,17 +742,6 @@ def _digest(data: bytes) -> bytes:
   return hashlib.md5(data, usedforsecurity=False).digest()
 
 
-def _trail_indent(s: bytes) -> bytes:
-  """
-  Return the last newline in `s` followed by the whitespace that
-  immediately follows it, or the empty sequence if `s` has no newline.
-  """
-  start = s.rfind(b"\n")
-  if start < 0:
-    return b""
-  return leading_whitespace(s[start:])
-
-
 def _render_ctm(
   texts: list[bytes],
   ctm: list[bytes | None],
@@ -803,7 +796,7 @@ def _render_ctm(
       else:
         # This is B, the end of the last piece of the gap.
         ws = leading_whitespace(text)
-        indent = _trail_indent(b"".join(trivial))
+        indent = trail_indent(b"".join(trivial))
         if contains_newline(ws):
           candidate.append(text)
         elif indent:
@@ -839,7 +832,7 @@ def _render_ctm(
       if replacement:
         # End of a piece with a non-trivial replacement.
         candidate.append(
-          _trail_indent(b"".join(trivial) + leading_whitespace(text)) +
+          trail_indent(b"".join(trivial) + leading_whitespace(text)) +
           replacement)
         trivial = []
       else:
