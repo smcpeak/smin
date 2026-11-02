@@ -72,8 +72,8 @@ whitespace will be inserted to prevent token coalescing during
 rendering.
 
 
-Algorithm
----------
+Minimization Algorithm 1 (MA1)
+------------------------------
 
 Let S be the number of tokens in the input tree.  (If S=0 then halt
 early as there is nothing to do.)
@@ -325,6 +325,167 @@ Proof:
     E  <=  L
 
   Which is true by the assumption 0 < E <= L.  QED.
+
+
+Minimization Algorithm 2 (MA2)
+------------------------------
+
+MA2 makes as many passes as the maximum depth, MAX_DEPTH, of the token
+tree root at `root`.  ("Depth" is defined as the maximum number of edges
+from root to leaf, per `token_tree.depth()`.  So a tree with a root
+node, all of whose children are leaves, has depth 1.)
+
+If --max-passes N, then regard MAX_DEPTH as at most N.
+
+As pseudocode, the algorithm is:
+
+  For `target_depth` in [1,MAX_DEPTH]:
+
+    Invoke `minimize_node(root, target_depth)`.
+
+  def minimize_node(node, max_depth):
+
+    Let `children` be the surviving (unreplaced) children of `node`,
+    excluding the delimiters if `node` is a delimiter group.
+
+      -> If a child is not marked as replaced, but it has no live tokens
+         due to replacements further down, this algorithm still treats
+         it as unreplaced for uniformity.
+
+    Set `granularity` to `len(children)` if `node` is a delimiter group,
+    and `len(children)//2` otherwise.  This is the number of child nodes
+    we are currently trying to remove at once.
+
+      Rationale: For a node that is not a delimiter group, we just tried
+      (and failed) to delete it in its entirety in the caller.  The only
+      exception is when `node==root`, but trying to delete the whole
+      file is very unlikely to succeed.  For a delimiter group, however,
+      it might be possible to delete the interior.
+
+    Set `limit` to `len(children)` also.  This is the number of child
+    nodes in scope for removal; children beyond the limit are deemed
+    (for the duration of this call) necessary for candidate acceptance.
+
+    While `limit` > 0:
+
+      Test a candidate formed by replacing the last `granularity`
+      surviving elements of `children` that are not beyond `limit` with
+      the empty string.
+
+      If ACCEPT:
+
+        Permanently replace the relevant children (updating what
+        `children` refers to).
+
+        Reduce `limit` by the number of replaced children to preserve
+        the boundary between doubtful and necessary children.
+
+        Double `granularity`, but then clamp it to `limit`.
+
+      If REJECT and `granularity` > 1:
+
+        Cut `granularity` in half, rounding down.
+
+      If REJECT and `granularity` == 1:
+
+        Let `c` be the child we tried to remove.
+
+        If `c` has a non-trivial replacement:
+
+          Test a candidate formed by replacing `c` with its non-trivial
+          replacement.
+
+          If ACCEPT:
+
+            Permanently replace `c` with that replacement.
+
+            Reduce `limit` by 1 to account for the replaced child.
+
+            Keep `granularity` at 1 (since `c` required individualized
+            attention, its neighbor might too).
+
+            Continue to the next iteration of the main loop.
+
+        Reduce `limit` by 1.  The relevant child `c` is considered
+        "necessary" until we revisit `node` in a later pass.
+
+        If `max_depth` > 1:
+
+          Invoke `minimize_node(c, max_depth-1)`.
+
+        Note: `granularity` remains 1.
+
+In cases where a node, or the entire tree, has no live tokens, the
+algorithm as specified should naturally work without needing any special
+cases.  In particular, I think this algorithm cannot issue a progress
+report when L (the number of live tokens in the last-accepted candidate)
+is zero.
+
+For this algorithm, we use the same progress report form:
+
+  P:  target_depth
+  Pm: MAX_DEPTH
+  G:  granularity (which is an integer here) (currently disabled)
+  F:  same as above
+  R:  same as above
+
+The monotonicity argument for F within a pass still holds.  The new case
+is when we enter the recursive call, but in that case the end token of
+the next candidate will be no later in the file than the end token of
+the previous due to the containment of the child `c` within the parent
+`node`.
+
+
+This algorithm is activated by passing --ma2 to the minimizer program.
+For now, MA1 is the default.
+
+Motivation:
+
+  MA2 is motivated by a few observations.  First, if we fail to remove a
+  large suffix of the original file, it is almost always a waste of time
+  to try removing a large section higher up, since that will nearly
+  always break ref-decl edges pointing from the suffix we failed to
+  remove into the removed section.  Instead, it is better to immediately
+  try to remove less at the end to improve the chance of removing
+  something there.  We want to work toward either removing something or
+  concluding that a particular top-level construct is necessary as
+  quickly as possible, since those are the two most likely ways to make
+  progress.  In contrast, MA1 makes many extremely low probability "Hail
+  Mary" attempts before again trying something with reasonable success
+  probability.
+
+  Then, having eventually decided something near the end is necessary
+  (as is typical), we want to repeat that process to zoom in on the next
+  necessary top-level construct.
+
+  Each time we find a necessary node, there is a good chance there will
+  be a lengthy stretch of stuff to delete before we get to the next, so
+  we increase the granularity when a removal is accepted.  Again, we
+  want to zoom in on the next boundary between necessary and
+  unnecessary.
+
+  Only after having (approximately) reduced the top-level constructs as
+  much as possible (in pass 1) should we then dig into their children
+  (in pass 2).  And there, we again aggressively try to remove material
+  from the end since that is what frees up earlier nodes to be removed.
+
+  In this algorithm, pass N+1 repeats approximately all of the deletion
+  attempts made on pass N.  My hope is that progress made in the
+  meantime will allow deletions to succeed that previously failed, and
+  that if not, the memoization mechanism will be sufficient to avoid
+  substantial cost.  Experimentation is needed here; memoization also
+  might need optimization, and the decision to issue progress reports
+  for memo hits revisited.
+
+  We keep `granularity` at 1 after finding a necessary child because
+  "interesting" features tend to cluster together, so there is a good
+  chance the next child (going backward) will also be necessary.  If
+  not, we will begin increasing `granularity` after the successful
+  removal.
+
+  Unlike MA1, MA2 does not use token counts to choose how much to try to
+  remove.  My observation is that structure seems to be a better
+  predictor of success than size, hence the departure.
 
 
 Candidate testing
