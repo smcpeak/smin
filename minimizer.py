@@ -543,18 +543,29 @@ class Minimizer:
       self.ma2_granularity = granularity
       run: list[TTNode] = children[limit-granularity : limit]
       if self._try_candidate({id(n): b"" for n in run}, run):
+        # Removing `run` worked.  `_try_candidate` marked the nodes as
+        # replaced in the tree, but we need to update our local list.
         del children[limit-granularity : limit]
+
+        # Move the limit to reflect the shortened list.
         limit -= granularity
+
+        # Increase the granularity.  If we succeeded at removing
+        # something, we might be able to remove in bigger amounts,
+        # since, usually, most of text is removable.
         granularity = min(2 * granularity, limit)
         continue
 
       if granularity > 1:
+        # Removing `run` did not work.  Try removing less at once.
         granularity //= 2
         continue
 
-      # We failed to remove `c` by itself.
+      # We failed to remove `c` by itself (when using a trivial
+      # replacement).
       c: TTNode = run[0]
 
+      # Try a non-trivial replacement.
       replacement = self.get_non_trivial_replacement(c)
       if replacement and self._try_candidate({id(c): replacement}, [c]):
         # Keep `granularity` at 1 since `c` required individualized
@@ -563,9 +574,17 @@ class Minimizer:
         limit -= 1
         continue
 
-      # `c` is necessary, at least until we revisit `node` in a later
-      # pass.  Now try to reduce its children.
+      # We could not remove `c`, so we hereby regard it as necessary, at
+      # least until we revisit `node` in a later pass.
       limit -= 1
+
+      # Now try to reduce its children before moving to siblings.
+      #
+      # This is one of the key changes in MA2: In later passes, we
+      # persistently try to reduce nodes near the end before moving
+      # toward the beginning.  This is because removing even one small
+      # piece near the end could unlock many deletions higher up, so
+      # it's worth spending more time here.
       if max_depth > 1:
         self._ma2_min_node(c, max_depth-1)
 
