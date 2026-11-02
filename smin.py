@@ -110,10 +110,9 @@ class _Console:
 def parse_command_line(argv: list[str]) -> argparse.Namespace:
   """
   Parse the command line arguments `argv` (not including the program
-  name).  The result has attributes `max_passes` (None if not
-  specified), `ma2` (True if --ma2 was given), `test_command` (the test
-  program and its arguments), and `input_file`.  On error, exit with
-  status 2.
+  name).
+
+  On error, exit with status 2.  (ArgumentParser.error does that.)
   """
 
   parser = argparse.ArgumentParser(
