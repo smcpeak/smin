@@ -101,8 +101,8 @@ class Recorder:
   ) -> Minimizer:
     self.minimizer = Minimizer(
       tree_root                   = root,
-      get_non_trivial_replacement = nt,
       test_acceptance             = self.test,
+      get_non_trivial_replacement = nt,
       should_stop                 = should_stop,
       report_test_starting        = self.starts.append,
       report_test_finished        = self.finish,

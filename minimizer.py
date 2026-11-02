@@ -104,15 +104,18 @@ class Minimizer:
   # The root of the token tree representing the original input.
   tree_root: TTNode
 
+  # ---- Primary input and output callback ----
+  # Check if a given candidate is accepted.  In normal operation, this
+  # will spawn and wait for a child process.
+  #
+  # The data passed to this function is the minimizer's primary output,
+  # and the return values from it are its primary input (aside from
+  # `tree_root`).
+  test_acceptance: AcceptanceTestFunc
+
   # ---- Callbacks that affect algorithm behavior ----
   # Query for non-trivial replacement text for a node.
   get_non_trivial_replacement: NTReplacementFunc
-
-  # TODO: Adjust the location and header for this callback.
-  #
-  # Check if a given candidate is accepted.  In normal operation, this
-  # will start a child process.
-  test_acceptance: AcceptanceTestFunc
 
   # If not None, called after each candidate to ask whether to stop.
   should_stop: Optional[StopQueryFunc]
@@ -211,8 +214,8 @@ class Minimizer:
     self,
     *,
     tree_root: TTNode,
-    get_non_trivial_replacement: NTReplacementFunc,
     test_acceptance: AcceptanceTestFunc,
+    get_non_trivial_replacement: NTReplacementFunc,
     should_stop: Optional[StopQueryFunc] = None,
     report_test_starting: TestStartReportFunc,
     report_test_finished: TestFinishedReportFunc,
@@ -230,8 +233,8 @@ class Minimizer:
     """
 
     self.tree_root = tree_root
-    self.get_non_trivial_replacement = get_non_trivial_replacement
     self.test_acceptance = test_acceptance
+    self.get_non_trivial_replacement = get_non_trivial_replacement
     self.should_stop = should_stop
     self.report_test_starting = report_test_starting
     self.report_test_finished = report_test_finished
