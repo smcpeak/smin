@@ -19,6 +19,7 @@ from smin_token import SMToken
 from start_report import TestStartReport
 from token_tree import TTNode
 from whitespace import (
+  LF_BYTES,
   contains_newline,
   leading_whitespace,
   trail_indent,
@@ -242,7 +243,7 @@ class Minimizer:
     end = self._compute_spans(tree_root, 0)
     assert end == len(self.tokens)
     self.ends_with_newline = (
-      len(self.tokens) > 0 and self.tokens[-1].text.endswith(b"\n"))
+      len(self.tokens) > 0 and self.tokens[-1].text.endswith(LF_BYTES))
 
     self.cur_replacement = {}
     self.token_live = [True] * len(self.tokens)
@@ -361,8 +362,8 @@ class Minimizer:
 
     # Ensure the candidate ends with a newline (if the original did)
     # since working with files that do not is annoying.
-    if self.ends_with_newline and not text.endswith(b"\n"):
-      text += b"\n"
+    if self.ends_with_newline and not text.endswith(LF_BYTES):
+      text += LF_BYTES
 
     if affected_byte_range is None:
       return text, None
