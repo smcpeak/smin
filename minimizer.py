@@ -163,17 +163,28 @@ class Minimizer:
   # ---- Progress data ----
   # Number of candidates reported so far, including those whose verdict
   # was found in the memoization table.
+  #
+  # This is incremented in _try_candidate and read in _make_report.
   sequence_num: int
 
   # Number of passes the algorithm will make.
+  #
+  # This is calculated in the constructor, then used to control
+  # algorithm termination, and is included in the progress reports.
   total_num_passes: int
 
   # Index of the current pass, starting at 0.  With MA1, the
   # granularity of pass k is `len(tokens) / 2**k`.  With MA2, pass k
   # considers nodes up to depth k+1.
+  #
+  # This is maintained by the outer loop, used to compute the
+  # granularity for MA1, and included in progress reports for both.
   pass_index: int
 
   # With MA2, the granularity, in nodes, of the candidate being tested.
+  #
+  # This is maintained as the algorithm makes granularity adjustments,
+  # then included in progress reports.
   ma2_granularity: int
 
 
