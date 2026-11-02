@@ -178,12 +178,13 @@ out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	$(RM) out/m/hello-cpp.ii.*
 	clang -E test/hello-cpp.cc -o out/m/hello-cpp.ii
-	$(PYTHON) ./smin.py ./t_accept.py \
-	  --clang \
-	  --before-after helper helper \
-	  --has-string std::cout \
-	  --input-log out/m/hello-cpp.ii.ilog \
-	  --tsv-log out/m/hello-cpp.ii.tsv \
+	$(PYTHON) ./smin.py \
+	  ./t_accept.py \
+	    --clang \
+	    --before-after helper helper \
+	    --has-string std::cout \
+	    --input-log out/m/hello-cpp.ii.ilog \
+	    --tsv-log out/m/hello-cpp.ii.tsv \
 	  -- out/m/hello-cpp.ii
 	cmp out/m/hello-cpp.ii test/hello-cpp.ii.exp
 	touch $@
@@ -194,12 +195,15 @@ out/m/hello-cpp-ma2.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	$(RM) out/m/hello-cpp-ma2.ii.*
 	clang -E test/hello-cpp.cc -o out/m/hello-cpp-ma2.ii
-	$(PYTHON) ./smin.py --ma2 ./t_accept.py \
-	  --clang \
-	  --before-after helper helper \
-	  --has-string std::cout \
-	  --input-log out/m/hello-cpp-ma2.ii.ilog \
-	  --tsv-log out/m/hello-cpp-ma2.ii.tsv \
+	$(PYTHON) ./smin.py \
+	  --max-seconds 100 \
+	  --ma2 \
+	  ./t_accept.py \
+	    --clang \
+	    --before-after helper helper \
+	    --has-string std::cout \
+	    --input-log out/m/hello-cpp-ma2.ii.ilog \
+	    --tsv-log out/m/hello-cpp-ma2.ii.tsv \
 	  -- out/m/hello-cpp-ma2.ii
 	touch $@
 

@@ -13,6 +13,7 @@ from build_tree import build_tree
 from minimizer import (
   Minimizer,
   NTReplacementFunc,
+  StopQueryFunc,
 )
 from start_report import TestStartReport
 from test_util import all_nodes
@@ -92,12 +93,22 @@ class Recorder:
   def make_minimizer(
     self,
     root: TTNode,
+    *,
     nt: NTReplacementFunc = no_replacement,
+    should_stop: StopQueryFunc | None = None,
     max_passes: int | None = None,
     use_ma2_alg: bool = False,
   ) -> Minimizer:
-    self.minimizer = Minimizer(root, nt, self.test, self.starts.append,
-                               self.finish, max_passes, use_ma2_alg)
+    self.minimizer = Minimizer(
+      tree_root                   = root,
+      get_non_trivial_replacement = nt,
+      test_acceptance             = self.test,
+      should_stop                 = should_stop,
+      report_test_starting        = self.starts.append,
+      report_test_finished        = self.finish,
+      max_passes                  = max_passes,
+      use_ma2_alg                 = use_ma2_alg,
+    )
     return self.minimizer
 
   def finish(self, result: AcceptanceTestResult, memoized: bool) -> None:
@@ -329,7 +340,7 @@ class MinimizerTest(ReportCheckingTestCase):
 
     rec = Recorder(lambda d: b"keep" in d and b"f();" in d)
     m = rec.make_minimizer(
-      build_tree(tokenize_cpp(b"void f() { x; }\nint keep;\n")), nt)
+      build_tree(tokenize_cpp(b"void f() { x; }\nint keep;\n")), nt=nt)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b" f();\nkeep\n")
     self.check_reports(rec, m)
@@ -432,6 +443,95 @@ int main()
       m.run_minimizer()
 
 
+class ShouldStopTest(unittest.TestCase):
+  """Tests of the `should_stop` callback."""
+
+  SRC = b"int a;\nint keep;\nint b;\n"
+
+  def make(
+    self,
+    accept: Callable[[bytes], bool],
+    should_stop: Callable[[Recorder], bool],
+    src: bytes = SRC,
+    use_ma2_alg: bool = False,
+  ) -> tuple[Recorder, Minimizer]:
+    """
+    Make a minimizer for `src` that stops when `should_stop`, given the
+    recorder, returns True.
+    """
+    rec = Recorder(accept)
+    m = rec.make_minimizer(
+      build_tree(tokenize_cpp(src)),
+      should_stop = lambda: should_stop(rec),
+      use_ma2_alg = use_ma2_alg,
+    )
+    return rec, m
+
+  def test_not_requested(self) -> None:
+    # A callback that always returns False has no effect.
+    rec, m = self.make(lambda d: b"keep" in d, lambda r: False)
+    self.assertEqual(m.run_minimizer(), ACCEPT)
+    self.assertFalse(m.stop_requested)
+    self.assertEqual(m.get_minimized_test_input(), b"\nkeep\n")
+    self.assertEqual(len(rec.tested), 7)
+
+  def test_stop_after_reject(self) -> None:
+    # MA1's first candidate, removing everything, is rejected.
+    rec, m = self.make(lambda d: b"keep" in d, lambda r: True)
+    self.assertEqual(m.run_minimizer(), ACCEPT)
+    self.assertTrue(m.stop_requested)
+    self.assertEqual(rec.tested, [b"\n"])
+    self.assertEqual(rec.finishes, [(REJECT, False)])
+    self.assertEqual(m.get_minimized_test_input(), self.SRC)
+
+  def test_stop_keeps_just_accepted(self) -> None:
+    # MA2's first candidate is accepted, and is kept when stopping
+    # right after it.
+    rec, m = self.make(lambda d: b"keep" in d, lambda r: True,
+                       use_ma2_alg=True)
+    self.assertEqual(m.run_minimizer(), ACCEPT)
+    self.assertTrue(m.stop_requested)
+    self.assertEqual(rec.finishes, [(ACCEPT, False)])
+    self.assertEqual(m.get_minimized_test_input(), b"int a;\nint keep;\n")
+    self.assertEqual(m.get_minimized_test_input(), rec.tested[0])
+    self.assertEqual(m.current_tok_count(), m.live_tok_count)
+
+  def test_called_after_memo_hit(self) -> None:
+    # Nothing can be removed, so the second pass begins with a memo hit.
+    src = b"a;\nb;\nc;\nd;"
+    rec, m = self.make(lambda d: d == src,
+                       lambda r: r.finishes[-1][1], src=src)
+    self.assertEqual(m.run_minimizer(), ACCEPT)
+    self.assertTrue(m.stop_requested)
+    self.assertEqual(rec.finishes[-1], (REJECT, True))
+    self.assertEqual([memo for _, memo in rec.finishes].count(True), 1)
+
+  def test_normal_termination_takes_precedence(self) -> None:
+    # The first candidate removes everything, which ends minimization
+    # normally before the callback is consulted.
+    rec, m = self.make(lambda d: True, lambda r: True, src=b"a b c")
+    self.assertEqual(m.run_minimizer(), ACCEPT)
+    self.assertFalse(m.stop_requested)
+    self.assertEqual(rec.tested, [b""])
+    self.assertEqual(m.get_minimized_test_input(), b"")
+
+  def test_interrupt_takes_precedence(self) -> None:
+    # An interrupted test stops minimization without consulting the
+    # callback.
+    rec = Recorder(lambda d: True, interrupt_at=1)
+    calls: list[None] = []
+
+    def should_stop() -> bool:
+      calls.append(None)
+      return True
+
+    m = rec.make_minimizer(build_tree(tokenize_cpp(self.SRC)),
+                           should_stop=should_stop)
+    self.assertEqual(m.run_minimizer(), INTERRUPTED)
+    self.assertFalse(m.stop_requested)
+    self.assertEqual(calls, [])
+
+
 class MA2Test(ReportCheckingTestCase):
   """Tests of Minimization Algorithm 2."""
 
@@ -447,8 +547,8 @@ class MA2Test(ReportCheckingTestCase):
     reports, and return the recorder and minimizer.
     """
     rec = Recorder(accept)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(src)), nt,
-                           max_passes, use_ma2_alg=True)
+    m = rec.make_minimizer(build_tree(tokenize_cpp(src)), nt=nt,
+                           max_passes=max_passes, use_ma2_alg=True)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertTrue(accept(m.get_minimized_test_input()))
     self.check_reports(rec, m)

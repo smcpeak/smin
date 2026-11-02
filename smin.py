@@ -15,6 +15,11 @@ Options:
     granularity.  Without this, minimization runs as many passes as
     needed to eventually try removing individual tokens.
 
+  --max-seconds S
+
+    Stop the minimization process after S (a decimal number) seconds if
+    it has not already stopped by then.
+
   --ma2
 
     Use Minimization Algorithm 2 (MA2) as described in the spec.
@@ -25,6 +30,7 @@ See spec in minimization-algorithm.txt.
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import shutil
 import signal
@@ -142,6 +148,13 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
     """)
 
   parser.add_argument(
+    "--max-seconds", type=_seconds, metavar="S",
+    help="""
+      Stop minimizing after S (a decimal number) seconds if it has not
+      already stopped by then.
+    """)
+
+  parser.add_argument(
     "--ma2", action="store_true",
     help="""
       Use Minimization Algorithm 2 (MA2) rather than the default, MA1.
@@ -187,6 +200,21 @@ def _positive_int(s: str) -> int:
   return n
 
 
+def _seconds(s: str) -> str:
+  """
+  Check that `s` is a finite, nonnegative decimal number, for argparse.
+  Return `s` itself, so that it can be printed as the user wrote it.
+  """
+  try:
+    x = float(s)
+  except ValueError:
+    x = -1
+  if not (math.isfinite(x) and x >= 0):
+    raise argparse.ArgumentTypeError(
+      f"not a nonnegative number of seconds: {s!r}")
+  return s
+
+
 def format_elapsed_time(seconds: float) -> str:
   """Format `seconds` as D:HH:MM:SS, truncating fractional seconds."""
   minutes, secs = divmod(int(seconds), 60)
@@ -202,7 +230,8 @@ def main(argv: list[str]) -> int:
 
   Exit codes:
 
-      0: Successful completed minimization.
+      0: Successful completed minimization, or stopped early due to
+         --max-seconds.
 
       1: Initial input was rejected by the acceptance test.
 
@@ -300,14 +329,26 @@ def main(argv: list[str]) -> int:
       (" (which was overwritten)." if bak_was_overwritten else "."))
 
     # ---- Minimization ----
+
+    # If --max-seconds, the time (on the `start_time` clock) at which
+    # to stop.
+    deadline: Optional[float] = (
+      None if args.max_seconds is None
+      else start_time + float(args.max_seconds))
+
+    def time_limit_reached() -> bool:
+      return deadline is not None and time.monotonic() >= deadline
+
     minimizer = Minimizer(
-      tree,
-      language.get_non_trivial_replacement_func(),
-      checker.run_acceptance_test,
-      console.report_test_starting,
-      console.report_test_finished,
-      args.max_passes,
-      args.ma2)
+      tree_root                   = tree,
+      get_non_trivial_replacement = language.get_non_trivial_replacement_func(),
+      test_acceptance             = checker.run_acceptance_test,
+      report_test_starting        = console.report_test_starting,
+      report_test_finished        = console.report_test_finished,
+      should_stop                 = time_limit_reached,
+      max_passes                  = args.max_passes,
+      use_ma2_alg                 = args.ma2,
+    )
     result = minimizer.run_minimizer()
 
   except KeyboardInterrupt:
@@ -368,6 +409,9 @@ def main(argv: list[str]) -> int:
   console.line(
     f"Elapsed time (D:HH:MM:SS): "
     f"{format_elapsed_time(time.monotonic() - start_time)}")
+
+  if minimizer is not None and minimizer.stop_requested:
+    console.line(f"Stopping early due to --max-seconds {args.max_seconds}.")
 
   return EXIT_INTERRUPTED if interrupted else 0
 

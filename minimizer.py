@@ -52,6 +52,12 @@ TestStartReportFunc = Callable[[TestStartReport], None]
 # console.
 TestFinishedReportFunc = Callable[[AcceptanceTestResult, bool], None]
 
+# Signature of a function called after each candidate is tested (and,
+# if accepted, made current).  If it returns True, minimization stops.
+# In normal operation, this checks whether a time limit has been
+# reached.
+StopQueryFunc = Callable[[], bool]
+
 
 class _TokenRange(AbstractRange):
   """
@@ -98,12 +104,18 @@ class Minimizer:
   # The root of the token tree representing the original input.
   tree_root: TTNode
 
+  # ---- Callbacks that affect algorithm behavior ----
   # Query for non-trivial replacement text for a node.
   get_non_trivial_replacement: NTReplacementFunc
 
+  # TODO: Adjust the location and header for this callback.
+  #
   # Check if a given candidate is accepted.  In normal operation, this
   # will start a child process.
   test_acceptance: AcceptanceTestFunc
+
+  # If not None, called after each candidate to ask whether to stop.
+  should_stop: Optional[StopQueryFunc]
 
   # ---- Progress callbacks ----
   # Called before starting a test.
@@ -158,6 +170,8 @@ class Minimizer:
   minimizer_invoked: bool
 
   # True to use Minimization Algorithm 2 (MA2) rather than MA1.
+  #
+  # TODO: Move where this is declared.
   use_ma2_alg: bool
 
   # ---- Progress data ----
@@ -187,27 +201,38 @@ class Minimizer:
   # then included in progress reports.
   ma2_granularity: int
 
+  # ---- Output data ----
+  # True if minimization stopped early because `should_stop` returned
+  # True.
+  stop_requested: bool
+
 
   def __init__(
     self,
+    *,
     tree_root: TTNode,
     get_non_trivial_replacement: NTReplacementFunc,
     test_acceptance: AcceptanceTestFunc,
+    should_stop: Optional[StopQueryFunc] = None,
     report_test_starting: TestStartReportFunc,
     report_test_finished: TestFinishedReportFunc,
     max_passes: Optional[int] = None,
     use_ma2_alg: bool = False,
   ) -> None:
     """
-    Prepare to minimize the input represented by `tree_root`.  If
-    `max_passes` is not None, make at most that many passes.
+    Prepare to minimize the input represented by `tree_root`.
 
     Requires that the acceptance test has already accepted that input.
+
+    If `max_passes` is not None, make at most that many passes.  If
+    `should_stop` is not None, it is called after each candidate, and
+    minimization stops if it returns True.
     """
 
     self.tree_root = tree_root
     self.get_non_trivial_replacement = get_non_trivial_replacement
     self.test_acceptance = test_acceptance
+    self.should_stop = should_stop
     self.report_test_starting = report_test_starting
     self.report_test_finished = report_test_finished
 
@@ -232,10 +257,14 @@ class Minimizer:
     else:
       # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
       self.total_num_passes = len(self.tokens).bit_length()
+
     if max_passes is not None:
       self.total_num_passes = min(self.total_num_passes, max_passes)
+
     self.pass_index = 0
     self.ma2_granularity = 0
+
+    self.stop_requested = False
 
     initial_text = self.render_candidate({})
     self.accepted_size = len(initial_text)
@@ -251,7 +280,8 @@ class Minimizer:
     Requires that `run_minimizer` has not been invoked previously.
 
     It returns ACCEPT if we reached the end of the algorithm normally,
-    and INTERRUPTED otherwise.
+    or stopped early because `should_stop` returned True (in which case
+    `stop_requested` is set), and INTERRUPTED otherwise.
     """
 
     assert not self.minimizer_invoked
@@ -635,12 +665,18 @@ class Minimizer:
         raise _StopMinimization(result)
       self.memoized_accept[digest] = result
 
-    if result != AcceptanceTestResult.ACCEPT:
-      return False
+    accepted: bool = result == AcceptanceTestResult.ACCEPT
+    if accepted:
+      self.accepted_size = len(text)
+      self._commit(extra)
 
-    self.accepted_size = len(text)
-    self._commit(extra)
-    return True
+    # This is checked after committing so that, if we stop, the most
+    # recently accepted input includes this candidate when accepted.
+    if self.should_stop is not None and self.should_stop():
+      self.stop_requested = True
+      raise _StopMinimization(AcceptanceTestResult.ACCEPT)
+
+    return accepted
 
 
   def _commit(self, extra: dict[int, bytes]) -> None:

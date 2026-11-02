@@ -63,6 +63,20 @@ class ParseCommandLineTest(unittest.TestCase):
       self.check_error(["--max-passes", n, "./test.sh", "--", "in.cc"])
     self.check_error(["--max-passes"])
 
+  def test_max_seconds(self) -> None:
+    args = parse_command_line(["./test.sh", "--", "in.cc"])
+    self.assertIsNone(args.max_seconds)
+
+    # The value is kept as written, so it can be printed that way.
+    for s in ["0", "2", "0.5", "1.50", "1e3"]:
+      args = parse_command_line(["--max-seconds", s, "./t", "--", "in"])
+      self.assertEqual(args.max_seconds, s)
+
+  def test_max_seconds_invalid(self) -> None:
+    for s in ["-1", "-0.5", "x", "", "nan", "inf"]:
+      self.check_error(["--max-seconds", s, "./test.sh", "--", "in.cc"])
+    self.check_error(["--max-seconds"])
+
   def test_ma2(self) -> None:
     args = parse_command_line(["./test.sh", "--", "in.cc"])
     self.assertFalse(args.ma2)
@@ -222,6 +236,36 @@ class MainTest(unittest.TestCase):
     self.assertEqual(status, 0)
     self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
     self.assertEqual(self.progress_passes(out), ["P=(1/1)"] * 4)
+
+  def test_max_seconds_reached(self) -> None:
+    # With a limit of zero, minimization stops after the first
+    # candidate.  With MA2, that candidate is accepted, so it is the
+    # final result.
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, err = self.run_main(
+      self.KEEP_CODE, ("--ma2", "--max-seconds", "0.0"))
+    self.assertEqual(status, 0)
+    self.assertEqual(err, "")
+    self.assertEqual(self.input_path.read_bytes(), b"int a;\nint keep;\n")
+    self.assertEqual(self.best_path.read_bytes(), b"int a;\nint keep;\n")
+    self.assertEqual(len(self.progress_passes(out)), 1)
+
+    # The message comes last, and shows the limit as written.
+    lines = out.splitlines()
+    self.assertEqual(lines[-3],
+      f"Reduced file {self.input_path} from 10 tokens (24 bytes) "
+      f"to 6 tokens (17 bytes).")
+    self.assertRegex(lines[-2], r"^Elapsed time ")
+    self.assertEqual(lines[-1], "Stopping early due to --max-seconds 0.0.")
+
+  def test_max_seconds_not_reached(self) -> None:
+    # A generous limit has no effect.
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, _ = self.run_main(self.KEEP_CODE, ("--max-seconds", "600"))
+    self.assertEqual(status, 0)
+    self.assertEqual(self.input_path.read_bytes(), b"\nkeep\n")
+    self.assertNotIn("Stopping early", out)
+    self.assertRegex(out.splitlines()[-1], r"^Elapsed time ")
 
   def test_backup_overwritten(self) -> None:
     self.input_path.write_bytes(b"keep\n")
