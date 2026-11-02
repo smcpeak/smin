@@ -15,7 +15,11 @@ Options:
     granularity.  Without this, minimization runs as many passes as
     needed to eventually try removing individual tokens.
 
-See minimization-algorithm.txt, especially "Startup" and "Termination".
+  --ma2
+
+    Use Minimization Algorithm 2 (MA2) as described in the spec.
+
+See spec in minimization-algorithm.txt.
 """
 
 from __future__ import annotations
@@ -107,8 +111,9 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
   """
   Parse the command line arguments `argv` (not including the program
   name).  The result has attributes `max_passes` (None if not
-  specified), `test_command` (the test program and its arguments), and
-  `input_file`.  On error, exit with status 2.
+  specified), `ma2` (True if --ma2 was given), `test_command` (the test
+  program and its arguments), and `input_file`.  On error, exit with
+  status 2.
   """
 
   parser = argparse.ArgumentParser(
@@ -135,6 +140,12 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
     help="""
       Make at most N passes, limiting how finely the input is divided
       when trying removals.
+    """)
+
+  parser.add_argument(
+    "--ma2", action="store_true",
+    help="""
+      Use Minimization Algorithm 2 (MA2) rather than the default, MA1.
     """)
 
   # The test command, separator, and input file are all collected into
@@ -296,7 +307,8 @@ def main(argv: list[str]) -> int:
       checker.run_acceptance_test,
       console.report_test_starting,
       console.report_test_finished,
-      args.max_passes)
+      args.max_passes,
+      args.ma2)
     result = minimizer.run_minimizer()
 
   except KeyboardInterrupt:

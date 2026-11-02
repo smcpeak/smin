@@ -157,6 +157,9 @@ class Minimizer:
   # check that that function is only invoked once.
   minimizer_invoked: bool
 
+  # True to use Minimization Algorithm 2 (MA2) rather than MA1.
+  ma2: bool
+
   # ---- Progress data ----
   # Number of candidates reported so far, including those whose verdict
   # was found in the memoization table.
@@ -165,9 +168,13 @@ class Minimizer:
   # Number of passes the algorithm will make.
   total_num_passes: int
 
-  # Index of the current pass, starting at 0.  The granularity of pass
-  # k is `len(tokens) / 2**k`.
+  # Index of the current pass, starting at 0.  With MA1, the
+  # granularity of pass k is `len(tokens) / 2**k`.  With MA2, pass k
+  # considers nodes up to depth k+1.
   pass_index: int
+
+  # With MA2, the granularity, in nodes, of the candidate being tested.
+  ma2_granularity: int
 
 
   def __init__(
@@ -178,10 +185,12 @@ class Minimizer:
     report_test_starting: TestStartReportFunc,
     report_test_finished: TestFinishedReportFunc,
     max_passes: Optional[int] = None,
+    ma2: bool = False,
   ) -> None:
     """
     Prepare to minimize the input represented by `tree_root`.  If
-    `max_passes` is not None, make at most that many passes.
+    `max_passes` is not None, make at most that many passes.  If `ma2`,
+    use Minimization Algorithm 2.
 
     Requires that the acceptance test has already accepted that input.
     """
@@ -203,14 +212,20 @@ class Minimizer:
     self.token_live = [True] * len(self.tokens)
     self.live_tok_count = len(self.tokens)
     self.minimizer_invoked = False
+    self.ma2 = ma2
 
     self.sequence_num = 0
 
-    # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
-    self.total_num_passes = len(self.tokens).bit_length()
+    if ma2:
+      # MA2 makes one pass per level of the tree.
+      self.total_num_passes = tree_root.depth()
+    else:
+      # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
+      self.total_num_passes = len(self.tokens).bit_length()
     if max_passes is not None:
       self.total_num_passes = min(self.total_num_passes, max_passes)
     self.pass_index = 0
+    self.ma2_granularity = 0
 
     initial_text = self.render_candidate({})
     self.accepted_size = len(initial_text)
@@ -235,7 +250,10 @@ class Minimizer:
     try:
       for k in range(self.total_num_passes):
         self.pass_index = k
-        self._minimize_node(self.tree_root)
+        if self.ma2:
+          self._ma2_min_node(self.tree_root, k+1)
+        else:
+          self._minimize_node(self.tree_root)
     except _StopMinimization as e:
       return e.result
 
@@ -458,6 +476,71 @@ class Minimizer:
       i = j
 
 
+  def _ma2_min_node(self, node: TTNode, max_depth: int) -> None:
+    """
+    Try to replace the children of `node`, working backward from the
+    last, and recursing into each child found to be necessary, down to
+    `max_depth` levels below `node`.  This is `ma2_min_node` in the
+    spec, "Minimization Algorithm 2".
+    """
+
+    # This can only happen if the root is a token, which the structure
+    # deduction algorithm does not produce, or in a recursive call for a
+    # leaf, which has no children anyway.
+    if node.token is not None:
+      return
+
+    # The surviving children, excluding delimiters.
+    all_children = node.children
+    lo, hi = ((1, len(all_children)-1) if node.delim_group
+              else (0, len(all_children)))
+    children: list[TTNode] = [
+      c for c in all_children[lo:hi] if id(c) not in self.cur_replacement]
+
+    # Number of children we are currently trying to remove at once.  If
+    # `node` is not a delimiter group, removing all of its children is
+    # the same as removing `node`, which the caller just tried, so start
+    # with half.  (Clamp to 1 so a lone surviving child is still tried.)
+    granularity: int = (
+      len(children) if node.delim_group else len(children) // 2)
+    granularity = max(1, granularity)
+
+    # Number of children in scope for removal.  Those at or beyond this
+    # index in `children` are deemed necessary (for this call).
+    limit: int = len(children)
+
+    while limit > 0:
+      # Try removing the last `granularity` children in scope.
+      self.ma2_granularity = granularity
+      run: list[TTNode] = children[limit-granularity : limit]
+      if self._try_candidate({id(n): b"" for n in run}, run):
+        del children[limit-granularity : limit]
+        limit -= granularity
+        granularity = min(2 * granularity, limit)
+        continue
+
+      if granularity > 1:
+        granularity //= 2
+        continue
+
+      # We failed to remove `c` by itself.
+      c: TTNode = run[0]
+
+      replacement = self.get_non_trivial_replacement(c)
+      if replacement and self._try_candidate({id(c): replacement}, [c]):
+        # Keep `granularity` at 1 since `c` required individualized
+        # attention, so its neighbor might too.
+        del children[limit-1]
+        limit -= 1
+        continue
+
+      # `c` is necessary, at least until we revisit `node` in a later
+      # pass.  Now try to reduce its children.
+      limit -= 1
+      if max_depth > 1:
+        self._ma2_min_node(c, max_depth-1)
+
+
   def _try_replace_single(self, node: TTNode) -> bool:
     """
     Try replacing `node` with the empty sequence, then, if that fails,
@@ -552,7 +635,9 @@ class Minimizer:
       last_accepted_tok_count=num_live,
       pass_num=self.pass_index + 1,
       total_num_passes=self.total_num_passes,
-      granularity=len(self.tokens) / (1 << self.pass_index),
+      granularity=(
+        float(self.ma2_granularity) if self.ma2
+        else len(self.tokens) / (1 << self.pass_index)),
       completion_fraction=(num_live - e) / num_live,
       removed_tok_count=sum(self.node_size(n) for n in nodes),
       initial_tok_count=len(self.tokens),

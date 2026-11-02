@@ -63,6 +63,13 @@ class ParseCommandLineTest(unittest.TestCase):
       self.check_error(["--max-passes", n, "./test.sh", "--", "in.cc"])
     self.check_error(["--max-passes"])
 
+  def test_ma2(self) -> None:
+    args = parse_command_line(["./test.sh", "--", "in.cc"])
+    self.assertFalse(args.ma2)
+    args = parse_command_line(["--ma2", "./test.sh", "--ma2", "--", "in.cc"])
+    self.assertTrue(args.ma2)
+    self.assertEqual(args.test_command, ["./test.sh", "--ma2"])
+
   def test_help(self) -> None:
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
@@ -195,6 +202,26 @@ class MainTest(unittest.TestCase):
     passes = self.progress_passes(out)
     self.assertEqual(passes[0], "P=(1/4)")
     self.assertEqual(passes[-1], "P=(4/4)")
+
+  def test_ma2(self) -> None:
+    # MA2 makes one pass per tree level, here two.
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, err = self.run_main(self.KEEP_CODE, ("--ma2",))
+    self.assertEqual(status, 0)
+    self.assertEqual(err, "")
+    self.assertEqual(self.input_path.read_bytes(), b"\nkeep\n")
+    self.assertEqual(self.best_path.read_bytes(), b"\nkeep\n")
+    self.assertEqual(self.progress_passes(out),
+                     ["P=(1/2)"] * 4 + ["P=(2/2)"] * 5)
+    self.assertIn("to 1 tokens (6 bytes).", out)
+
+  def test_ma2_max_passes(self) -> None:
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, _ = self.run_main(self.KEEP_CODE,
+                                   ("--ma2", "--max-passes", "1"))
+    self.assertEqual(status, 0)
+    self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
+    self.assertEqual(self.progress_passes(out), ["P=(1/1)"] * 4)
 
   def test_backup_overwritten(self) -> None:
     self.input_path.write_bytes(b"keep\n")
