@@ -143,14 +143,15 @@ check: out/m/hello-delim-3pass.c.ok
 # have at least one end-to-end test that exercises it.
 out/m/hello-clang.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
+	$(RM) out/m/hello-clang.c.*
 	cp test/hello.c out/m/hello-clang.c
-	$(RM) out/m/hello-clang.c.ilog
 	$(PYTHON) ./smin.py ./t_accept.py \
 	  --clang \
 	  --before-after helper helper \
 	  --has-string printf \
 	  --input-log out/m/hello-clang.c.ilog \
 	  --log-new-best \
+	  --tsv-log out/m/hello-clang.c.tsv \
 	  -- out/m/hello-clang.c
 	cmp out/m/hello-clang.c test/hello-clang.c.exp
 	touch $@
@@ -158,13 +159,14 @@ out/m/hello-clang.c.ok: test/hello.c out/unittest.ok $(ALL_PYTHON_FILES)
 # Same idea but using C++ syntax.
 out/m/hello-cpp.cc.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
+	$(RM) out/m/hello-cpp.cc.*
 	cp test/hello-cpp.cc out/m/hello-cpp.cc
-	$(RM) out/m/hello-cpp.cc.ilog
 	$(PYTHON) ./smin.py ./t_accept.py \
 	  --clang \
 	  --before-after helper helper \
 	  --has-string std::cout \
 	  --input-log out/m/hello-cpp.cc.ilog \
+	  --tsv-log out/m/hello-cpp.cc.tsv \
 	  -- out/m/hello-cpp.cc
 	cmp out/m/hello-cpp.cc test/hello-cpp.cc.exp
 	touch $@
@@ -172,13 +174,14 @@ out/m/hello-cpp.cc.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 # Minimize preprocessed output.
 out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
+	$(RM) out/m/hello-cpp.ii.*
 	clang -E test/hello-cpp.cc -o out/m/hello-cpp.ii
-	$(RM) out/m/hello-cpp.ii.ilog
 	$(PYTHON) ./smin.py ./t_accept.py \
 	  --clang \
 	  --before-after helper helper \
 	  --has-string std::cout \
 	  --input-log out/m/hello-cpp.ii.ilog \
+	  --tsv-log out/m/hello-cpp.ii.tsv \
 	  -- out/m/hello-cpp.ii
 	cmp out/m/hello-cpp.ii test/hello-cpp.ii.exp
 	touch $@
@@ -187,11 +190,12 @@ out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 # Preprocessed output, limited to 2 passes and using --reject.
 out/m/hello-cpp-2pass-rej.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
+	$(RM) out/m/hello-cpp-2pass-rej.ii.*
 	clang -E test/hello-cpp.cc -o out/m/hello-cpp-2pass-rej.ii
-	$(RM) out/m/hello-cpp-2pass-rej.ii.ilog
 	$(PYTHON) ./smin.py --max-passes 2 ./t_accept.py \
 	  --reject \
 	  --input-log out/m/hello-cpp-2pass-rej.ii.ilog \
+	  --tsv-log out/m/hello-cpp-2pass-rej.ii.tsv \
 	  -- out/m/hello-cpp-2pass-rej.ii
 	@# No expected output here, I just want to see it run.
 	touch $@

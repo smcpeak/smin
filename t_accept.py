@@ -76,6 +76,17 @@ Options:
     with " NEW BEST " centered between lines of equals-signs, then the
     contents of the input file.
 
+  --tsv-log <tsvfile>
+
+    Append to <tsvfile> a tab-separated line containing:
+
+      * <timestamp> (as described under --capture).
+      * The verdict, where "TRUE" means accept and "FALSE" means reject.
+      * $SMIN_PROGRESS, separated into fields by treating each
+        contiguous run of digits as a field, then leading zeroes
+        stripped from each field.  If it is unset or empty, omit the
+        progress fields.
+
 It is an error (exit code 2) if INPUT is not set in the environment or
 the named file cannot be read.
 """
@@ -163,7 +174,25 @@ def main(argv: list[str]) -> int:
         f.write(" NEW BEST ".center(72, "=").encode() + b"\n")
         f.write(data)
 
+  if args.tsv_log is not None:
+    fields = [timestamp, "FALSE" if failure is not None else "TRUE"]
+    fields += _progress_fields(os.environ.get("SMIN_PROGRESS", ""))
+    with open(args.tsv_log, "a") as f:
+      f.write("\t".join(fields) + "\n")
+
   return 1 if failure is not None else 0
+
+
+def _progress_fields(progress: str) -> list[str]:
+  """
+  Return the runs of digits in `progress`, each without leading zeroes
+  (but "0" for a run of only zeroes), for --tsv-log.  For example,
+  "N=000056 S=16 P=(6/7) F=06% R=07" yields
+  ["56", "16", "6", "7", "6", "7"].
+
+  If `str` is empty, then so is the returned list.
+  """
+  return [str(int(d)) for d in re.findall(r"[0-9]+", progress)]
 
 
 def _diff_from_best(data: bytes) -> bytes:
@@ -256,6 +285,11 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
     "--log-new-best", action="store_true",
     help="With --input-log, upon acceptance, also append the new best "
          "input.")
+  parser.add_argument(
+    "--tsv-log", metavar="TSVFILE",
+    help="Append a tab-separated line with the timestamp, verdict "
+         "(TRUE or FALSE), and the numbers in $SMIN_PROGRESS to "
+         "TSVFILE.")
   return parser.parse_args(argv)
 
 

@@ -270,6 +270,47 @@ class TAcceptTest(unittest.TestCase):
       log.read_text(),
       f"{self.input_path} {stamp} accept {captured}\n")
 
+  def test_tsv_log(self) -> None:
+    tsv = self.dir / "log.tsv"
+    argv = ["--tsv-log", str(tsv), "--has-string", "a"]
+    self.assertEqual(self.run_main(argv, b"a\n", {
+      "SMIN_PROGRESS": "N=000056 S=16 P=(6/7) F=06% R=07"}), 0)
+    self.assertEqual(self.run_main(argv, b"b\n", {
+      "SMIN_PROGRESS": "N=000100 S=00 P=(10/12) F=99% R=000"}), 1)
+
+    # Each line is appended.  Leading zeroes are stripped, but a field
+    # of only zeroes remains "0".
+    lines = tsv.read_text().splitlines()
+    self.assertEqual(len(lines), 2)
+    self.assertRegex(lines[0],
+                     f"^{self.TIMESTAMP}\tTRUE\t56\t16\t6\t7\t6\t7$")
+    self.assertRegex(lines[1],
+                     f"^{self.TIMESTAMP}\tFALSE\t100\t0\t10\t12\t99\t0$")
+
+  def test_tsv_log_without_progress_numbers(self) -> None:
+    # The initial test has no numbers in SMIN_PROGRESS, and without
+    # SMIN_PROGRESS there are none either.
+    tsv = self.dir / "log.tsv"
+    self.assertEqual(self.run_main(["--tsv-log", str(tsv)], b"",
+                                   {"SMIN_PROGRESS": "initial"}), 0)
+    with mock.patch.dict(os.environ):
+      os.environ.pop("SMIN_PROGRESS", None)
+      self.assertEqual(self.run_main(["--tsv-log", str(tsv)], b""), 0)
+    lines = tsv.read_text().splitlines()
+    self.assertEqual(len(lines), 2)
+    for line in lines:
+      self.assertRegex(line, f"^{self.TIMESTAMP}\tTRUE$")
+
+  def test_tsv_log_with_capture(self) -> None:
+    # The timestamp is the same one used for --capture.
+    tsv = self.dir / "log.tsv"
+    capture_dir = self.dir / "captures"
+    self.check(["--tsv-log", str(tsv), "--capture", str(capture_dir)],
+               b"data\n", 0)
+    (captured,) = capture_dir.iterdir()
+    stamp = captured.name.removeprefix("input-")
+    self.assertTrue(tsv.read_text().startswith(f"{stamp}\tTRUE"))
+
   # Separator lines written by --input-log.
   ACCEPT_LINE = "-" * 32 + " ACCEPT " + "-" * 32 + "\n"
   REJECT_LINE = "-" * 32 + " reject " + "-" * 32 + "\n"
