@@ -141,6 +141,41 @@ directives and comments that do not respect the indentation of the
 surrounding code.  For now, I accept this potential deficiency.
 
 
+Phase 4.5: Grouping heads with delimited bodies
+-----------------------------------------------
+
+The goal here is to group the "head" of a construct, such as the
+"namespace" or "class" line, or the signature part of a function
+definition, with its brace-enclosed body that starts on the next line.
+
+To heuristically recognize this, look for:
+
+* Two adjacent sibling nodes A and B.
+
+* B is a delimiter group.
+
+  - The opening delimiter token has leading whitespace consisting of a
+    single line break followed by some number (call it N) of spaces and
+    tabs (treating them as equivalent).  A "line break" is a newline,
+    optionally preceded by a carriage return.
+
+* A is *not* a delimiter group.
+
+  - The first token of A has leading whitespace that includes at least
+    one newline, or it is the first token in the file.
+
+  - After the last newline in the leading whitespace, there are no more
+    than N spaces and tabs.  If it has no newline (it is first in the
+    file), the leading whitespace contains no more than N spaces and
+    tabs.
+
+Under these conditions, group A and B together as a two-element node.
+
+Currently, this rule is often redundant with the paragraph rule.  The
+head-body rule is meant as a more precise alternative; the paragraph
+rule may be removed or weakened in the future.
+
+
 Phase 5: Grouping paragraphs
 ----------------------------
 
@@ -195,23 +230,25 @@ Output 1:
       "        // std::cout"
     ]
     [
-      [
-        "\n\nint main"
+      [ # head-body group
         [
-          "(int argc, char **argv)"
-        ]
-      ]
-      [
-        "\n{"
-        [
+          "\n\nint main"
           [
-            "\n  std::cout << \"Hello\\n\";"
-          ]
-          [
-            "\n  return 0;"
+            "(int argc, char **argv)"
           ]
         ]
-        "\n}"
+        [
+          "\n{"
+          [
+            [
+              "\n  std::cout << \"Hello\\n\";"
+            ]
+            [
+              "\n  return 0;"
+            ]
+          ]
+          "\n}"
+        ]
       ]
       "\n"
     ]
@@ -241,70 +278,72 @@ Input 2: C++ function with several `if` statements.
 Output 2:
 
   [
-    [
-      "bool GetDepsVisitor::isRefactoringDN"
+    [ # head-body group
       [
-        "(DependencyNode dn)"
-      ]
-      " const"
-    ]
-    [
-      "\n{"
-      [
-        "\n  // Must be a named declaration."
+        "bool GetDepsVisitor::isRefactoringDN"
         [
-          "\n  if"
-          [
-            " (!isa<clang::NamedDecl>"
-            [
-              "(dn.m_decl)"
-            ]
-            ")"
-          ]
-          [
-            " {"
-            [
-              "\n    return false;"
-            ]
-            "\n  }"
-          ]
+          "(DependencyNode dn)"
         ]
+        " const"
       ]
       [
-        "\n\n  // What is its syntactic parent?"
+        "\n{"
         [
+          "\n  // Must be a named declaration."
           [
-            "\n  clang::NamedDecl const *parent ="
-          ]
-          [
-            "\n    getNamedParentDeclOpt_templateAdjustment"
+            "\n  if"
             [
-              "(dn.m_decl)"
-            ]
-            ";"
-          ]
-        ]
-        [
-          "\n  if"
-          [
-            " (!parent)"
-          ]
-          [
-            " {"
-            [
-              "\n    // The parent is the TU."
+              " (!isa<clang::NamedDecl>"
               [
-                "\n    return true;"
+                "(dn.m_decl)"
               ]
+              ")"
             ]
-            "\n  }"
+            [
+              " {"
+              [
+                "\n    return false;"
+              ]
+              "\n  }"
+            ]
           ]
         ]
+        [
+          "\n\n  // What is its syntactic parent?"
+          [
+            [
+              "\n  clang::NamedDecl const *parent ="
+            ]
+            [
+              "\n    getNamedParentDeclOpt_templateAdjustment"
+              [
+                "(dn.m_decl)"
+              ]
+              ";"
+            ]
+          ]
+          [
+            "\n  if"
+            [
+              " (!parent)"
+            ]
+            [
+              " {"
+              [
+                "\n    // The parent is the TU."
+                [
+                  "\n    return true;"
+                ]
+              ]
+              "\n  }"
+            ]
+          ]
+        ]
+        [
+          "\n\n  return true;"
+        ]
+        "\n}"
       ]
-      [
-        "\n\n  return true;"
-      ]
-      "\n}"
     ]
     "\n"
   ]

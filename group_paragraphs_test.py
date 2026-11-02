@@ -8,6 +8,7 @@ from __future__ import annotations
 import unittest
 
 from group_delimiters import group_delimiters
+from group_head_body import group_head_body
 from group_indentation import group_indentation
 from group_lines import group_lines
 from group_paragraphs import group_paragraphs
@@ -29,8 +30,8 @@ class GroupParagraphsTest(unittest.TestCase):
     phases, and passing `skip_toplevel`, yields a tree whose debug
     string is `expect` (dedented).  Return the tree.
     """
-    input_tree = group_indentation(group_lines(group_delimiters(
-      tokenize_cpp(data))))
+    input_tree = group_head_body(group_indentation(group_lines(
+      group_delimiters(tokenize_cpp(data)))))
     input_debug = input_tree.to_debug_string()
 
     tree = group_paragraphs(input_tree, skip_toplevel=skip_toplevel)
@@ -332,10 +333,58 @@ class GroupParagraphsTest(unittest.TestCase):
       """)
 
   def test_delimiters_excluded(self) -> None:
-    # The brace group as a whole is first on its line, so it joins the
-    # header's paragraph.  But the "{" and "}" tokens themselves are not
-    # grouped with the lines between them, whose paragraph is therefore
-    # made into a group even though it is the entire interior.
+    # Phase 4.5 groups the header with the brace group, and that pair
+    # joins the final newline's paragraph.  The "{" and "}" tokens
+    # themselves are not grouped with the lines between them, whose
+    # paragraph is therefore made into a group even though it is the
+    # entire interior.
+    self.check("""
+      x;
+
+      f()
+      {
+        a;
+        b;
+      }
+      """, r"""
+      [
+        [
+          "x"
+          ";"
+        ]
+        [
+          [
+            [
+              "\n\nf"
+              [
+                "("
+                ")"
+              ]
+            ]
+            [
+              "\n{"
+              [
+                [
+                  "\n  a"
+                  ";"
+                ]
+                [
+                  "\n  b"
+                  ";"
+                ]
+              ]
+              "\n}"
+            ]
+          ]
+          "\n"
+        ]
+      ]
+      """)
+
+  def test_skip_toplevel(self) -> None:
+    # Same input as `test_delimiters_excluded`, but the root's children
+    # are not grouped into paragraphs.  The lines inside the braces
+    # still are.  (The header and brace group are grouped by Phase 4.5.)
     self.check("""
       x;
 
@@ -372,49 +421,6 @@ class GroupParagraphsTest(unittest.TestCase):
             ]
             "\n}"
           ]
-          "\n"
-        ]
-      ]
-      """)
-
-  def test_skip_toplevel(self) -> None:
-    # Same input as `test_delimiters_excluded`, but the root's children
-    # are not grouped into paragraphs.  The lines inside the braces
-    # still are.
-    self.check("""
-      x;
-
-      f()
-      {
-        a;
-        b;
-      }
-      """, r"""
-      [
-        [
-          "x"
-          ";"
-        ]
-        [
-          "\n\nf"
-          [
-            "("
-            ")"
-          ]
-        ]
-        [
-          "\n{"
-          [
-            [
-              "\n  a"
-              ";"
-            ]
-            [
-              "\n  b"
-              ";"
-            ]
-          ]
-          "\n}"
         ]
         "\n"
       ]

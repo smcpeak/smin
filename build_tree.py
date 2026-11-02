@@ -8,6 +8,7 @@ See structure-deduction-algorithm.txt.
 from __future__ import annotations
 
 from group_delimiters import group_delimiters
+from group_head_body import group_head_body
 from group_indentation import group_indentation
 from group_lines import group_lines
 from group_paragraphs import group_paragraphs
@@ -22,9 +23,9 @@ def build_tree(tokens: list[SMToken]) -> TTNode:
   Deduce the hierarchical structure of `tokens`, returning the root of
   a tree whose leaves are those tokens, in order.
 
-  This performs phases 2 through 5 of the algorithm.  Phase 6 is not
-  needed as a separate pass, since the grouping phases do not create
-  redundant groups (see `recursively_group_sequences`).
+  This performs phases 2 through 5 (including 4.5) of the algorithm.
+  Phase 6 is not needed as a separate pass, since the grouping phases
+  do not create redundant groups (see `recursively_group_sequences`).
   """
 
   # For experimentation, optionally disable paragraphing at top level.
@@ -36,6 +37,7 @@ def build_tree(tokens: list[SMToken]) -> TTNode:
   root = group_delimiters(tokens)
   root = group_lines(root)
   root = group_indentation(root)
+  root = group_head_body(root)
   root = group_paragraphs(root, skip_toplevel=skip_toplevel)
 
   return root

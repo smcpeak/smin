@@ -77,38 +77,40 @@ class BuildTreeTest(unittest.TestCase):
         ]
         [
           [
-            "\n\nint"
-            " main"
             [
-              "("
-              "int"
-              " argc"
-              ","
-              " char"
-              " *"
-              "*"
-              "argv"
-              ")"
-            ]
-          ]
-          [
-            "\n{"
-            [
+              "\n\nint"
+              " main"
               [
-                "\n  std"
-                "::"
-                "cout"
-                " <<"
-                " \"Hello\\n\""
-                ";"
-              ]
-              [
-                "\n  return"
-                " 0"
-                ";"
+                "("
+                "int"
+                " argc"
+                ","
+                " char"
+                " *"
+                "*"
+                "argv"
+                ")"
               ]
             ]
-            "\n}"
+            [
+              "\n{"
+              [
+                [
+                  "\n  std"
+                  "::"
+                  "cout"
+                  " <<"
+                  " \"Hello\\n\""
+                  ";"
+                ]
+                [
+                  "\n  return"
+                  " 0"
+                  ";"
+                ]
+              ]
+              "\n}"
+            ]
           ]
           "\n"
         ]
@@ -116,7 +118,8 @@ class BuildTreeTest(unittest.TestCase):
       """)
 
   def test_cpp_if_statements(self) -> None:
-    # Example input 2 from the spec.
+    # Example input 2 from the spec.  Phase 4.5 groups the head, which
+    # starts with the first token in the file, with its body.
     self.check(r"""
       bool GetDepsVisitor::isRefactoringDN(DependencyNode dn) const
       {
@@ -138,105 +141,107 @@ class BuildTreeTest(unittest.TestCase):
       """, r"""
       [
         [
-          "bool"
-          " GetDepsVisitor"
-          "::"
-          "isRefactoringDN"
           [
-            "("
-            "DependencyNode"
-            " dn"
-            ")"
-          ]
-          " const"
-        ]
-        [
-          "\n{"
-          [
-            "\n  // Must be a named declaration."
+            "bool"
+            " GetDepsVisitor"
+            "::"
+            "isRefactoringDN"
             [
-              "\n  if"
-              [
-                " ("
-                "!"
-                "isa"
-                "<"
-                "clang"
-                "::"
-                "NamedDecl"
-                ">"
-                [
-                  "("
-                  "dn"
-                  "."
-                  "m_decl"
-                  ")"
-                ]
-                ")"
-              ]
-              [
-                " {"
-                [
-                  "\n    return"
-                  " false"
-                  ";"
-                ]
-                "\n  }"
-              ]
+              "("
+              "DependencyNode"
+              " dn"
+              ")"
             ]
+            " const"
           ]
           [
-            "\n\n  // What is its syntactic parent?"
+            "\n{"
             [
+              "\n  // Must be a named declaration."
               [
-                "\n  clang"
-                "::"
-                "NamedDecl"
-                " const"
-                " *"
-                "parent"
-                " ="
-              ]
-              [
-                "\n    getNamedParentDeclOpt_templateAdjustment"
+                "\n  if"
                 [
-                  "("
-                  "dn"
-                  "."
-                  "m_decl"
+                  " ("
+                  "!"
+                  "isa"
+                  "<"
+                  "clang"
+                  "::"
+                  "NamedDecl"
+                  ">"
+                  [
+                    "("
+                    "dn"
+                    "."
+                    "m_decl"
+                    ")"
+                  ]
                   ")"
                 ]
-                ";"
-              ]
-            ]
-            [
-              "\n  if"
-              [
-                " ("
-                "!"
-                "parent"
-                ")"
-              ]
-              [
-                " {"
                 [
-                  "\n    // The parent is the TU."
+                  " {"
                   [
                     "\n    return"
-                    " true"
+                    " false"
                     ";"
                   ]
+                  "\n  }"
                 ]
-                "\n  }"
               ]
             ]
+            [
+              "\n\n  // What is its syntactic parent?"
+              [
+                [
+                  "\n  clang"
+                  "::"
+                  "NamedDecl"
+                  " const"
+                  " *"
+                  "parent"
+                  " ="
+                ]
+                [
+                  "\n    getNamedParentDeclOpt_templateAdjustment"
+                  [
+                    "("
+                    "dn"
+                    "."
+                    "m_decl"
+                    ")"
+                  ]
+                  ";"
+                ]
+              ]
+              [
+                "\n  if"
+                [
+                  " ("
+                  "!"
+                  "parent"
+                  ")"
+                ]
+                [
+                  " {"
+                  [
+                    "\n    // The parent is the TU."
+                    [
+                      "\n    return"
+                      " true"
+                      ";"
+                    ]
+                  ]
+                  "\n  }"
+                ]
+              ]
+            ]
+            [
+              "\n\n  return"
+              " true"
+              ";"
+            ]
+            "\n}"
           ]
-          [
-            "\n\n  return"
-            " true"
-            ";"
-          ]
-          "\n}"
         ]
         "\n"
       ]
