@@ -10,10 +10,7 @@ from __future__ import annotations
 from build_tree_util import recursively_group_sequences
 from smin_token import SMToken
 from token_tree import TTNode
-
-
-# Bytes regarded as whitespace when looking for blank lines.
-_WHITESPACE: frozenset[int] = frozenset(b" \t\r\f\v\n")
+from whitespace import WHITESPACE
 
 
 def group_paragraphs(node: TTNode, skip_toplevel: bool = False) -> TTNode:
@@ -89,7 +86,7 @@ def _follows_blank_line(token: SMToken) -> bool:
   """
   newlines = 0
   for c in token.text:
-    if c not in _WHITESPACE:
+    if c not in WHITESPACE:
       break
     if c == 0x0A:
       newlines += 1
