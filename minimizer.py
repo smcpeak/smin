@@ -18,10 +18,8 @@ from byte_range import ByteRange
 from smin_token import SMToken
 from start_report import TestStartReport
 from token_tree import TTNode
+from whitespace import leading_whitespace
 
-
-# Bytes regarded as whitespace when rendering candidates.
-_WHITESPACE: frozenset[int] = frozenset(b" \t\r\f\v\n")
 
 _NEWLINE: int = ord("\n")
 
@@ -743,14 +741,6 @@ def _digest(data: bytes) -> bytes:
   return hashlib.md5(data, usedforsecurity=False).digest()
 
 
-def _leading_ws(s: bytes) -> bytes:
-  """Return the whitespace at the start of `s`."""
-  i = 0
-  while i < len(s) and s[i] in _WHITESPACE:
-    i += 1
-  return s[:i]
-
-
 def _trail_indent(s: bytes) -> bytes:
   """
   Return the last newline in `s` followed by the whitespace that
@@ -759,7 +749,7 @@ def _trail_indent(s: bytes) -> bytes:
   start = s.rfind(b"\n")
   if start < 0:
     return b""
-  return _leading_ws(s[start:])
+  return leading_whitespace(s[start:])
 
 
 def _render_ctm(
@@ -815,7 +805,7 @@ def _render_ctm(
 
       else:
         # This is B, the end of the last piece of the gap.
-        ws = _leading_ws(text)
+        ws = leading_whitespace(text)
         indent = _trail_indent(b"".join(trivial))
         if _NEWLINE in ws:
           candidate.append(text)
@@ -841,7 +831,7 @@ def _render_ctm(
 
           # Length of after-first-whitespace byte sequence that was just
           # added for the current token.
-          len_after_ws: int = len(text) - len(_leading_ws(text))
+          len_after_ws: int = len(text) - len(leading_whitespace(text))
 
           # Only the whitespace emitted before this token's own
           # non-whitespace text can differ from the last accepted input.
@@ -852,7 +842,7 @@ def _render_ctm(
       if replacement:
         # End of a piece with a non-trivial replacement.
         candidate.append(
-          _trail_indent(b"".join(trivial) + _leading_ws(text)) +
+          _trail_indent(b"".join(trivial) + leading_whitespace(text)) +
           replacement)
         trivial = []
       else:
