@@ -341,9 +341,9 @@ As pseudocode, the algorithm is:
 
   For `target_depth` in [1,MAX_DEPTH]:
 
-    Invoke `minimize_node(root, target_depth)`.
+    Invoke `ma2_min_node(root, target_depth)`.
 
-  def minimize_node(node, max_depth):
+  def ma2_min_node(node, max_depth):
 
     Let `children` be the surviving (unreplaced) children of `node`,
     excluding the delimiters if `node` is a delimiter group.
@@ -411,7 +411,7 @@ As pseudocode, the algorithm is:
 
         If `max_depth` > 1:
 
-          Invoke `minimize_node(c, max_depth-1)`.
+          Invoke `ma2_min_node(c, max_depth-1)`.
 
         Note: `granularity` remains 1.
 
@@ -486,6 +486,9 @@ Motivation:
   Unlike MA1, MA2 does not use token counts to choose how much to try to
   remove.  My observation is that structure seems to be a better
   predictor of success than size, hence the departure.
+
+  In this spec, the primary MA2 function is called "ma2_min_node" so its
+  name is sufficiently distinct from the primary MA1 function.
 
 
 Candidate testing
