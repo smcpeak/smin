@@ -13,6 +13,8 @@ from build_tree_util import recursively_group_sequences
 from smin_token import SMToken
 from token_tree import TTNode
 from whitespace import (
+  CRLF_BYTES,
+  LF_BYTES,
   count_indentation,
   leading_whitespace,
   only_indentation,
@@ -70,9 +72,9 @@ def _body_indentation(node: TTNode) -> Optional[int]:
     return None
 
   ws = leading_whitespace(node.first_token().text)
-  if ws.startswith(b"\n"):
+  if ws.startswith(LF_BYTES):
     indentation = ws[1:]
-  elif ws.startswith(b"\r\n"):
+  elif ws.startswith(CRLF_BYTES):
     indentation = ws[2:]
   else:
     return None

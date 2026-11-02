@@ -19,7 +19,13 @@ WHITESPACE_BYTES_SET: frozenset[int] = frozenset(b" \t\r\f\v\n")
 # Bytes counted as indentation.
 INDENTATION_BYTES_SET: frozenset[int] = frozenset(b" \t")
 
-NEWLINE_BYTE: int = ord("\n")
+# Byte sequences that can function as line endings.  Naming these does
+# not make code smaller, it makes references to these concepts easier to
+# find by grepping.
+LF_BYTES: bytes = b"\n"
+CRLF_BYTES: bytes = b"\r\n"
+
+NEWLINE_BYTE: int = ord(LF_BYTES)
 
 
 def leading_whitespace(text: bytes) -> bytes:
