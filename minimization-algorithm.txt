@@ -774,10 +774,10 @@ rather than "accepted" or "rejected".
 
 The driver accepts a --max-seconds command line argument.  After each
 candidate acceptance test, if the specified time limit is reached
-without normal termination, then stop minimizing, copy the overwrite the
-input file with the last accepted input (which might be the one just
-tested), and (after printing the "Reduced file ..." and "Elapsed time
-..." lines) print:
+without normal termination, then stop minimizing, overwrite the input
+file with the last accepted input (which might be the one just tested),
+and (after printing the "Reduced file ..." and "Elapsed time ..." lines)
+print:
 
   Stopping early due to --max-seconds <S>.
 
