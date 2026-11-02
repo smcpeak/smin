@@ -188,6 +188,21 @@ out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	cmp out/m/hello-cpp.ii test/hello-cpp.ii.exp
 	touch $@
 
+# Minimize preprocessed output using MA2.  Currently this is extremely
+# slow (I've never waited for it to finish).
+out/m/hello-cpp-ma2.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
+	$(CREATE_OUTPUT_DIRECTORY)
+	$(RM) out/m/hello-cpp-ma2.ii.*
+	clang -E test/hello-cpp.cc -o out/m/hello-cpp-ma2.ii
+	$(PYTHON) ./smin.py --ma2 ./t_accept.py \
+	  --clang \
+	  --before-after helper helper \
+	  --has-string std::cout \
+	  --input-log out/m/hello-cpp-ma2.ii.ilog \
+	  --tsv-log out/m/hello-cpp-ma2.ii.tsv \
+	  -- out/m/hello-cpp-ma2.ii
+	touch $@
+
 
 # Preprocessed output, limited to 2 passes and using --reject.
 out/m/hello-cpp-2pass-rej.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
@@ -211,6 +226,9 @@ check: out/m/hello-cpp.cc.ok
 
 # This one is currently very slow.  I'm working on improving it.
 #check: out/m/hello-cpp.ii.ok
+
+# Even slower!
+#check: out/m/hello-cpp-ma2.ii.ok
 
 check: out/m/hello-cpp-2pass-rej.ii.ok
 endif
