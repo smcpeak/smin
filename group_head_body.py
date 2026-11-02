@@ -12,14 +12,11 @@ from typing import Optional
 from build_tree_util import recursively_group_sequences
 from smin_token import SMToken
 from token_tree import TTNode
-
-
-# Bytes regarded as whitespace when finding a token's leading
-# whitespace.
-_WHITESPACE: frozenset[int] = frozenset(b" \t\r\f\v\n")
-
-# Bytes counted as indentation after a newline.
-_SPACE_TAB: frozenset[int] = frozenset(b" \t")
+from whitespace import (
+  count_indentation,
+  leading_whitespace,
+  only_indentation,
+)
 
 
 def group_head_body(node: TTNode) -> TTNode:
@@ -72,14 +69,14 @@ def _body_indentation(node: TTNode) -> Optional[int]:
   if not node.delim_group:
     return None
 
-  ws = _leading_whitespace(node.first_token())
+  ws = leading_whitespace(node.first_token().text)
   if ws.startswith(b"\n"):
     indentation = ws[1:]
   elif ws.startswith(b"\r\n"):
     indentation = ws[2:]
   else:
     return None
-  if not all(c in _SPACE_TAB for c in indentation):
+  if not only_indentation(indentation):
     return None
   return len(indentation)
 
@@ -97,26 +94,15 @@ def _is_head(
     return False
 
   first = node.first_token()
-  ws = _leading_whitespace(first)
+  ws = leading_whitespace(first.text)
   last_newline = ws.rfind(b"\n")
   if last_newline < 0 and first is not file_first:
     return False
 
   # If there is no newline, `last_newline` is -1, so all of `ws` is
   # counted.
-  indentation = sum(1 for c in ws[last_newline+1:] if c in _SPACE_TAB)
+  indentation: int = count_indentation(ws[last_newline+1:])
   return indentation <= body_indentation
-
-
-def _leading_whitespace(token: SMToken) -> bytes:
-  """
-  Return the whitespace at the start of `token`, which ends at its
-  first non-whitespace byte (or is all of it).
-  """
-  for i, c in enumerate(token.text):
-    if c not in _WHITESPACE:
-      return token.text[:i]
-  return token.text
 
 
 # EOF

@@ -54,6 +54,7 @@ PYTHON_SRCS += test_util.py
 PYTHON_SRCS += token_tree.py
 PYTHON_SRCS += tokenize_cpp.py
 PYTHON_SRCS += tokenizer.py
+PYTHON_SRCS += whitespace.py
 
 PYTHON_TESTS :=
 PYTHON_TESTS += abstract_range_test.py
@@ -75,6 +76,7 @@ PYTHON_TESTS += t_accept_test.py
 PYTHON_TESTS += test_util_test.py
 PYTHON_TESTS += token_tree_test.py
 PYTHON_TESTS += tokenize_cpp_test.py
+PYTHON_TESTS += whitespace_test.py
 
 ALL_PYTHON_FILES = $(PYTHON_SRCS) $(PYTHON_TESTS)
 
