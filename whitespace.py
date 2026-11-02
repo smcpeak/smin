@@ -13,13 +13,13 @@ does too.
 from __future__ import annotations
 
 
-# All whitespace bytes.
-WHITESPACE: frozenset[int] = frozenset(b" \t\r\f\v\n")
+# All whitespace bytes as a set.
+WHITESPACE_BYTES_SET: frozenset[int] = frozenset(b" \t\r\f\v\n")
 
 # Bytes counted as indentation.
-INDENTATION: frozenset[int] = frozenset(b" \t")
+INDENTATION_BYTES_SET: frozenset[int] = frozenset(b" \t")
 
-NEWLINE: int = ord("\n")
+NEWLINE_BYTE: int = ord("\n")
 
 
 def leading_whitespace(text: bytes) -> bytes:
@@ -28,7 +28,7 @@ def leading_whitespace(text: bytes) -> bytes:
   non-whitespace byte (or is all of it).
   """
   for i, c in enumerate(text):
-    if c not in WHITESPACE:
+    if c not in WHITESPACE_BYTES_SET:
       return text[:i]
   return text
 
@@ -37,21 +37,21 @@ def only_indentation(text: bytes) -> bool:
   """
   True if `text` contains only characters that count as indentation.
   """
-  return all(c in INDENTATION for c in text)
+  return all(c in INDENTATION_BYTES_SET for c in text)
 
 
 def count_indentation(text: bytes) -> int:
   """
   Number of bytes in `text` that count as indentation.
   """
-  return sum(1 for c in text if c in INDENTATION)
+  return sum(1 for c in text if c in INDENTATION_BYTES_SET)
 
 
 def contains_newline(text: bytes) -> bool:
   """
   True if `text` contains a newline character.
   """
-  return NEWLINE in text
+  return NEWLINE_BYTE in text
 
 
 # EOF
