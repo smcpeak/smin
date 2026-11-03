@@ -177,11 +177,15 @@ out/m/hello-cpp.cc.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	cmp out/m/hello-cpp.cc test/hello-cpp.cc.exp
 	touch $@
 
+
+# Clean preprocessed code for minimization.
+CLEANUP_PREPROC = ./pp-cleanup.sh
+
 # Minimize preprocessed output.
 out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	$(RM) out/m/hello-cpp.ii.*
-	clang -E -P test/hello-cpp.cc -o out/m/hello-cpp.ii
+	clang -E test/hello-cpp.cc | $(CLEANUP_PREPROC) > out/m/hello-cpp.ii
 	$(PYTHON) ./smin.py \
 	  ./t_accept.py \
 	    --clang \
@@ -194,20 +198,8 @@ out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	touch $@
 
 
-# Hack to put a hash character into a variable, which otherwise trips
-# because `make` treats it as starting a comment.
-HASH = $(shell printf '\043')
-
-# Command to be used as part of a pipe to clean up the preprocessor
-# output a little.  The first part strips '#' directives without using
-# -P, which collapses a bunch of whitespace too.  Then the perl command
-# collapses 3-or-more newlines to just 2, so a blank line remains but
-# the long stretches of blank lines are removed.
-CLEANUP_PREPROC = grep -v '^ *$(HASH)' | perl -0777 -pe 's/\n{3,}/\n\n/g'
-
 # Time limit to use for time-limited long runs.
 MAX_SECONDS = 100
-
 
 # Minimize preprocessed output using MA2.  Currently this is extremely
 # slow (I've never waited for it to finish).
