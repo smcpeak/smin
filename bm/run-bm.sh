@@ -21,7 +21,7 @@ fi
 # Validate the minimizer.
 minimizer="$1"
 case "$minimizer" in
-  smin|delta|creduce)
+  smin|delta|creduce|cvise)
     ;;
 
   *)
@@ -98,6 +98,11 @@ case "$minimizer" in
   creduce)
     # --n 1 causes it to run sequentially.
     echo_exec time creduce --n 1 ./test.sh input
+    ;;
+
+  cvise)
+    # --n 1 causes it to run sequentially.
+    echo_exec time cvise --n 1 ./test.sh input
     ;;
 
 esac
