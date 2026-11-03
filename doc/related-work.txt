@@ -4,7 +4,7 @@ specification.  I've reviewed it, and it appears solid, although I have
 yet to dig into any of the cited work (except my own, of course, and
 ddmin back in the day).
 
-So far, I haven't changed any of what Claude wrote.
+My additions are marked with "smcpeak:".
 
 
 Related work
@@ -353,6 +353,16 @@ which runs of siblings to try.
   delimiter-balanced removal, related to smin's delimiter groups, and
   an early pass that uses topformflat (see 6.1).  It is the obvious
   benchmark baseline for smin on C/C++.
+
+  smcpeak:
+
+    I tried C-Reduce on my hello-cpp benchmark.  It does well during its
+    initial pass_lines phase, but then bogs down trying to delete
+    individual tokens.  I wanted to adjust it to only do pass_lines, but
+    then I discovered the next bit:
+
+    C-Reduce seems to not be actively developed.  C-Vise seems to be the
+    alternative that is under active development.
 
 5.2 llvm-reduce and bugpoint
 

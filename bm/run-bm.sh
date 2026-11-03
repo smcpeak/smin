@@ -3,18 +3,25 @@
 
 # Print usage if no arguments.
 if [ "x$1" = "x" ]; then
-  echo "Usage: $0 <minimizer> <benchmarkdir>"
+  echo "Usage: ./run-bm.sh <minimizer> <benchmarkdir>"
   echo ""
   echo "<minimizer> is one of:"
   echo "  smin"
   echo "  delta"
+  echo "  creduce"
+  exit 2
+fi
+
+if [ ! -x ./run-bm.sh ]; then
+  echo "This script has to be run in the same directory that the " 1>&2
+  echo "script lives in due to how T_ACCEPT_PY works." 1>&2
   exit 2
 fi
 
 # Validate the minimizer.
 minimizer="$1"
 case "$minimizer" in
-  smin|delta)
+  smin|delta|creduce)
     ;;
 
   *)
@@ -49,6 +56,10 @@ echo_run() {
   "$@" || exit
 }
 
+# Location of the acceptance test script, exported so test.sh can find
+# it from anywhere.
+export T_ACCEPT_PY="$(pwd)/../t_accept.py"
+
 # Remove a prior run.
 if [ -e "out/$benchmarkdir/$minimizer" ]; then
   echo_run rm -r "out/$benchmarkdir/$minimizer"
@@ -62,6 +73,10 @@ echo_run cd "out/$benchmarkdir/$minimizer"
 
 # Generate the input to minimize.
 echo_run ./gen.sh
+
+# Export the name of the log file so test.sh can log to it from
+# anywhere.  (creduce runs the program in a temporary directory.)
+export T_ACCEPT_LOG_TSV="$(pwd)/$benchmarkdir-$minimizer.tsv"
 
 # Echo, then exec.  This is how the minimizer is run so that I can
 # safely edit this script while it runs.
@@ -78,6 +93,11 @@ case "$minimizer" in
 
   delta)
     echo_exec time multimultidelta ./test.sh input
+    ;;
+
+  creduce)
+    # --n 1 causes it to run sequentially.
+    echo_exec time creduce --n 1 ./test.sh input
     ;;
 
 esac

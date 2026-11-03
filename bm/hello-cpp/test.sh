@@ -3,11 +3,11 @@
 
 export INPUT=input
 
-exec python3 ../../../../t_accept.py \
+exec python3 "$T_ACCEPT_PY" \
     --clang \
     --before-after helper helper \
     --has-string std::cout \
-    --tsv-log log.tsv \
+    --tsv-log "$T_ACCEPT_LOG_TSV" \
     >/dev/null 2>&1
 
 # EOF
