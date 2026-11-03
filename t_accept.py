@@ -82,6 +82,7 @@ Options:
 
       * <timestamp> (as described under --capture).
       * The verdict, where "TRUE" means accept and "FALSE" means reject.
+      * The candidate file size in bytes.
       * $SMIN_PROGRESS, separated into fields by treating each
         contiguous run of digits as a field, then leading zeroes
         stripped from each field.  If it is unset or empty, omit the
@@ -175,7 +176,8 @@ def main(argv: list[str]) -> int:
         f.write(data)
 
   if args.tsv_log is not None:
-    fields = [timestamp, "FALSE" if failure is not None else "TRUE"]
+    fields = [timestamp, "FALSE" if failure is not None else "TRUE",
+              str(len(data))]
     fields += _progress_fields(os.environ.get("SMIN_PROGRESS", ""))
     with open(args.tsv_log, "a") as f:
       f.write("\t".join(fields) + "\n")

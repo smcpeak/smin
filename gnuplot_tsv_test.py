@@ -22,8 +22,12 @@ POSIX = os.name == "posix"
 
 
 def row(timestamp: str, size: str, verdict: str = "TRUE") -> str:
-  """A TSV row with `timestamp` and `size`, and plausible other fields."""
-  return "\t".join([timestamp, verdict, "1", size, "1", "2", "0", "3"]) + "\n"
+  """
+  A TSV row with `timestamp`, `verdict`, and `size` (in bytes), followed
+  by plausible progress fields.
+  """
+  return "\t".join([timestamp, verdict, size,
+                    "1", "20", "1", "2", "0", "3"]) + "\n"
 
 
 class ParseTsvTest(unittest.TestCase):
@@ -32,7 +36,7 @@ class ParseTsvTest(unittest.TestCase):
 
   def test_well_formed(self) -> None:
     text = (row("100.5", "10") +
-            row("100.75", "6", "FALSE") +
+            row("100.75", "6") +
             row("101.000000001", "6"))
     self.assertEqual(parse_tsv(text), ([
       (Decimal(0), 10),
@@ -41,13 +45,26 @@ class ParseTsvTest(unittest.TestCase):
       (Decimal("0.500000001"), 6),
     ], 3))
 
+  def test_rejected_rows_ignored(self) -> None:
+    # Only a verdict of exactly "TRUE" is accepted.  The reltime is
+    # measured from the first accepted row, and the ignored rows still
+    # count toward the total.
+    text = (row("99.0", "12", "FALSE") +
+            row("100.0", "10") +
+            row("100.5", "8", "FALSE") +
+            row("101.0", "9", "true") +
+            row("101.5", "9", "maybe") +
+            row("102.0", "7"))
+    self.assertEqual(parse_tsv(text),
+                     ([(Decimal(0), 10), (Decimal(2), 7)], 6))
+
   def test_integer_timestamp(self) -> None:
     self.assertEqual(parse_tsv(row("7", "1") + row("9", "0")),
                      ([(Decimal(0), 1), (Decimal(2), 0)], 2))
 
   def test_malformed_rows_ignored(self) -> None:
     text = (
-      # Too few fields, like the row for the initial test.
+      # Too few fields.
       "100.0\tTRUE\n" +
       row("x100.0", "10") +
       row("100.0", "ten") +
@@ -65,8 +82,13 @@ class ParseTsvTest(unittest.TestCase):
                      ([(Decimal(0), 8), (Decimal(1), 7)], 10))
 
   def test_other_columns_not_validated(self) -> None:
-    text = "5.0\tmaybe\tN\t3\tP\tPm\tF\tR\n"
+    text = "5.0\tTRUE\t3\tN\tS\tP\tPm\tF\tR\n"
     self.assertEqual(parse_tsv(text), ([(Decimal(0), 3)], 1))
+
+  def test_three_fields_enough(self) -> None:
+    # The initial test's row has no progress fields.
+    self.assertEqual(parse_tsv("5.0\tTRUE\t30\n" + row("6.0", "20")),
+                     ([(Decimal(0), 30), (Decimal(1), 20)], 2))
 
   def test_extra_fields_allowed(self) -> None:
     self.assertEqual(parse_tsv(row("5.0", "3").rstrip("\n") + "\textra\n"),
@@ -84,7 +106,7 @@ class MakeScriptTest(unittest.TestCase):
     self.assertEqual(script,
       "set title 'Accepted Size vs. Time'\n"
       "set xlabel 'reltime (s)'\n"
-      "set ylabel 'size (tokens)'\n"
+      "set ylabel 'size (bytes)'\n"
       "$data1 << EOD\n"
       "0\t10\n"
       "0.25\t6\n"
@@ -103,7 +125,7 @@ class MakeScriptTest(unittest.TestCase):
     self.assertEqual(script,
       "set title 'Accepted Size vs. Time'\n"
       "set xlabel 'reltime (s)'\n"
-      "set ylabel 'size (tokens)'\n"
+      "set ylabel 'size (bytes)'\n"
       "$data1 << EOD\n"
       "0\t10\n"
       "EOD\n"
@@ -166,7 +188,7 @@ class MainTest(unittest.TestCase):
   EXPECTED_SCRIPT = (
     "set title 'Accepted Size vs. Time'\n"
     "set xlabel 'reltime (s)'\n"
-    "set ylabel 'size (tokens)'\n"
+    "set ylabel 'size (bytes)'\n"
     "$data1 << EOD\n"
     "0.0\t10\n"
     "1.5\t4\n"
@@ -212,7 +234,7 @@ class MainTest(unittest.TestCase):
     self.assertEqual(gp.read_text(),
       "set title 'Accepted Size vs. Time'\n"
       "set xlabel 'reltime (s)'\n"
-      "set ylabel 'size (tokens)'\n"
+      "set ylabel 'size (bytes)'\n"
       "$data1 << EOD\n"
       "0.0\t10\n"
       "1.5\t4\n"

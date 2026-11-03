@@ -21,21 +21,17 @@ Behavior:
 
   Read <tsvfile>s and construct a gnuplot script in memory.
 
-  Each <tsvfile> is expected to have these tab-separated columns (with
-  no preceding label row):
+  Each <tsvfile> is expected to have at least these tab-separated
+  columns (with no preceding label row):
 
     * timestamp: unix time of invocation as a decimal number
     * verdict: TRUE or FALSE
-    * N: invocation number
-    * S: candidate size in tokens
-    * P: pass number
-    * Pm: maximum pass number
-    * F: completion fraction as an integer in [0,99]
-    * R: number of tokens removed when making the candidate
+    * B: candidate size in bytes
 
-  A well-formed row must have properly-formatted <timestamp> and <S>
-  fields.  Ignore rows that do not have enough fields, or where those
-  two are improperly formatted.  Don't validate the other columns.
+  A well-formed row must have properly-formatted <timestamp> and <B>
+  fields.  Ignore rows that have fewer than 3 fields (more than 3 is
+  fine), or where those two are improperly formatted.  Also ignore rows
+  where the verdict is not "TRUE".
 
   Each <tsvfile> contributes its own data line, with its Y data labeled
   with the name of its <tsvfile>, omitting path information.
@@ -46,7 +42,7 @@ Behavior:
 
   The plot's X axis is labeled "reltime (s)".
 
-  The Y axis is "S", and is labeled "size (tokens)".
+  The Y axis is "B", and is labeled "size (bytes)".
 
   The title of the plot is "Accepted Size vs. Time".
 
@@ -78,15 +74,16 @@ from decimal import Decimal
 # A well-formed timestamp field: a decimal number.
 _TIMESTAMP_RE = re.compile(r"[0-9]+(\.[0-9]+)?")
 
-# A well-formed S (size) field: a nonnegative integer.
+# A well-formed B (size in bytes) field: a nonnegative integer.
 _SIZE_RE = re.compile(r"[0-9]+")
 
-# Number of columns a row must have to be well-formed.
-_NUM_COLUMNS = 8
+# Minimum number of columns a row must have to be well-formed.
+_NUM_COLUMNS = 3
 
 # Column indices (0-based) of the fields that are used.
 _TIMESTAMP_COL = 0
-_SIZE_COL = 3
+_VERDICT_COL = 1
+_SIZE_COL = 2
 
 
 def main(argv: list[str]) -> int:
@@ -104,7 +101,7 @@ def main(argv: list[str]) -> int:
 
   tsv_names: list[str] = args.tsvfile
 
-  # For each element of `tsv_names`, its well-formed (reltime, S) pairs
+  # For each element of `tsv_names`, its well-formed (reltime, B) pairs
   # and its total number of rows.
   parsed: list[tuple[list[tuple[Decimal, int]], int]] = []
 
@@ -154,12 +151,13 @@ def main(argv: list[str]) -> int:
 
 def parse_tsv(text: str) -> tuple[list[tuple[Decimal, int]], int]:
   """
-  Parse `text`, the contents of a TSV file.  Return the (reltime, S)
-  pairs of the well-formed rows, and the total number of rows.
+  Parse `text`, the contents of a TSV file.  Return the (reltime, B)
+  pairs of the well-formed rows with a "TRUE" verdict, and the total
+  number of rows.
   """
   rows = text.splitlines()
 
-  # Timestamp of the first well-formed row.
+  # Timestamp of the first well-formed, accepted row.
   first: Decimal | None = None
 
   points: list[tuple[Decimal, int]] = []
@@ -170,7 +168,8 @@ def parse_tsv(text: str) -> tuple[list[tuple[Decimal, int]], int]:
     timestamp = fields[_TIMESTAMP_COL]
     size = fields[_SIZE_COL]
     if not (_TIMESTAMP_RE.fullmatch(timestamp) and
-            _SIZE_RE.fullmatch(size)):
+            _SIZE_RE.fullmatch(size) and
+            fields[_VERDICT_COL] == "TRUE"):
       continue
 
     # Using `Decimal` keeps the difference exact, so the script shows
@@ -188,7 +187,7 @@ def make_script(
 ) -> str:
   """
   Return a gnuplot script that plots each of `datasets`, a (label,
-  points) pair where `points` are (reltime, S) pairs, as its own line
+  points) pair where `points` are (reltime, B) pairs, as its own line
   labeled with `label` in the legend.  The data is embedded in the
   script, and the script waits for the plot window to be closed before
   exiting.
@@ -200,7 +199,7 @@ def make_script(
   lines = [
     "set title 'Accepted Size vs. Time'",
     "set xlabel 'reltime (s)'",
-    "set ylabel 'size (tokens)'",
+    "set ylabel 'size (bytes)'",
   ]
 
   # One data block per dataset, named "$data1", "$data2", etc.
@@ -209,10 +208,10 @@ def make_script(
     lines.extend(f"{reltime}\t{size}" for reltime, size in points)
     lines.append("EOD")
 
-  # S only changes when a candidate is accepted, so each is drawn as a
-  # step function.  The labels are not "enhanced" so that, e.g., "_" in
-  # a file name is not treated as a subscript marker.  (gnuplot skips a
-  # data block with no points, with a warning.)
+  # The accepted size only changes at each accepted candidate, so each
+  # is drawn as a step function.  The labels are not "enhanced" so that,
+  # e.g., "_" in a file name is not treated as a subscript marker.
+  # (gnuplot skips a data block with no points, with a warning.)
   plot_elements = [
     f"$data{i} using 1:2 with steps title {_quote(label)} noenhanced"
     for i, (label, _) in enumerate(datasets, start=1)]
