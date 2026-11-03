@@ -205,6 +205,9 @@ HASH = $(shell printf '\043')
 # the long stretches of blank lines are removed.
 CLEANUP_PREPROC = grep -v '^ *$(HASH)' | perl -0777 -pe 's/\n{3,}/\n\n/g'
 
+# Time limit to use for time-limited long runs.
+MAX_SECONDS = 100
+
 
 # Minimize preprocessed output using MA2.  Currently this is extremely
 # slow (I've never waited for it to finish).
@@ -213,7 +216,7 @@ out/m/hello-cpp-ma2.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(RM) out/m/hello-cpp-ma2.ii.*
 	clang -E test/hello-cpp.cc | $(CLEANUP_PREPROC) > out/m/hello-cpp-ma2.ii
 	$(PYTHON) ./smin.py \
-	  --max-seconds 100 \
+	  --max-seconds $(MAX_SECONDS) \
 	  --ma2 \
 	  ./t_accept.py \
 	    --clang \
