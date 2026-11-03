@@ -185,7 +185,10 @@ CLEANUP_PREPROC = ./pp-cleanup.sh
 out/m/hello-cpp.ii.ok: test/hello-cpp.cc out/unittest.ok $(ALL_PYTHON_FILES)
 	$(CREATE_OUTPUT_DIRECTORY)
 	$(RM) out/m/hello-cpp.ii.*
-	clang -E test/hello-cpp.cc | $(CLEANUP_PREPROC) > out/m/hello-cpp.ii
+	@# In this test, cleaning up the pp output changes the run time
+	@# from about 4 minutes to about 7 minutes!
+	@#clang -E test/hello-cpp.cc | $(CLEANUP_PREPROC) > out/m/hello-cpp.ii
+	clang -E test/hello-cpp.cc -o out/m/hello-cpp.ii
 	$(PYTHON) ./smin.py \
 	  ./t_accept.py \
 	    --clang \
