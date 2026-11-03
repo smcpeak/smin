@@ -1,6 +1,10 @@
 Note: The following was compiled by Claude in response to a prompt to
 search for related work based on the current requirements and functional
-specification.  I'm just starting the process of vetting it.
+specification.  I've reviewed it, and it appears solid, although I have
+yet to dig into any of the cited work (except my own, of course, and
+ddmin back in the day).
+
+So far, I haven't changed any of what Claude wrote.
 
 
 Related work
