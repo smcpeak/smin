@@ -34,7 +34,7 @@ Options:
 
   --clang
 
-    Require that "clang -fsyntax-only -xc++ $INPUT" exit with code 0.
+    Require that "clang -fsyntax-only -w -xc++ $INPUT" exit with code 0.
 
   --reject
 
@@ -263,7 +263,7 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
          "containing AFTER.")
   parser.add_argument(
     "--clang", action="store_true",
-    help='Require that "clang -fsyntax-only -xc++ $INPUT" succeeds.')
+    help='Require that "clang -fsyntax-only -w -xc++ $INPUT" succeeds.')
   parser.add_argument(
     "--reject", action="store_true",
     help="Reject every input except the first, which is recognized by "
@@ -351,8 +351,13 @@ def _first_failure(
       return f"no line contains {before!r} followed by one with {after!r}"
 
   if args.clang:
+    # Passing -w is useful because (1) we don't care, and (2) when
+    # working with preprocessed code, clang's usual rules that suppress
+    # warnings in system headers do not work, so we get tons.  Normally
+    # this output is sent to /dev/null anyway, but when it's not, I
+    # don't want extra noise.
     proc = subprocess.run(
-      ["clang", "-fsyntax-only", "-xc++", input_name], check=False)
+      ["clang", "-fsyntax-only", "-w", "-xc++", input_name], check=False)
     if proc.returncode != 0:
       return f"clang exited with code {proc.returncode}"
 

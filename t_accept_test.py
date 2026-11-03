@@ -146,9 +146,10 @@ class TAcceptTest(unittest.TestCase):
     clang = bin_dir / "clang"
     clang.write_text(
       "#!/bin/sh\n"
-      '[ "$#" = 3 ] && [ "$1" = -fsyntax-only ] && [ "$2" = -xc++ ] &&\n'
-      '  [ "$3" = "$INPUT" ] || exit 99\n'
-      'if grep -q error "$3"; then exit 1; fi\n'
+      '[ "$#" = 4 ] &&\n'
+      '  [ "$*" = "-fsyntax-only -w -xc++ $INPUT" ] ||\n'
+      '  exit 99\n'
+      'if grep -q error "$4"; then exit 1; fi\n'
       "exit 0\n")
     clang.chmod(0o755)
     return {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
