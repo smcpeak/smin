@@ -29,7 +29,10 @@ def build_tree(tokens: list[SMToken]) -> TTNode:
   """
 
   # For experimentation, optionally disable paragraphing at top level.
-  skip_toplevel: bool = (os.environ.get("SKIP_TOP_PARA", "") == "1")
+  skip_top_para: bool = (os.environ.get("SKIP_TOP_PARA", "") == "1")
+
+  # Likewise, maybe skip head-body.
+  skip_head_body: bool = (os.environ.get("SKIP_HEAD_BODY", "") == "1")
 
   root: TTNode
 
@@ -37,8 +40,11 @@ def build_tree(tokens: list[SMToken]) -> TTNode:
   root = group_delimiters(tokens)
   root = group_lines(root)
   root = group_indentation(root)
-  root = group_head_body(root)
-  root = group_paragraphs(root, skip_toplevel=skip_toplevel)
+  if skip_head_body:
+    print("Skipping head-body grouping.")
+  else:
+    root = group_head_body(root)
+  root = group_paragraphs(root, skip_toplevel=skip_top_para)
 
   return root
 
