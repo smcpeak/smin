@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest import mock
 
 from gnuplot_tsv import main, make_script, parse_tsv
+from test_util import dedent
 
 
 # The fake gnuplot is a shell script.
@@ -103,16 +104,19 @@ class MakeScriptTest(unittest.TestCase):
   def test_one_dataset(self) -> None:
     script = make_script([("log.tsv", [(Decimal(0), 10),
                                        (Decimal("0.25"), 6)])])
-    self.assertEqual(script,
-      "set title 'Accepted Size vs. Time'\n"
-      "set xlabel 'reltime (s)'\n"
-      "set ylabel 'size (bytes)'\n"
-      "$data1 << EOD\n"
-      "0\t10\n"
-      "0.25\t6\n"
-      "EOD\n"
-      "plot $data1 using 1:2 with steps title 'log.tsv' noenhanced\n"
-      "pause mouse close\n")
+    self.assertEqual(script, dedent("""
+      set title 'Accepted Size vs. Time'
+      set xlabel 'reltime (s)'
+      set ylabel 'size (bytes)'
+      $data1 << EOD
+      0\t10
+      0.25\t6
+      EOD
+      set terminal wxt size 1600,800 font "Arial,20"
+      set linetype 1 lw 2
+      plot $data1 using 1:2 with steps title 'log.tsv' noenhanced
+      pause mouse close
+      """))
 
   def test_multiple_datasets(self) -> None:
     # Each dataset has its own data block and plot element.  A dataset
@@ -122,23 +126,28 @@ class MakeScriptTest(unittest.TestCase):
       ("b.tsv", []),
       ("c.tsv", [(Decimal(0), 7), (Decimal(3), 5)]),
     ])
-    self.assertEqual(script,
-      "set title 'Accepted Size vs. Time'\n"
-      "set xlabel 'reltime (s)'\n"
-      "set ylabel 'size (bytes)'\n"
-      "$data1 << EOD\n"
-      "0\t10\n"
-      "EOD\n"
-      "$data2 << EOD\n"
-      "EOD\n"
-      "$data3 << EOD\n"
-      "0\t7\n"
-      "3\t5\n"
-      "EOD\n"
-      "plot $data1 using 1:2 with steps title 'a.tsv' noenhanced, \\\n"
-      "     $data2 using 1:2 with steps title 'b.tsv' noenhanced, \\\n"
-      "     $data3 using 1:2 with steps title 'c.tsv' noenhanced\n"
-      "pause mouse close\n")
+    self.assertEqual(script, dedent("""
+      set title 'Accepted Size vs. Time'
+      set xlabel 'reltime (s)'
+      set ylabel 'size (bytes)'
+      $data1 << EOD
+      0\t10
+      EOD
+      $data2 << EOD
+      EOD
+      $data3 << EOD
+      0\t7
+      3\t5
+      EOD
+      set terminal wxt size 1600,800 font "Arial,20"
+      set linetype 1 lw 2
+      set linetype 2 lw 2
+      set linetype 3 lw 2
+      plot $data1 using 1:2 with steps title 'a.tsv' noenhanced, \\
+           $data2 using 1:2 with steps title 'b.tsv' noenhanced, \\
+           $data3 using 1:2 with steps title 'c.tsv' noenhanced
+      pause mouse close
+      """))
 
   def test_label_quoted(self) -> None:
     script = make_script([("it's.tsv", [])])
@@ -185,16 +194,19 @@ class MainTest(unittest.TestCase):
 
   # The script for `tsv_path`.  The label has no path information, and
   # the first reltime is "0.0" since it is computed as "100.0 - 100.0".
-  EXPECTED_SCRIPT = (
-    "set title 'Accepted Size vs. Time'\n"
-    "set xlabel 'reltime (s)'\n"
-    "set ylabel 'size (bytes)'\n"
-    "$data1 << EOD\n"
-    "0.0\t10\n"
-    "1.5\t4\n"
-    "EOD\n"
-    "plot $data1 using 1:2 with steps title 'run_1.tsv' noenhanced\n"
-    "pause mouse close\n")
+  EXPECTED_SCRIPT = dedent("""
+    set title 'Accepted Size vs. Time'
+    set xlabel 'reltime (s)'
+    set ylabel 'size (bytes)'
+    $data1 << EOD
+    0.0\t10
+    1.5\t4
+    EOD
+    set terminal wxt size 1600,800 font "Arial,20"
+    set linetype 1 lw 2
+    plot $data1 using 1:2 with steps title 'run_1.tsv' noenhanced
+    pause mouse close
+    """)
 
   HINT_LINE = ("Run with --show to see it, or --output to save the "
                "gnuplot script.\n")
@@ -231,22 +243,26 @@ class MainTest(unittest.TestCase):
 
     # Each file's reltime is measured from its own first timestamp, and
     # its label has no path information.
-    self.assertEqual(gp.read_text(),
-      "set title 'Accepted Size vs. Time'\n"
-      "set xlabel 'reltime (s)'\n"
-      "set ylabel 'size (bytes)'\n"
-      "$data1 << EOD\n"
-      "0.0\t10\n"
-      "1.5\t4\n"
-      "EOD\n"
-      "$data2 << EOD\n"
-      "0\t8\n"
-      "3\t5\n"
-      "4\t2\n"
-      "EOD\n"
-      "plot $data1 using 1:2 with steps title 'run_1.tsv' noenhanced, \\\n"
-      "     $data2 using 1:2 with steps title 'run_2.tsv' noenhanced\n"
-      "pause mouse close\n")
+    self.assertEqual(gp.read_text(), dedent("""
+      set title 'Accepted Size vs. Time'
+      set xlabel 'reltime (s)'
+      set ylabel 'size (bytes)'
+      $data1 << EOD
+      0.0\t10
+      1.5\t4
+      EOD
+      $data2 << EOD
+      0\t8
+      3\t5
+      4\t2
+      EOD
+      set terminal wxt size 1600,800 font "Arial,20"
+      set linetype 1 lw 2
+      set linetype 2 lw 2
+      plot $data1 using 1:2 with steps title 'run_1.tsv' noenhanced, \\
+           $data2 using 1:2 with steps title 'run_2.tsv' noenhanced
+      pause mouse close
+      """))
 
   def test_one_of_multiple_files_missing(self) -> None:
     # Nothing is printed or written, even for the readable file.

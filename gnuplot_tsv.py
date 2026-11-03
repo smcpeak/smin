@@ -208,6 +208,13 @@ def make_script(
     lines.extend(f"{reltime}\t{size}" for reltime, size in points)
     lines.append("EOD")
 
+  # Use a larger default size and font since I'm using a 4k monitor.
+  lines.append('set terminal wxt size 1600,800 font "Arial,20"')
+
+  # Increase the line thickness.
+  for i in range(len(datasets)):
+    lines.append(f"set linetype {i+1} lw 2")
+
   # The accepted size only changes at each accepted candidate, so each
   # is drawn as a step function.  The labels are not "enhanced" so that,
   # e.g., "_" in a file name is not treated as a subscript marker.
