@@ -364,6 +364,11 @@ which runs of siblings to try.
     C-Reduce seems to not be actively developed.  C-Vise seems to be the
     alternative that is under active development.
 
+    However, I tried C-Vise (2.12.0), and it performed even worse than
+    C-Reduce, taking about twice as long while having a similar
+    size-vs-time trajectory.  Google AI suggested adding
+    --pass-group=delta, but that was far worse.
+
 5.2 llvm-reduce and bugpoint
 
   LLVM project.  https://llvm.org/docs/Bugpoint.html and
