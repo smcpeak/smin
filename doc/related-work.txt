@@ -1,0 +1,557 @@
+Note: The following was compiled by Claude in response to a prompt to
+search for related work based on the current requirements and functional
+specification.  I'm just starting the process of vetting it.
+
+
+Related work
+============
+
+This file surveys published research and tools related to smin, as
+described in smin-requirements.txt, structure-deduction-algorithm.txt,
+and minimization-algorithm.txt.  It was compiled in November 2026 from
+web searches.  The summaries are based on abstracts, project READMEs,
+and similar descriptions, not on careful reading of every paper, so
+details should be checked against the sources before being relied on.
+
+Each entry has a citation, a link, a short summary, and a note on how it
+relates to smin ("Relation:").
+
+
+Overview
+--------
+
+The general problem smin solves is usually called "test-case reduction",
+"input minimization", or (for programs) "program reduction".  The
+literature descends from Delta Debugging (Zeller and Hildebrandt), and
+splits roughly into:
+
+* Flat, list-based algorithms (ddmin and its successors), which treat
+  the input as a sequence of lines, bytes, or tokens.
+
+* Tree-based algorithms (HDD, Perses, and successors), which parse the
+  input with a grammar and reduce the parse tree.
+
+* Language-specific reducers (C-Reduce, llvm-reduce, ddSMT, J-Reduce),
+  which apply semantic transformations for one language.
+
+* Grammar-free heuristic tools (delta/topformflat, Lithium, Shrink Ray,
+  structureshrink), which get some structure from cheap heuristics.
+
+smin sits between the second and fourth groups: it reduces a tree, like
+HDD and Perses, but deduces that tree heuristically from tokens,
+delimiters, and indentation rather than from a grammar.  The closest
+precedents for that are topformflat (brace nesting levels), Shrink Ray
+(bracket balancing), and structureshrink (repeated substrings).  I did
+not find published work that uses indentation as a structural signal for
+reduction, nor a tree-based reducer whose explicit design goal is
+minimizing total test time under a cost model proportional to input
+size, although Perses, Pardis, and WDD each address part of that.
+
+
+1. Foundations
+--------------
+
+1.1 Delta Debugging (ddmin)
+
+  Andreas Zeller and Ralf Hildebrandt.  "Simplifying and Isolating
+  Failure-Inducing Input."  IEEE Transactions on Software Engineering
+  28(2):183-200, February 2002.  DOI 10.1109/32.988498.
+  https://www.st.cs.uni-saarland.de/papers/tse2002/tse2002.pdf
+
+  Introduces ddmin, which splits the input into n chunks, tries
+  removing each chunk (and each complement), and increases n when
+  nothing works.  Defines 1-minimality: removing any single element
+  makes the test fail.  Worst case is quadratic in the number of tests.
+
+  Relation: The origin of the "acceptance test" framing, the
+  coarse-to-fine granularity schedule, and the 1-minimality goal in
+  smin-requirements.txt.  ddmin operates on a flat list; smin's MA1
+  granularity sequence G = S, S/2, S/4, ... is a tree-aware analogue
+  of ddmin's chunk refinement.
+
+
+2. Tree-based (hierarchical) reduction
+--------------------------------------
+
+2.1 Hierarchical Delta Debugging (HDD)
+
+  Ghassan Misherghi and Zhendong Su.  "HDD: Hierarchical Delta
+  Debugging."  ICSE 2006, pp. 142-151.
+  https://www.cs.ucdavis.edu/~su/publications/icse06-hdd.pdf
+
+  Parses the input with a grammar and runs ddmin on one tree level at a
+  time, from the root down.  Removed nodes are replaced by the smallest
+  syntactically valid fragment for their nonterminal.  Reports simpler
+  outputs and orders of magnitude fewer tests than flat ddmin.
+
+  Relation: The most direct ancestor of smin's approach.  MA2's
+  level-by-level passes (one per tree depth) are structurally similar
+  to HDD's level-by-level ddmin.  smin's "non-trivial candidate
+  replacement" (e.g., ";") plays the role of HDD's minimal syntactic
+  replacement.  The key difference is that smin needs no grammar.
+
+2.2 Picireny, and the Szeged HDD papers
+
+  Renáta Hodován and Ákos Kiss.  "Modernizing Hierarchical Delta
+  Debugging."  A-TEST 2016, pp. 31-37.  DOI 10.1145/2994291.2994296.
+
+  Renáta Hodován, Ákos Kiss, and Tibor Gyimóthy.  "Tree Preprocessing
+  and Test Outcome Caching for Efficient Hierarchical Delta Debugging."
+  AST 2017, pp. 23-29.  DOI 10.1109/AST.2017.4.
+
+  Renáta Hodován, Ákos Kiss, and Tibor Gyimóthy.  "Coarse Hierarchical
+  Delta Debugging."  ICSME 2017.
+
+  Ákos Kiss, Renáta Hodován, and Tibor Gyimóthy.  "HDDr: A Recursive
+  Variant of the Hierarchical Delta Debugging Algorithm."  A-TEST 2018.
+
+  Dániel Vince, Renáta Hodován, Daniella Bársony, and Ákos Kiss.  "The
+  Effect of Hoisting on Variants of Hierarchical Delta Debugging."
+  Journal of Software: Evolution and Process, 2022.
+  https://www.inf.u-szeged.hu/~vinced/files/vince2022effectsOfHoisting.pdf
+
+  Tool: Picireny, https://github.com/renatahodovan/picireny (Python,
+  ANTLR grammars).
+
+  A sustained line of work refining HDD:
+  - The AST 2017 paper preprocesses the tree before reduction (I
+    believe by collapsing redundant chains of nodes) and caches test
+    outcomes, cutting test counts by about 45% on average.
+  - Coarse HDD restricts attention to nodes that can be removed
+    outright, trading theoretical minimality for speed; it can be used
+    alone or as a preprocessing step for full HDD.
+  - HDDr changes the traversal order: it recurses depth-first into
+    nodes instead of processing whole levels.
+  - "Hoisting" replaces a node with a compatible descendant, which the
+    2022 paper reports shrinks results by about 27% on average.
+
+  Relation:
+  - The tree preprocessing echoes smin's Phase 6 (collapsing
+    single-child groups).
+  - Outcome caching is smin's `memoized_accept`.
+  - Coarse HDD's "accept losing minimality for speed" matches smin's
+    choice not to iterate to quiescence.
+  - HDDr's recursive descent resembles MA1/MA2's recursion into a node
+    when it can't be removed whole.
+  - Hoisting is a possible future replacement strategy for smin
+    (replacing a group by one of its children).
+
+2.3 Perses
+
+  Chengnian Sun, Yuanbo Li, Qirun Zhang, Tianxiao Gu, and Zhendong Su.
+  "Perses: Syntax-Guided Program Reduction."  ICSE 2018, pp. 361-371.
+  https://web.cs.ucdavis.edu/~su/publications/perses.pdf
+  Tool: https://github.com/uw-pluverse/perses
+
+  Uses a (normalized) grammar so that only syntactically valid
+  candidates are generated, and processes tree nodes from a priority
+  queue ordered by size, largest first.  Handles quantified grammar
+  elements (lists, optionals) specially, applying ddmin to list
+  children.  Reports results 2% and 45% of the size of DD's and HDD's.
+
+  Relation: Perses's largest-first worklist has the same aim as smin's
+  descending granularity: spend early tests on big removals.  Unlike
+  smin it needs a grammar for each language, and its validity
+  guarantee comes from that grammar.
+
+2.4 Pardis
+
+  Golnaz Gharachorlu and Nick Sumner.  "Pardis: Priority Aware Test
+  Case Reduction."  FASE 2019, pp. 409-426.
+  https://www.cs.sfu.ca/~wsumner//research/2019-Pardis-Priority-Aware-Test-Case-Reduction.html
+
+  Argues that Perses suffers from "priority inversion", spending effort
+  on low-priority parts of the tree, and proposes better priority
+  orderings.  Also: Gharachorlu and Sumner, "Avoiding the Familiar to
+  Speed Up Test Case Reduction," QRS 2018; and Gharachorlu's PhD thesis
+  "Accelerating Test Case Reduction," SFU, 2023,
+  https://summit.sfu.ca/_flysystem/fedora/2023-06/etd22465.pdf
+
+  Relation: Directly about smin's stated goal of minimum total time,
+  i.e., choosing which candidates to try first.
+
+2.5 Vulcan
+
+  Zhenyang Xu, Yongqiang Tian, Mengxiao Zhang, Gaosen Zhao, Yu Jiang,
+  and Chengnian Sun.  "Pushing the Limit of 1-Minimality of
+  Language-Agnostic Program Reduction."  OOPSLA 2023.
+  https://cs.uwaterloo.ca/~cnsun/publication/oopsla23/oopsla23.pdf
+
+  After a Perses-style reduction reaches a 1-minimal result, Vulcan
+  applies further transformations (identifier replacement, subtree
+  replacement, local exhaustive enumeration) to escape that local
+  minimum.  Reports 22-34% fewer tokens than Perses.
+
+  Relation: A reminder that 1-minimality with respect to deletion is a
+  weak notion; richer replacements (beyond smin's single non-trivial
+  replacement) can go much further.
+
+2.6 T-Rec
+
+  Zhenyang Xu, Yongqiang Tian, Mengxiao Zhang, Jiarui Zhang, Puzhuo
+  Liu, Yu Jiang, and Chengnian Sun.  "T-Rec: Fine-Grained
+  Language-Agnostic Program Reduction Guided by Lexical Syntax."  ACM
+  TOSEM 34(2), Article 34, 2025 (presented at ICSE 2025, journal-first).
+  DOI 10.1145/3690631.
+  https://cs.uwaterloo.ca/~cnsun/public/publication/tosem24-trec/tosem24-trec.pdf
+
+  Uses the lexical grammar of a language to reduce inside tokens (e.g.,
+  shortening identifiers and literals), improving Perses and Vulcan
+  results by up to 66% and 54% in bytes.
+
+  Relation: smin treats tokens as atomic; T-Rec shows the value of
+  sub-token reduction once the tree-level work is done.  smin's
+  tokenizer is a natural place to hang such a pass.
+
+2.7 GTR
+
+  Satia Herfert, Jibesh Patra, and Michael Pradel.  "Automatically
+  Reducing Tree-Structured Test Inputs."  ASE 2017, pp. 861-871.  DOI
+  10.1109/ASE.2017.8115697.
+  Tool: https://github.com/sherfert/GTR
+
+  Language-independent reduction of trees that combines deletion with
+  tree transformations (e.g., replacing a node by a descendant), and
+  learns from example trees which transformations are worthwhile.
+
+  Relation: Another grammar-light tree reducer; its learned
+  transformations are an alternative to smin's fixed, language-supplied
+  non-trivial replacement.
+
+2.8 treereduce
+
+  Langston Barrett.  treereduce.
+  https://github.com/langston-barrett/treereduce
+  (Rust; crates.io has per-language variants such as treereduce-java.)
+
+  A fast, parallel, syntax-aware reducer built on tree-sitter grammars.
+
+  Relation: Gets its tree from tree-sitter, an error-tolerant parser,
+  which partially addresses smin's robustness requirement but still
+  needs a grammar per language.
+
+
+3. Improved list-reduction algorithms
+-------------------------------------
+
+These operate on a flat list, but tree reducers (HDD, Perses) call them
+on each node's children, so they are applicable to how smin chooses
+which runs of siblings to try.
+
+3.1 Practical improvements to ddmin (Picire)
+
+  Renáta Hodován and Ákos Kiss.  "Practical Improvements to the
+  Minimizing Delta Debugging Algorithm."  ICSOFT 2016, pp. 241-248.
+  DOI 10.5220/0005988602410248.
+  https://www.scitepress.org/Papers/2016/59886/59886.pdf
+  Tool: Picire, https://github.com/renatahodovan/picire
+
+  Reorders and prunes ddmin's subset/complement tests, and parallelizes
+  them; reports reaching 1-minimal results in one-fourth to one-fifth
+  of the time.
+
+3.2 ProbDD and CDD
+
+  Guancheng Wang, Ruobing Shen, Junjie Chen, Yingfei Xiong, and Lu
+  Zhang.  "Probabilistic Delta Debugging."  ESEC/FSE 2021 (Distinguished
+  Paper).  DOI 10.1145/3468264.3468625.
+  https://xiongyingfei.github.io/papers/FSE21a.pdf
+
+  "A Probabilistic Delta Debugging Approach for Abstract Syntax Trees."
+  ISSRE 2023.  https://xiongyingfei.github.io/papers/ISSRE23.pdf
+
+  Mengxiao Zhang, Zhenyang Xu, Yongqiang Tian, Xinru Cheng, and
+  Chengnian Sun.  "Toward a Better Understanding of Probabilistic Delta
+  Debugging."  ICSE 2025.  https://arxiv.org/abs/2408.04735
+
+  ProbDD keeps, for each element, an estimated probability that it is
+  needed, and chooses deletion subsets to maximize expected gain.  The
+  ICSE 2025 paper shows that a much simpler counter-based variant
+  (CDD) performs the same, and that ProbDD's randomness doesn't matter.
+
+  Relation: MA2's adaptive granularity (double on ACCEPT, halve on
+  REJECT) is a simple adaptive scheme in the same spirit as CDD's
+  counters: both adjust subset size based on recent outcomes.  CDD
+  would be a good baseline to compare against MA2.
+
+3.3 Weighted Delta Debugging (WDD)
+
+  Xintong Zhou, Zhenyang Xu, Mengxiao Zhang, Yongqiang Tian, and
+  Chengnian Sun.  "WDD: Weighted Delta Debugging."  ICSE 2025, pp.
+  1592-1603.  https://arxiv.org/abs/2411.19410
+
+  Weights each list element by the size of the input fragment it
+  represents (e.g., a subtree's token count), and partitions by weight
+  instead of by element count.  Reports about 10-12% less time and
+  smaller results when plugged into HDD and Perses.
+
+  Relation: Very close to smin's MA1, which measures node size in live
+  tokens and forms runs by total size rather than by count.  MA2, in
+  contrast, uses child counts; WDD's results suggest weighting MA2's
+  granularity by size might help.
+
+
+4. Dependency-aware reduction
+-----------------------------
+
+4.1 J-Reduce and Logical Bytecode Reduction
+
+  Christian Gram Kalhauge and Jens Palsberg.  "Binary Reduction of
+  Dependency Graphs."  ESEC/FSE 2019, pp. 556-566.  DOI
+  10.1145/3338906.3338956.
+
+  Christian Gram Kalhauge and Jens Palsberg.  "Logical Bytecode
+  Reduction."  PLDI 2021.
+
+  Model the input as a dependency graph and only remove dependency-
+  closed sets of items, which makes reduction of Java bytecode much
+  faster (12x vs. delta debugging) and smaller.
+
+4.2 DRReduce
+
+  Qiong Feng, Xiaotian Ma, Yongqiang Tian, Wei Song, and Peng Liang.
+  "DRReduce: Enhancing Syntax-Guided Program Reduction with Dependency
+  Reconstruction."  arXiv:2605.19412, May 2026.
+  https://arxiv.org/abs/2605.19412
+
+  Adds a lightweight semantic dependency graph to a Perses-style
+  reducer, and repairs dependencies broken by deletions so more
+  candidates pass; reports results comparable to C-Reduce for C.
+
+  Relation (both): minimization-algorithm.txt notes that working
+  backwards is "a very crude way to avoid breaking decl-ref edges" and
+  that explicitly representing such edges is a possible extension.
+  These papers are the main prior work on that extension.
+
+
+5. Language-specific reducers
+-----------------------------
+
+5.1 C-Reduce and C-Vise
+
+  John Regehr, Yang Chen, Pascal Cuoq, Eric Eide, Chucky Ellison, and
+  Xuejun Yang.  "Test-Case Reduction for C Compiler Bugs."  PLDI 2012,
+  pp. 335-346.
+  https://fsl.cs.illinois.edu/publications/regehr-chen-cuoq-eide-ellison-yang-pldi-2012.html
+  Blog series: John Regehr, "Design and Evolution of C-Reduce,"
+  https://blog.regehr.org/archives/1678
+  Tools: C-Reduce, https://github.com/csmith-project/creduce;
+  C-Vise (Python port by Martin Liška), https://github.com/marxin/cvise
+
+  A pass-based reducer: many independent transformation passes (line
+  deletion, balanced-delimiter removal, and Clang-based semantic
+  transformations via clang_delta) run to a fixpoint, with parallel
+  speculative testing.  The de facto standard for C/C++ compiler bugs;
+  produces very small results but can be slow.
+
+  Relation: smin's motivating use case (C++ compiler crashes) is
+  C-Reduce's home turf.  C-Reduce's generic passes include
+  delimiter-balanced removal, related to smin's delimiter groups, and
+  an early pass that uses topformflat (see 6.1).  It is the obvious
+  benchmark baseline for smin on C/C++.
+
+5.2 llvm-reduce and bugpoint
+
+  LLVM project.  https://llvm.org/docs/Bugpoint.html and
+  https://llvm.org/docs/CommandGuide/llvm-reduce.html
+
+  Delta-debugging reducers for LLVM IR that use IR structure (modules,
+  functions, blocks, instructions) as the hierarchy.  llvm-reduce is
+  the newer, faster replacement for bugpoint's reduction role.
+
+5.3 ddSMT
+
+  Aina Niemetz and Armin Biere.  "ddSMT: A Delta Debugger for the
+  SMT-LIB v2 Format."  SMT Workshop 2013.
+  https://cs.stanford.edu/~niemetz/publications/2013/NiemetzBiere-SMT13.pdf
+
+  Gereon Kremer, Aina Niemetz, and Mathias Preiner.  "ddSMT 2.0:
+  Better Delta Debugging for the SMT-LIBv2 Language and Friends."  CAV
+  2021, LNCS 12760, pp. 231-242.
+  Tool: https://github.com/ddsmt/ddsmt
+
+  Reduces S-expression inputs hierarchically with term substitution.
+  Relation: S-expressions are a case where smin's delimiter grouping
+  recovers the full syntax tree, so ddSMT is a useful comparison point.
+
+
+6. Generic and grammar-free tools
+---------------------------------
+
+6.1 delta, multidelta, and topformflat
+
+  Daniel S. Wilkerson and Scott McPeak.  delta (2003-2006).
+  https://github.com/dsw/delta
+  Debian package "delta" (singledelta, multidelta, topformflat).
+
+  delta is a line-based ddmin implementation.  topformflat reformats C
+  code so that each line corresponds to a construct at a chosen brace
+  nesting depth; multidelta runs delta repeatedly with increasing
+  topformflat depth, giving a crude hierarchical reduction.
+
+  Relation: This is smin's own direct ancestor (by the same author):
+  topformflat's "flatten to nesting level N, then delete lines" is the
+  idea that smin generalizes into an explicit tree built from
+  delimiters, lines, and indentation, with MA2's per-depth passes
+  playing the role of multidelta's increasing levels.
+
+6.2 Lithium
+
+  Jesse Ruderman / Mozilla.  Lithium.
+  https://github.com/MozillaSecurity/lithium
+  https://squarefree.com/lithium/using.html
+
+  Line- (or character-) based reducer that removes chunks of size
+  2^k, then 2^(k-1), ..., down to 1, then repeats size-1 rounds until
+  nothing changes (giving 1-minimality).  Documents O(m lg n) tests for
+  an n-line input with an m-line result.
+
+  Relation: Lithium's power-of-two chunk schedule, working through the
+  file at each size, is essentially MA1's G = S, S/2, S/4, ... schedule
+  on a flat list (without smin's tree).  Lithium iterates to quiescence
+  at size 1; smin deliberately doesn't.
+
+6.3 halfempty
+
+  Tavis Ormandy / Google Project Zero.  halfempty.
+  https://github.com/googleprojectzero/halfempty
+
+  Bisection-based reducer for (mostly binary) fuzzer outputs that
+  speculatively tests future bisection steps in parallel ("pessimistic
+  speculative execution"), killing tests that turn out to be unneeded.
+
+  Relation: Parallelism is outside smin's current requirements, but
+  speculative parallel testing (also used by C-Reduce and Shrink Ray)
+  is the standard way to cut wall-clock time, which is smin's ultimate
+  metric.  See also David MacIver, "Auto-parallelising test-case
+  reduction," https://drmaciver.com/notebook/2018/10/auto-parallelising-test-case-reduction/
+
+6.4 structureshrink
+
+  David R. MacIver.  structureshrink.
+  https://github.com/DRMacIver/structureshrink
+
+  A research-prototype reducer for files of unknown format.  It infers
+  "structure" from frequently repeated byte n-grams, splits the input
+  at their occurrences, and deletes pieces.
+
+  Relation: Another answer to smin's question of how to get structure
+  without a grammar, using statistics rather than delimiters and
+  indentation.
+
+6.5 Shrink Ray
+
+  David R. MacIver.  Shrink Ray.  https://github.com/DRMacIver/shrinkray
+  (also on PyPI as "shrinkray").
+
+  A highly parallel, multi-format reducer combining generic passes
+  (MacIver describes bracket balancing among its heuristics) with
+  format-specific passes for C/C++, Python, JSON, and others.  Recent
+  versions add an optional local-LLM pass that proposes rewrites when
+  ordinary passes stall.
+
+  Relation: Probably the closest actively maintained tool to smin's
+  "language-agnostic with light structure" niche.  A good practical
+  comparison point.
+
+6.6 Hypothesis's internal reducer
+
+  David R. MacIver and Alastair F. Donaldson.  "Test-Case Reduction via
+  Test-Case Generation: Insights from the Hypothesis Reducer."  ECOOP
+  2020, LIPIcs 166, 13:1-13:27.
+  https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2020.13
+
+  Reduces the sequence of random choices made by a generator rather
+  than the generated test case, so every reduced case is valid by
+  construction.  Contains a useful discussion of reduction passes and
+  their ordering.
+
+  Relation: Not directly applicable (smin has no generator), but its
+  discussion of pass design, caching, and validity is relevant.
+
+
+7. LLM-assisted reduction
+-------------------------
+
+7.1 LPR
+
+  Mengxiao Zhang, Yongqiang Tian, Zhenyang Xu, Yiwen Dong, Shin Hwei
+  Tan, and Chengnian Sun.  "LPR: Large Language Models-Aided Program
+  Reduction."  ISSTA 2024.  DOI 10.1145/3650212.3652126.
+  https://arxiv.org/abs/2312.13064
+
+  Alternates Perses with LLM-proposed semantic transformations (e.g.,
+  inlining, simplifying), getting results smaller than Vulcan's in
+  less time on C, Rust, and JavaScript.
+
+  Relation: As with Vulcan and T-Rec, a post-pass that could follow
+  smin's structural reduction.  Shrink Ray (6.5) has a similar mode.
+
+
+8. Robust structure recovery
+----------------------------
+
+8.1 Island grammars
+
+  Leon Moonen.  "Generating Robust Parsers Using Island Grammars."
+  WCRE 2001, pp. 13-22.  DOI 10.1109/WCRE.2001.957806.
+  https://ir.cwi.nl/pub/4325/04325D.pdf
+
+  Parses only the constructs of interest ("islands") precisely and
+  absorbs everything else ("water") with liberal rules, giving parsers
+  that tolerate errors, dialects, and incomplete code.
+
+  Relation: smin-requirements.txt asks that structure deduction be
+  robust and "never outright reject an input."  Island grammars are the
+  classic reverse-engineering answer to that requirement; smin's
+  delimiter/indentation heuristics are an even more liberal version
+  where essentially everything is water except delimiters.
+
+
+9. Surveys and tutorials
+------------------------
+
+9.1 Program Reduction 101
+
+  Yongqiang Tian.  Program Reduction 101 (free online book), 2026.
+  https://yqtian-se.github.io/program-reduction-101/
+
+  Covers Delta Debugging, HDD, Perses and syntax-guided reduction,
+  minimality, the "Perses family" of follow-up work, reducer
+  evaluation, and test oracles.  A good starting point for the
+  research literature, and a source of benchmarks to evaluate smin
+  against.
+
+9.2 Xu's thesis
+
+  Zhenyang Xu.  "Pushing the Limit of Language-Agnostic Program
+  Reduction."  PhD thesis, University of Waterloo, 2026.
+  https://uwspace.uwaterloo.ca/items/7b74bf58-8cc2-4496-b3e6-31f9d16d7918
+
+  Collects Vulcan, T-Rec, and related work.
+
+
+Possible directions suggested by this survey
+--------------------------------------------
+
+* Evaluate smin against C-Reduce/C-Vise, Perses/Vulcan, Picireny, and
+  Shrink Ray on a shared benchmark (e.g., from the Perses/Vulcan
+  papers or Program Reduction 101), measuring both total test time
+  and result size.
+
+* Compare MA2's double/halve granularity rule with CDD (3.2), and try
+  weighting granularity by node size as in WDD (3.3).
+
+* Consider hoisting (2.2) and identifier/subtree replacement (2.5)
+  as additional candidate replacements.
+
+* Consider sub-token reduction (2.6) as a final pass.
+
+* Consider explicit declaration-reference dependencies (4.1, 4.2) as a
+  more principled alternative to working backwards.
+
+* Consider speculative parallel testing (6.3) to reduce wall-clock
+  time.
+
+
+EOF
