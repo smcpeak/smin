@@ -7,6 +7,7 @@ exec python3 ../../../../t_accept.py \
     --clang \
     --before-after helper helper \
     --has-string std::cout \
-    --tsv-log hello-cpp-E-smin.tsv
+    --tsv-log log.tsv \
+    >/dev/null 2>&1
 
 # EOF
