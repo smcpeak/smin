@@ -63,23 +63,24 @@ class ParseTestCase(unittest.TestCase):
 
 class ParseTsvTest(ParseTestCase):
   def test_empty(self) -> None:
-    self.assertEqual(self.parse(""), DataSeries(self.name, 0, [], []))
+    self.assertEqual(self.parse(""), DataSeries(self.name))
 
   def test_well_formed(self) -> None:
     text = (row("100.5", "10") +
             row("100.75", "6") +
             row("101.000000001", "6"))
-    self.assertEqual(self.parse(text), DataSeries(self.name, 3, [
+    self.assertEqual(self.parse(text), DataSeries(self.name, num_rows=3,
+                                                  points=[
       (Decimal(0), 10),
       (Decimal("0.25"), 6),
       # The difference is exact.
       (Decimal("0.500000001"), 6),
     ]))
 
-  def test_rejected_rows_ignored(self) -> None:
-    # Only a verdict of exactly "TRUE" is accepted.  The reltime is
-    # measured from the first accepted row, and the ignored rows still
-    # count toward the total.
+  def test_rejected_rows_not_plotted(self) -> None:
+    # Only a verdict of exactly "TRUE" is plotted.  But the reltime is
+    # measured from the first well-formed row, whatever its verdict, and
+    # rows with other verdicts are not malformed.
     text = (row("99.0", "12", "FALSE") +
             row("100.0", "10") +
             row("100.5", "8", "FALSE") +
@@ -87,13 +88,14 @@ class ParseTsvTest(ParseTestCase):
             row("101.5", "9", "maybe") +
             row("102.0", "7"))
     self.assertEqual(self.parse(text), DataSeries(
-      self.name, 6, [(Decimal(0), 10), (Decimal(2), 7)]))
+      self.name, num_rows=6,
+      points=[(Decimal(1), 10), (Decimal(3), 7)]))
 
   def test_integer_timestamp(self) -> None:
     self.assertEqual(self.parse(row("7", "1") + row("9", "0")), DataSeries(
-      self.name, 2, [(Decimal(0), 1), (Decimal(2), 0)]))
+      self.name, num_rows=2, points=[(Decimal(0), 1), (Decimal(2), 0)]))
 
-  def test_malformed_rows_ignored(self) -> None:
+  def test_malformed_rows(self) -> None:
     text = (
       # Too few fields.
       "100.0\tTRUE\n" +
@@ -107,31 +109,39 @@ class ParseTsvTest(ParseTestCase):
       row("101.5", "8") +
       row("102.5", "7"))
 
-    # The reltime is measured from the first well-formed row, and the
-    # ignored rows still count toward the total.
+    # Malformed rows are counted, but otherwise ignored, so the reltime
+    # is measured from the first well-formed row.
     self.assertEqual(self.parse(text), DataSeries(
-      self.name, 10, [(Decimal(0), 8), (Decimal(1), 7)]))
+      self.name, num_rows=10, num_malformed_rows=8,
+      points=[(Decimal(0), 8), (Decimal(1), 7)]))
+
+  def test_malformed_rejected_row(self) -> None:
+    # A malformed row is counted as such whatever its verdict.
+    text = row("x", "10", "FALSE") + row("1.0", "9")
+    self.assertEqual(self.parse(text), DataSeries(
+      self.name, num_rows=2, num_malformed_rows=1,
+      points=[(Decimal(0), 9)]))
 
   def test_other_columns_not_validated(self) -> None:
     text = "5.0\tTRUE\t3\tN\tS\tP\tPm\tF\tR\n"
-    self.assertEqual(self.parse(text),
-                     DataSeries(self.name, 1, [(Decimal(0), 3)]))
+    self.assertEqual(self.parse(text), DataSeries(
+      self.name, num_rows=1, points=[(Decimal(0), 3)]))
 
   def test_three_fields_enough(self) -> None:
     # The initial test's row has no progress fields.
     self.assertEqual(self.parse("5.0\tTRUE\t30\n" + row("6.0", "20")),
-                     DataSeries(self.name, 2,
-                                [(Decimal(0), 30), (Decimal(1), 20)]))
+                     DataSeries(self.name, num_rows=2,
+                                points=[(Decimal(0), 30), (Decimal(1), 20)]))
 
   def test_extra_fields_allowed(self) -> None:
     self.assertEqual(self.parse(row("5.0", "3").rstrip("\n") + "\textra\n"),
-                     DataSeries(self.name, 1, [(Decimal(0), 3)]))
+                     DataSeries(self.name, num_rows=1,
+                                points=[(Decimal(0), 3)]))
 
   def test_no_final_newline(self) -> None:
     self.assertEqual(self.parse(row("5.0", "3") + row("6.0", "2").rstrip()),
-                     DataSeries(self.name, 2,
-                                [(Decimal(0), 3), (Decimal(1), 2)]))
-
+                     DataSeries(self.name, num_rows=2,
+                                points=[(Decimal(0), 3), (Decimal(1), 2)]))
 
 
 class ParseTsvFileTest(unittest.TestCase):
@@ -147,19 +157,21 @@ class ParseTsvFileTest(unittest.TestCase):
   def test_read(self) -> None:
     self.path.write_text(prow("5.0", "3", "1") + prow("6.0", "2", "2"))
     self.assertEqual(parse_tsv(str(self.path), PASS_COL), DataSeries(
-      str(self.path), 2,
-      [(Decimal(0), 3), (Decimal(1), 2)],
-      [(Decimal(0), 3, "1"), (Decimal(1), 2, "2")]))
+      str(self.path), num_rows=2,
+      points=[(Decimal(0), 3), (Decimal(1), 2)],
+      pass_changes=[(Decimal(0), 3, "1"), (Decimal(1), 2, "2")]))
 
   def test_missing_file(self) -> None:
     with self.assertRaises(OSError):
       parse_tsv(str(self.path))
 
   def test_invalid_utf8(self) -> None:
-    # Malformed UTF-8 is replaced rather than causing an error.
+    # Malformed UTF-8 is replaced rather than causing an error.  Here,
+    # it makes a malformed row.
     self.path.write_bytes(b"\xff\n" + row("5.0", "3").encode())
-    self.assertEqual(parse_tsv(str(self.path)),
-                     DataSeries(str(self.path), 2, [(Decimal(0), 3)]))
+    self.assertEqual(parse_tsv(str(self.path)), DataSeries(
+      str(self.path), num_rows=2, num_malformed_rows=1,
+      points=[(Decimal(0), 3)]))
 
 
 class ParseTsvPassColTest(ParseTestCase):
@@ -183,39 +195,65 @@ class ParseTsvPassColTest(ParseTestCase):
   def test_rows_without_column(self) -> None:
     # Rows lacking the column, like the initial test's, are skipped, and
     # do not affect what the most recent value was.  They do still set
-    # the origin of reltime.
+    # the origin of reltime and the accepted size.
     text = ("100.0\tTRUE\t60\n" +
             prow("101.0", "50", "1") +
             "102.0\tTRUE\t45\n" +
             prow("103.0", "40", "1") +
-            prow("104.0", "30", "2"))
+            "103.5\tTRUE\t35\n" +
+            prow("104.0", "30", "2", "FALSE"))
     self.assertEqual(self.parse(text, PASS_COL).pass_changes, [
       (Decimal("1.0"), 50, "1"),
-      (Decimal("4.0"), 30, "2"),
+      (Decimal("4.0"), 35, "2"),
     ])
 
-  def test_whole_series(self) -> None:
-    # The points and row count are the same as without a pass column.
+  def test_change_on_rejected_row(self) -> None:
+    # The change is marked at the rejected row's reltime, but with the
+    # most recently accepted size, which is where the plotted line is.
+    text = (prow("100.0", "50", "1") +
+            prow("101.0", "45", "1", "FALSE") +
+            prow("102.0", "40", "1") +
+            prow("103.0", "35", "2", "FALSE") +
+            prow("104.0", "38", "2", "FALSE") +
+            prow("105.0", "30", "2"))
+    self.assertEqual(self.parse(text, PASS_COL), DataSeries(
+      self.name, num_rows=6,
+      points=[(Decimal("0.0"), 50), (Decimal("2.0"), 40),
+              (Decimal("5.0"), 30)],
+      pass_changes=[(Decimal("0.0"), 50, "1"), (Decimal("3.0"), 40, "2")]))
+
+  def test_points_unaffected(self) -> None:
+    # The points and row counts are the same as without a pass column.
     text = (prow("100.0", "50", "1") +
             prow("101.0", "45", "2", "FALSE") +
-            prow("102.0", "40", "2"))
-    self.assertEqual(self.parse(text, PASS_COL), DataSeries(
-      self.name, 3,
-      [(Decimal("0.0"), 50), (Decimal("2.0"), 40)],
-      [(Decimal("0.0"), 50, "1"), (Decimal("2.0"), 40, "2")]))
-    self.assertEqual(self.parse(text, PASS_COL).points,
-                     self.parse(text).points)
-
-  def test_ignored_rows(self) -> None:
-    # Rejected and malformed rows are ignored entirely, so the change to
-    # pass 2 is marked at its first accepted row.
-    text = (prow("100.0", "50", "1") +
-            prow("101.0", "50", "2", "FALSE") +
             prow("x", "50", "2") +
             prow("102.0", "40", "2"))
+    with_col = self.parse(text, PASS_COL)
+    without = self.parse(text)
+    self.assertEqual(with_col.points, without.points)
+    self.assertEqual(with_col.num_rows, without.num_rows)
+    self.assertEqual(with_col.num_malformed_rows,
+                     without.num_malformed_rows)
+    self.assertEqual(without.pass_changes, [])
+
+  def test_malformed_rows_ignored(self) -> None:
+    # A malformed row does not mark a change, even if it has the column.
+    text = (prow("100.0", "50", "1") +
+            prow("x", "50", "2") +
+            prow("101.0", "40", "1"))
+    self.assertEqual(self.parse(text, PASS_COL).pass_changes,
+                     [(Decimal("0.0"), 50, "1")])
+
+  def test_change_before_first_accepted(self) -> None:
+    # Before the first accepted row, there is no line to put the dot on,
+    # so the change is marked at the first accepted row instead.
+    text = (prow("100.0", "50", "1", "FALSE") +
+            prow("101.0", "45", "2", "FALSE") +
+            prow("102.0", "40", "2") +
+            prow("103.0", "35", "3", "FALSE"))
     self.assertEqual(self.parse(text, PASS_COL).pass_changes, [
-      (Decimal("0.0"), 50, "1"),
       (Decimal("2.0"), 40, "2"),
+      (Decimal("3.0"), 40, "3"),
     ])
 
   def test_any_value(self) -> None:
@@ -242,7 +280,8 @@ class ParseTsvPassColTest(ParseTestCase):
 def series(tsv_name: str, points: list[tuple[Decimal, int]],
            pass_changes: list[PassChange] | None = None) -> DataSeries:
   """A `DataSeries` for `tsv_name` with `points` and `pass_changes`."""
-  return DataSeries(tsv_name, len(points), points, pass_changes or [])
+  return DataSeries(tsv_name, num_rows=len(points), points=points,
+                    pass_changes=pass_changes or [])
 
 
 class MakeScriptTest(unittest.TestCase):
@@ -381,8 +420,7 @@ class MainTest(unittest.TestCase):
     return code
 
   def summary_line(self) -> str:
-    return (f"{self.tsv_path} has 2 rows of well-formed data out of "
-            f"3 rows in total.\n")
+    return f"{self.tsv_path} has 3 rows (a=2, m=1).\n"
 
   def waiting_line(self) -> str:
     return "Per --show, running gnuplot and waiting for it ...\n"
@@ -434,7 +472,7 @@ class MainTest(unittest.TestCase):
     # One summary line per file, in command line order, with paths.
     self.assertEqual(self.out,
       self.summary_line() +
-      f"{other} has 3 rows of well-formed data out of 3 rows in total.\n")
+      f"{other} has 3 rows (a=3, m=0).\n")
 
     # Each file's reltime is measured from its own first timestamp, and
     # its label has no path information.
@@ -524,6 +562,8 @@ class MainTest(unittest.TestCase):
     self.assertEqual(self.out, "")
 
   def test_pass_col(self) -> None:
+    # The change to pass 2 happens on a rejected row, so it is marked at
+    # that row's time with the previously accepted size.
     tsv = self.dir / "passes.tsv"
     tsv.write_text(
       "100.0\tTRUE\t60\n" +
@@ -535,7 +575,7 @@ class MainTest(unittest.TestCase):
       self.run_main(["--pass-col", str(PASS_COL), "-o", str(gp),
                      str(tsv)]), 0)
     self.assertEqual(self.out,
-      f"{tsv} has 3 rows of well-formed data out of 4 rows in total.\n")
+      f"{tsv} has 4 rows (a=3, m=0).\n")
     self.assertEqual(gp.read_text(), dedent("""
       set title 'Accepted Size vs. Time'
       set xlabel 'reltime (s)'
@@ -548,7 +588,7 @@ class MainTest(unittest.TestCase):
       EOD
       $pass1 << EOD
       1.0\t50\t1
-      3.0\t40\t2
+      2.0\t50\t2
       EOD
       set terminal wxt size 1600,800 font "Arial,20"
       set linetype 1 lw 2

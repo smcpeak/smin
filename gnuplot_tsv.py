@@ -19,11 +19,17 @@ Options:
 
   --pass-col N
 
-    Treat (1-based) column N as the "pass" column.  If a non-ignored row
-    has that column, and its value is different from its most recent
-    value (when it was present; or for its first appearance), plot a
-    single dot on top of the data line at the corresponding location,
-    and label that dot with the new value of "pass".
+    Treat (1-based) column N as the "pass" column.  If a row has that
+    column, and its value is different from its most recent value (when
+    it was present; or for its first appearance), plot a single dot on
+    top of the data line at the corresponding location, and label that
+    dot with the new value of "pass".
+
+    If the verdict is not "TRUE" when the pass changes (which is
+    typical), then the Y coordinate of the "corresponding location" is
+    the size (B) column from the most recent line that had a "TRUE"
+    verdict, as that represents the size of the *accepted* candidate at
+    that point.
 
 Behavior:
 
@@ -38,8 +44,10 @@ Behavior:
 
   A well-formed row must have properly-formatted <timestamp> and <B>
   fields.  Ignore rows that have fewer than 3 fields (more than 3 is
-  fine), or where those two are improperly formatted.  Also ignore rows
-  where the verdict is not "TRUE".
+  fine), or where those two are improperly formatted.
+
+  Do not plot rows where the verdict is not "TRUE".  But a row with a
+  "FALSE" verdict can still be used to mark a pass change.
 
   Each <tsvfile> contributes its own data line, with its Y data labeled
   with the name of its <tsvfile>, omitting path information.
@@ -57,9 +65,11 @@ Behavior:
   After generating the gnuplot script in memory, write to stdout one
   line for each <tsvfile>:
 
-    <tsvfile> has <n> rows of well-formed data out of <t> rows in total.
+    <tsvfile> has <t> rows (a=<a>, m=<m>).
 
-  (where <tsvfile> does include its path info).
+  where <tsvfile> does include its path info, <a> is the number of
+  rows where the verdict is "TRUE", and <m> is the number of rows that
+  were malformed (too few columns, or malformed timestamp or size).
 
   If --show, print:
 
@@ -112,6 +122,10 @@ class DataSeries:
   # Total number of rows in the file.
   num_rows: int = 0
 
+  # Number of rows that are malformed: too few columns, or a malformed
+  # timestamp or size.  These rows are otherwise ignored.
+  num_malformed_rows: int = 0
+
   # Points to plot as a stepped line, as (reltime, B) pairs, showing
   # where the input file was successfully reduced in size.
   #
@@ -162,8 +176,8 @@ def main(argv: list[str]) -> int:
   script = make_script(series)
 
   for ds in series:
-    print(f"{ds.tsv_name} has {len(ds.points)} rows of well-formed data "
-          f"out of {ds.num_rows} rows in total.")
+    print(f"{ds.tsv_name} has {ds.num_rows} rows "
+          f"(a={len(ds.points)}, m={ds.num_malformed_rows}).")
 
   if args.output is not None:
     with open(args.output, "w", encoding="utf-8") as f:
@@ -212,42 +226,38 @@ def parse_tsv_text(
   data.
 
   The points are the (reltime, B) pairs of the well-formed rows with a
-  "TRUE" verdict.
+  "TRUE" verdict.  reltime is measured from the first well-formed row,
+  whatever its verdict.
 
-  If `pass_col` is not None, the pass changes are the points among those
-  same rows where the value in (1-based) column `pass_col` differs from
-  its most recent value, or appears for the first time.  Rows that lack
-  that column are skipped for this purpose.
-
-  Rationale for ignoring false verdicts: Although a pass change can (and
-  often does) occur on a false verdict, and hence it's tempting to plot
-  that, the size is wrong in that case (since it's the size of a
-  non-accepted candidate).  The current approach delays the pass marker
-  to keep it on the line.
+  If `pass_col` is not None, the pass changes are the well-formed rows,
+  with any verdict, where the value in (1-based) column `pass_col`
+  differs from its most recent value, or appears for the first time.
+  Rows that lack that column are skipped for this purpose.  Each change
+  is placed at its row's reltime, but with the most recently accepted
+  size, so it is on the plotted line.  A change before the first
+  accepted row has no such size, so it is instead marked at that row.
   """
   ds = DataSeries(tsv_name)
 
-  # Timestamp of the first well-formed, accepted row.
+  # Timestamp of the first well-formed row.
   first: Optional[Decimal] = None
 
-  # Most recent value of the pass column, if any.
+  # Size from the most recent well-formed row with a "TRUE" verdict.
+  accepted_size: Optional[int] = None
+
+  # Most recent value of the pass column that has been marked, if any.
   prev_pass: Optional[str] = None
 
   for row in text.splitlines():
     ds.num_rows += 1
 
-    # Require sufficient columns.
+    # Require sufficient columns, and well-formed time and size.
     fields = row.split("\t")
-    if len(fields) < _NUM_COLUMNS:
-      continue
-
-    # Get time and size; and require a true verdict (since otherwise the
-    # size is of a non-accepted candidate, which does not tell us much).
-    timestamp = fields[_TIMESTAMP_COL]
-    size = fields[_SIZE_COL]
+    timestamp = fields[_TIMESTAMP_COL] if len(fields) >= _NUM_COLUMNS else ""
+    size = fields[_SIZE_COL] if len(fields) >= _NUM_COLUMNS else ""
     if not (_TIMESTAMP_RE.fullmatch(timestamp) and
-            _SIZE_RE.fullmatch(size) and
-            fields[_VERDICT_COL] == "TRUE"):
+            _SIZE_RE.fullmatch(size)):
+      ds.num_malformed_rows += 1
       continue
 
     # Compute "reltime" by subtracting the first time we saw.  (Using
@@ -256,15 +266,23 @@ def parse_tsv_text(
     t = Decimal(timestamp)
     if first is None:
       first = t
-    point = (t - first, int(size))
-    ds.points.append(point)
+    reltime = t - first
 
-    # If requested, determine where the pass changes occur (except we
-    # don't notice until a verdict is true).
-    if pass_col is not None and len(fields) >= pass_col:
+    # Only accepted candidates are plotted, since otherwise the size is
+    # of a non-accepted candidate, which does not tell us much.
+    if fields[_VERDICT_COL] == "TRUE":
+      accepted_size = int(size)
+      ds.points.append((reltime, accepted_size))
+
+    # If requested, determine where the pass changes occur.  Typically
+    # that is on a rejected row, but the dot goes on the line, at the
+    # accepted size.
+    if (pass_col is not None and
+        len(fields) >= pass_col and
+        accepted_size is not None):
       value = fields[pass_col - 1]
       if value != prev_pass:
-        ds.pass_changes.append((*point, value))
+        ds.pass_changes.append((reltime, accepted_size, value))
         prev_pass = value
 
   return ds
