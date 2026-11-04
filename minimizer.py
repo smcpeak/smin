@@ -8,6 +8,7 @@ See minimization-algorithm.txt.
 from __future__ import annotations
 
 import hashlib
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Optional
@@ -97,8 +98,14 @@ class _AffectedByteRange:
   abr_stop: Optional[int]
 
 
-class Minimizer:
-  """Minimize a token tree w.r.t. a given acceptance test."""
+class Minimizer(ABC):
+  """
+  Minimize a token tree w.r.t. a given acceptance test.
+
+  This is an abstract class.  Concrete subclasses provide the details of
+  the minimization procedure.  They are implemented in modules with
+  names starting with "ma_".
+  """
 
   # ---- Input ----
   # The root of the token tree representing the original input.
@@ -109,6 +116,8 @@ class Minimizer:
   max_passes: Optional[int]
 
   # True to use Minimization Algorithm 2 (MA2) rather than MA1.
+  #
+  # TODO: Remove this field once I have two subclasses.
   use_ma2_alg: bool
 
   # ---- Primary input and output callback ----
@@ -258,26 +267,14 @@ class Minimizer:
     }
 
 
+  @abstractmethod
   def _total_num_passes(self) -> int:
     """
     Return the total number of passes to run.  This is used for the
     progress reports.  Specific algorithms might also use it to control
     their outer loop.
     """
-
-    ret: int
-
-    if self.use_ma2_alg:
-      # MA2 makes one pass per level of the tree.
-      ret = self.tree_root.depth()
-    else:
-      # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
-      ret = len(self.tokens).bit_length()
-
-    if self.max_passes is not None:
-      ret = min(ret, self.max_passes)
-
-    return ret
+    pass
 
 
   def run_minimizer(self) -> AcceptanceTestResult:
@@ -302,17 +299,12 @@ class Minimizer:
     return AcceptanceTestResult.ACCEPT
 
 
+  @abstractmethod
   def _run_specific_minimizer(self) -> None:
     """
     Run the particular minimizer algorithm specified by the user.
     """
-    # For the moment, the algorithms still share an outer loop.
-    for k in range(self._total_num_passes()):
-      self.pass_index = k
-      if self.use_ma2_alg:
-        self._ma2_min_node(self.tree_root, k+1)
-      else:
-        self._minimize_node(self.tree_root)
+    pass
 
 
   def get_minimized_test_input(self) -> bytes:
@@ -742,15 +734,14 @@ class Minimizer:
     )
 
 
+  @abstractmethod
   def _get_cur_granularity(self) -> float:
     """
     Return the current algorithm granularity for inclusion in the
     progress report for the acceptance test we are about to perform.
     The exact meaning depends on which algorithm is in use.
     """
-    return (
-      float(self.ma2_granularity) if self.use_ma2_alg
-      else len(self.tokens) / (1 << self.pass_index))
+    pass
 
 
 class _StopMinimization(Exception):

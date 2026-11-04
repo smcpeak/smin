@@ -10,6 +10,7 @@ from collections.abc import Callable
 
 from acceptance_test_result import AcceptanceTestResult
 from build_tree import build_tree
+from ma_ma1 import MA1Minimizer
 from minimizer import (
   Minimizer,
   NTReplacementFunc,
@@ -99,7 +100,7 @@ class Recorder:
     nt: NTReplacementFunc = no_replacement,
     should_stop: StopQueryFunc | None = None,
   ) -> Minimizer:
-    self.minimizer = Minimizer(
+    self.minimizer = MA1Minimizer(
       tree_root                   = root,
       max_passes                  = max_passes,
       test_acceptance             = self.test,

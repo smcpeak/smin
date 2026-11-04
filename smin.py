@@ -41,6 +41,7 @@ from typing import Optional
 from acceptance_test_result import AcceptanceTestResult
 from build_tree import build_tree
 from check_accept import CheckAccept
+from ma_ma1 import MA1Minimizer
 from minimizer import Minimizer
 from start_report import TestStartReport
 from lang_cpp import CPPLanguage
@@ -339,7 +340,7 @@ def main(argv: list[str]) -> int:
     def time_limit_reached() -> bool:
       return deadline is not None and time.monotonic() >= deadline
 
-    minimizer = Minimizer(
+    minimizer = MA1Minimizer(
       tree_root                   = tree,
       max_passes                  = args.max_passes,
       use_ma2_alg                 = args.ma2,
