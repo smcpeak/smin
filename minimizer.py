@@ -103,9 +103,15 @@ class Minimizer(ABC):
   """
   Minimize a token tree w.r.t. a given acceptance test.
 
-  This is an abstract class.  Concrete subclasses provide the details of
-  the minimization procedure.  They are implemented in modules with
-  names starting with "ma_".
+  This is an abstract class.  Concrete subclasses provide the core of
+  the minimization procedure, specifically, which nodes to try removing
+  and in what order.  They are implemented in modules with names
+  starting with "ma_".
+
+  This superclass provides the common infrastructure, the most important
+  parts of which are (1) holding the state about which parts of the tree
+  have been replaced (`cur_replacement`), and (2) rendering a candidate
+  input based on that information and the candidate tree replacements.
   """
 
   # ---- Input ----
@@ -443,207 +449,6 @@ class Minimizer(ABC):
                       else affected.union(child_affected))
 
     return affected
-
-
-  def _exceeds_half_granularity(self, size: int) -> bool:
-    """True if `size` > G/2."""
-    # G/2 = S / 2**(k+1), so compare using integers.
-    return (size << (self.pass_index + 1)) > len(self.tokens)
-
-  def _exceeds_granularity(self, size: int) -> bool:
-    """True if `size` > G."""
-    return (size << self.pass_index) > len(self.tokens)
-
-
-  def _minimize_node(self, parent: TTNode) -> None:
-    """
-    Try to replace the children of `parent`, recursively, scanning them
-    from last to first.
-    """
-
-    # This can only happen if the root is a token, which the structure
-    # deduction algorithm does not produce.
-    if parent.token is not None:
-      return
-
-    # Range [lo, hi) of children to consider, excluding delimiters.
-    children = parent.children
-    lo, hi = (1, len(children)-1) if parent.delim_group else (0, len(children))
-
-    # Index in `children` of the next node to process.  It walks the
-    # list backwards.
-    i = hi - 1
-
-    while i >= lo:
-      node = children[i]
-
-      # Skip dead nodes.
-      if id(node) in self.cur_replacement:
-        i -= 1
-        continue
-
-      size = self.node_size(node)
-
-      if self._exceeds_half_granularity(size):
-        # Case 1: Try replacing the entire node.
-        if not self._try_replace_single(node):
-          if self._exceeds_granularity(size):
-            # Case 2: Also try replacing its children.
-            self._minimize_node(node)
-        i -= 1
-        continue
-
-      # Case 3: Accumulate a run of small nodes, ending with `node`.
-      run = [node]
-      run_size = size
-      j = i - 1
-      while j >= lo:
-        prev = children[j]
-
-        # Skip dead nodes.
-        if id(prev) not in self.cur_replacement:
-          prev_size = self.node_size(prev)
-
-          # Stop accumulating if `prev` is big enough that we want to
-          # try removing it in isolation, or if adding it to the run
-          # would make that run larger than the current granularity.
-          if (self._exceeds_half_granularity(prev_size) or
-              self._exceeds_granularity(run_size + prev_size)):
-            break
-
-          run.append(prev)
-          run_size += prev_size
-
-        j -= 1
-
-      if len(run) == 1:
-        self._try_replace_single(node)
-      else:
-        # When we try removing a run, we only try the trivial
-        # replacement of an empty byte sequence.
-        self._try_candidate({id(n): b"" for n in run}, run)
-
-      # Continue with the node that stopped the run, if any.
-      i = j
-
-
-  def _get_surviving_nondelim_children(
-    self,
-    node: TTNode,
-  ) -> list[TTNode]:
-    """
-    Return the children of `node` that are not replaced, excluding the
-    delimiters if `node` is a delimiter group.
-    """
-
-    all_children: list[TTNode] = node.children
-
-    # Range of non-delimiter children.
-    lo, hi = ((1, len(all_children)-1) if node.delim_group
-              else (0, len(all_children)))
-
-    # Filter the range for having not been replaced.
-    return [
-      c
-      for c in all_children[lo:hi]
-      if id(c) not in self.cur_replacement
-    ]
-
-
-  def _ma2_min_node(self, node: TTNode, max_depth: int) -> None:
-    """
-    Try to replace the children of `node`, working backward from the
-    last, and recursing into each child found to be necessary, down to
-    `max_depth` levels below `node`.  This is `ma2_min_node` in the
-    spec, "Minimization Algorithm 2".
-    """
-
-    # This can only happen if the root is a token, which the structure
-    # deduction algorithm does not produce, or in a recursive call for a
-    # leaf, which has no children anyway.
-    if node.token is not None:
-      return
-
-    # The surviving children, excluding delimiters.
-    children: list[TTNode] = self._get_surviving_nondelim_children(node)
-
-    # Number of children we are currently trying to remove at once.  If
-    # `node` is not a delimiter group, removing all of its children is
-    # the same as removing `node`, which the caller just tried, so start
-    # with half.  Clamp to 1 so a lone surviving child is still tried.
-    granularity: int = (
-      len(children) if node.delim_group else len(children) // 2)
-    granularity = max(1, granularity)
-
-    # Number of children in scope for removal.  Those at or beyond this
-    # index in `children` are deemed necessary (for this call).
-    limit: int = len(children)
-
-    while limit > 0:
-      # Try removing the last `granularity` children in scope.
-      self.ma2_granularity = granularity
-      run: list[TTNode] = children[limit-granularity : limit]
-      if self._try_candidate({id(n): b"" for n in run}, run):
-        # Removing `run` worked.  `_try_candidate` marked the nodes as
-        # replaced in the tree, but we need to update our local list.
-        del children[limit-granularity : limit]
-
-        # Move the limit to reflect the shortened list.
-        limit -= granularity
-
-        # Increase the granularity.  If we succeeded at removing
-        # something, we might be able to remove in bigger amounts,
-        # since, usually, most of text is removable.
-        granularity = min(2 * granularity, limit)
-        continue
-
-      if granularity > 1:
-        # Removing `run` did not work.  Try removing less at once.
-        granularity //= 2
-        continue
-
-      # We failed to remove `c` by itself (when using a trivial
-      # replacement).
-      c: TTNode = run[0]
-
-      # Try a non-trivial replacement.
-      replacement = self.get_non_trivial_replacement(c)
-      if replacement and self._try_candidate({id(c): replacement}, [c]):
-        # Keep `granularity` at 1 since `c` required individualized
-        # attention, so its neighbor might too.
-        del children[limit-1]
-        limit -= 1
-        continue
-
-      # We could not remove `c`, so we hereby regard it as necessary, at
-      # least until we revisit `node` in a later pass.
-      limit -= 1
-
-      # Now try to reduce its children before moving to siblings.
-      #
-      # This is one of the key changes in MA2: In later passes, we
-      # persistently try to reduce nodes near the end before moving
-      # toward the beginning.  This is because removing even one small
-      # piece near the end could unlock many deletions higher up, so
-      # it's worth spending more time here.
-      if max_depth > 1:
-        self._ma2_min_node(c, max_depth-1)
-
-
-  def _try_replace_single(self, node: TTNode) -> bool:
-    """
-    Try replacing `node` with the empty sequence, then, if that fails,
-    with its non-trivial replacement, if any.  Return True if either
-    was accepted.
-    """
-    if self._try_candidate({id(node): b""}, [node]):
-      return True
-
-    replacement = self.get_non_trivial_replacement(node)
-    if replacement:
-      return self._try_candidate({id(node): replacement}, [node])
-
-    return False
 
 
   def _try_candidate(
