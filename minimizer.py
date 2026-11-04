@@ -261,7 +261,8 @@ class Minimizer:
   def _total_num_passes(self) -> int:
     """
     Return the total number of passes to run.  This is used for the
-    progress reports and to control the algorithm outer loop.
+    progress reports.  Specific algorithms might also use it to control
+    their outer loop.
     """
 
     ret: int
@@ -294,16 +295,24 @@ class Minimizer:
     self.minimizer_invoked = True
 
     try:
-      for k in range(self._total_num_passes()):
-        self.pass_index = k
-        if self.use_ma2_alg:
-          self._ma2_min_node(self.tree_root, k+1)
-        else:
-          self._minimize_node(self.tree_root)
+      self._run_specific_minimizer()
     except _StopMinimization as e:
       return e.result
 
     return AcceptanceTestResult.ACCEPT
+
+
+  def _run_specific_minimizer(self) -> None:
+    """
+    Run the particular minimizer algorithm specified by the user.
+    """
+    # For the moment, the algorithms still share an outer loop.
+    for k in range(self._total_num_passes()):
+      self.pass_index = k
+      if self.use_ma2_alg:
+        self._ma2_min_node(self.tree_root, k+1)
+      else:
+        self._minimize_node(self.tree_root)
 
 
   def get_minimized_test_input(self) -> bytes:
