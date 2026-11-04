@@ -70,7 +70,7 @@ class Recorder:
     self.starts: list[TestStartReport] = []
     self.finishes: list[tuple[AcceptanceTestResult, bool]] = []
 
-    # The minimizer made by `make_minimizer`.
+    # The minimizer made by `mk_minimizer`.
     self.minimizer: Minimizer | None = None
 
   def test(self, data: bytes, report: TestStartReport) -> AcceptanceTestResult:
@@ -92,7 +92,7 @@ class Recorder:
       return INTERRUPTED
     return ACCEPT if self.accept(data) else REJECT
 
-  def make_minimizer(
+  def mk_minimizer(
     self,
     root: TTNode,
     *,
@@ -101,6 +101,12 @@ class Recorder:
     nt: NTReplacementFunc = no_replacement,
     should_stop: StopQueryFunc | None = None,
   ) -> Minimizer:
+    """
+    Build a Minimizer object for testing.
+
+    This function is called "mk_minimizer" to avoid using the same name
+    as the global make_minimizer.
+    """
     alg_kind = (
       MinimizationAlgorithmKind.MA2 if use_ma2_alg
       else MinimizationAlgorithmKind.MA1)
@@ -127,7 +133,7 @@ class RenderCandidateTest(unittest.TestCase):
     node with that text by the corresponding value.
     """
     root = build_tree(tokenize_cpp(src))
-    m = Recorder(lambda d: True).make_minimizer(root)
+    m = Recorder(lambda d: True).mk_minimizer(root)
     extra = {id(find_node(root, k)): v for k, v in replace.items()}
     return m.render_candidate(extra)
 
@@ -141,7 +147,7 @@ class RenderCandidateTest(unittest.TestCase):
     None if there is none.
     """
     root = build_tree(tokenize_cpp(src))
-    m = Recorder(lambda d: True).make_minimizer(root)
+    m = Recorder(lambda d: True).mk_minimizer(root)
     extra = {id(find_node(root, k)): v for k, v in replace.items()}
     r = m.render_candidate_with_range(extra)[1]
     return None if r is None else (r.start, r.stop)
@@ -298,7 +304,7 @@ class ReportCheckingTestCase(unittest.TestCase):
 class MinimizerTest(ReportCheckingTestCase):
   def test_empty_input(self) -> None:
     rec = Recorder(lambda d: True)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(b"")))
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(b"")))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"")
     self.assertEqual(rec.tested, [])
@@ -307,7 +313,7 @@ class MinimizerTest(ReportCheckingTestCase):
     # The first candidate removes every child of the root, at which
     # point minimization stops.
     rec = Recorder(lambda d: True)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(b"a b c")))
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(b"a b c")))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"")
     self.assertEqual(rec.tested, [b""])
@@ -315,7 +321,7 @@ class MinimizerTest(ReportCheckingTestCase):
 
   def test_keep_one_identifier(self) -> None:
     rec = Recorder(lambda d: b"keep" in d)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(
       b"int a;\nint keep;\nint b;\n")))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"\nkeep\n")
@@ -327,7 +333,7 @@ class MinimizerTest(ReportCheckingTestCase):
   def test_max_passes(self) -> None:
     src = b"int a;\nint keep;\nint b;\n"
     rec = Recorder(lambda d: b"keep" in d)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(src)), max_passes=2)
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)), max_passes=2)
     self.assertEqual(m._total_num_passes(), 2)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"\nint keep;\n")
@@ -336,7 +342,7 @@ class MinimizerTest(ReportCheckingTestCase):
 
     # A limit above the usual number of passes has no effect.
     rec = Recorder(lambda d: b"keep" in d)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(src)), max_passes=5)
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)), max_passes=5)
     self.assertEqual(m._total_num_passes(), 4)
 
   def test_non_trivial_replacement(self) -> None:
@@ -348,7 +354,7 @@ class MinimizerTest(ReportCheckingTestCase):
       return None
 
     rec = Recorder(lambda d: b"keep" in d and b"f();" in d)
-    m = rec.make_minimizer(
+    m = rec.mk_minimizer(
       build_tree(tokenize_cpp(b"void f() { x; }\nint keep;\n")), nt=nt)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b" f();\nkeep\n")
@@ -356,7 +362,7 @@ class MinimizerTest(ReportCheckingTestCase):
 
   def test_interrupted(self) -> None:
     rec = Recorder(lambda d: b"keep" in d, interrupt_at=4)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(
       b"int a;\nint keep;\nint b;\n")))
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
     self.assertEqual(rec.finishes[-1], (INTERRUPTED, False))
@@ -378,7 +384,7 @@ class MinimizerTest(ReportCheckingTestCase):
     # rendering restores it.)
     src = b"a;\nb;\nc;\nd;"
     rec = Recorder(lambda d: d == src)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(src)))
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.check_reports(rec, m)
 
@@ -390,14 +396,14 @@ class MinimizerTest(ReportCheckingTestCase):
   def test_initial_input_memoized(self) -> None:
     rec = Recorder(lambda d: True)
     src = b"a;\nb;\n"
-    m = rec.make_minimizer(build_tree(tokenize_cpp(src)))
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)))
     self.assertEqual(list(m.memoized_accept.values()), [ACCEPT])
     self.assertEqual(m.render_candidate({}), src)
 
   def test_current_tok_count(self) -> None:
     rec = Recorder(lambda d: True)
     root = build_tree(tokenize_cpp(b"int a;\nint b;\n"))
-    m = rec.make_minimizer(root)
+    m = rec.mk_minimizer(root)
 
     # "int", "a", ";", "\nint", "b", ";", "\n".
     self.assertEqual(m.current_tok_count(), 7)
@@ -437,7 +443,7 @@ int main()
               d.count(b"(") == d.count(b")"))
 
     rec = Recorder(accept)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(src)))
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     result = m.get_minimized_test_input()
     self.assertTrue(accept(result))
@@ -446,7 +452,7 @@ int main()
 
   def test_run_twice_fails(self) -> None:
     rec = Recorder(lambda d: True)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(b"a")))
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(b"a")))
     m.run_minimizer()
     with self.assertRaises(AssertionError):
       m.run_minimizer()
@@ -469,7 +475,7 @@ class ShouldStopTest(unittest.TestCase):
     recorder, returns True.
     """
     rec = Recorder(accept)
-    m = rec.make_minimizer(
+    m = rec.mk_minimizer(
       build_tree(tokenize_cpp(src)),
       should_stop = lambda: should_stop(rec),
       use_ma2_alg = use_ma2_alg,
@@ -534,8 +540,8 @@ class ShouldStopTest(unittest.TestCase):
       calls.append(None)
       return True
 
-    m = rec.make_minimizer(build_tree(tokenize_cpp(self.SRC)),
-                           should_stop=should_stop)
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(self.SRC)),
+                         should_stop=should_stop)
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
     self.assertFalse(m.stop_requested)
     self.assertEqual(calls, [])
@@ -556,8 +562,8 @@ class MA2Test(ReportCheckingTestCase):
     reports, and return the recorder and minimizer.
     """
     rec = Recorder(accept)
-    m = rec.make_minimizer(build_tree(tokenize_cpp(src)), nt=nt,
-                           max_passes=max_passes, use_ma2_alg=True)
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)), nt=nt,
+                         max_passes=max_passes, use_ma2_alg=True)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertTrue(accept(m.get_minimized_test_input()))
     self.check_reports(rec, m)
@@ -682,7 +688,7 @@ class MA2Test(ReportCheckingTestCase):
 
   def test_interrupted(self) -> None:
     rec = Recorder(lambda d: b"keep" in d, interrupt_at=3)
-    m = rec.make_minimizer(
+    m = rec.mk_minimizer(
       build_tree(tokenize_cpp(b"int a;\nint keep;\nint b;\n")),
                  use_ma2_alg=True)
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
