@@ -14,7 +14,7 @@ from decimal import Decimal
 from pathlib import Path
 from unittest import mock
 
-from gnuplot_tsv import main, make_script, parse_tsv
+from gnuplot_tsv import main, make_script, parse_pass_changes, parse_tsv
 from test_util import dedent
 
 
@@ -29,6 +29,18 @@ def row(timestamp: str, size: str, verdict: str = "TRUE") -> str:
   """
   return "\t".join([timestamp, verdict, size,
                     "1", "20", "1", "2", "0", "3"]) + "\n"
+
+
+# The (1-based) column of P, the pass number, in rows made by `prow`, as
+# written by t_accept.py --tsv-log.
+PASS_COL = 6
+
+
+def prow(timestamp: str, size: str, pass_num: str,
+         verdict: str = "TRUE") -> str:
+  """Like `row`, but with `pass_num` in column `PASS_COL`."""
+  return "\t".join([timestamp, verdict, size,
+                    "1", "20", pass_num, "9", "0", "3"]) + "\n"
 
 
 class ParseTsvTest(unittest.TestCase):
@@ -100,6 +112,71 @@ class ParseTsvTest(unittest.TestCase):
                      ([(Decimal(0), 3), (Decimal(1), 2)], 2))
 
 
+class ParsePassChangesTest(unittest.TestCase):
+  def test_empty(self) -> None:
+    self.assertEqual(parse_pass_changes("", PASS_COL), [])
+
+  def test_changes(self) -> None:
+    # The first appearance counts as a change, and repeated values do
+    # not.  A value can recur after a different one.
+    text = (prow("100.0", "50", "1") +
+            prow("100.5", "40", "1") +
+            prow("101.0", "30", "2") +
+            prow("101.5", "20", "2") +
+            prow("102.0", "15", "1"))
+    self.assertEqual(parse_pass_changes(text, PASS_COL), [
+      (Decimal("0.0"), 50, "1"),
+      (Decimal("1.0"), 30, "2"),
+      (Decimal("2.0"), 15, "1"),
+    ])
+
+  def test_rows_without_column(self) -> None:
+    # Rows lacking the column, like the initial test's, are skipped, and
+    # do not affect what the most recent value was.  They do still set
+    # the origin of reltime.
+    text = ("100.0\tTRUE\t60\n" +
+            prow("101.0", "50", "1") +
+            "102.0\tTRUE\t45\n" +
+            prow("103.0", "40", "1") +
+            prow("104.0", "30", "2"))
+    self.assertEqual(parse_pass_changes(text, PASS_COL), [
+      (Decimal("1.0"), 50, "1"),
+      (Decimal("4.0"), 30, "2"),
+    ])
+
+  def test_ignored_rows(self) -> None:
+    # Rejected and malformed rows are ignored entirely, so the change to
+    # pass 2 is marked at its first accepted row.
+    text = (prow("100.0", "50", "1") +
+            prow("101.0", "50", "2", "FALSE") +
+            prow("x", "50", "2") +
+            prow("102.0", "40", "2"))
+    self.assertEqual(parse_pass_changes(text, PASS_COL), [
+      (Decimal("0.0"), 50, "1"),
+      (Decimal("2.0"), 40, "2"),
+    ])
+
+  def test_any_value(self) -> None:
+    # The value is not validated, and is compared as a string.
+    text = (prow("1", "5", "") +
+            prow("2", "4", "a b") +
+            prow("3", "3", "01") +
+            prow("4", "2", "1"))
+    self.assertEqual(parse_pass_changes(text, PASS_COL), [
+      (Decimal(0), 5, ""),
+      (Decimal(1), 4, "a b"),
+      (Decimal(2), 3, "01"),
+      (Decimal(3), 2, "1"),
+    ])
+
+  def test_other_columns(self) -> None:
+    # Any column can be used, including the required ones.
+    text = prow("1", "5", "1") + prow("2", "4", "1")
+    self.assertEqual(parse_pass_changes(text, 3),
+                     [(Decimal(0), 5, "5"), (Decimal(1), 4, "4")])
+    self.assertEqual(parse_pass_changes(text, 10), [])
+
+
 class MakeScriptTest(unittest.TestCase):
   def test_one_dataset(self) -> None:
     script = make_script([("log.tsv", [(Decimal(0), 10),
@@ -148,6 +225,59 @@ class MakeScriptTest(unittest.TestCase):
            $data3 using 1:2 with steps title 'c.tsv' noenhanced
       pause mouse close
       """))
+
+  def test_pass_changes(self) -> None:
+    # Only datasets with pass changes get a "$passN" block and a plot
+    # element, numbered to match the dataset, and placed after all of
+    # the data lines.
+    script = make_script(
+      [("a.tsv", [(Decimal(0), 10), (Decimal(2), 6)]),
+       ("b.tsv", [(Decimal(0), 7)]),
+       ("c.tsv", [(Decimal(0), 9), (Decimal(1), 8)])],
+      [[(Decimal(0), 10, "1"), (Decimal(2), 6, "2")],
+       [],
+       [(Decimal(1), 8, "x y")]])
+    self.assertEqual(script, dedent("""
+      set title 'Accepted Size vs. Time'
+      set xlabel 'reltime (s)'
+      set ylabel 'size (bytes)'
+      set datafile separator "\\t"
+      $data1 << EOD
+      0\t10
+      2\t6
+      EOD
+      $data2 << EOD
+      0\t7
+      EOD
+      $data3 << EOD
+      0\t9
+      1\t8
+      EOD
+      $pass1 << EOD
+      0\t10\t1
+      2\t6\t2
+      EOD
+      $pass3 << EOD
+      1\t8\tx y
+      EOD
+      set terminal wxt size 1600,800 font "Arial,20"
+      set linetype 1 lw 2
+      set linetype 2 lw 2
+      set linetype 3 lw 2
+      plot $data1 using 1:2 with steps title 'a.tsv' noenhanced, \\
+           $data2 using 1:2 with steps title 'b.tsv' noenhanced, \\
+           $data3 using 1:2 with steps title 'c.tsv' noenhanced, \\
+           $pass1 using 1:2:3 with labels point pt 7 lt 1 offset char 1,1 notitle noenhanced, \\
+           $pass3 using 1:2:3 with labels point pt 7 lt 3 offset char 1,1 notitle noenhanced
+      pause mouse close
+      """))
+
+  def test_no_pass_changes(self) -> None:
+    # If no dataset has pass changes, the script is the same as without
+    # them.
+    datasets = [("a.tsv", [(Decimal(0), 10)]), ("b.tsv", [])]
+    self.assertEqual(make_script(datasets, [[], []]),
+                     make_script(datasets))
 
   def test_label_quoted(self) -> None:
     script = make_script([("it's.tsv", [])])
@@ -327,6 +457,56 @@ class MainTest(unittest.TestCase):
     self.assertEqual(self.run_main([str(missing)]), 2)
     self.assertIn("cannot read", self.err)
     self.assertEqual(self.out, "")
+
+  def test_pass_col(self) -> None:
+    tsv = self.dir / "passes.tsv"
+    tsv.write_text(
+      "100.0\tTRUE\t60\n" +
+      prow("101.0", "50", "1") +
+      prow("102.0", "50", "2", "FALSE") +
+      prow("103.0", "40", "2"))
+    gp = self.dir / "plot.gp"
+    self.assertEqual(
+      self.run_main(["--pass-col", str(PASS_COL), "-o", str(gp),
+                     str(tsv)]), 0)
+    self.assertEqual(self.out,
+      f"{tsv} has 3 rows of well-formed data out of 4 rows in total.\n")
+    self.assertEqual(gp.read_text(), dedent("""
+      set title 'Accepted Size vs. Time'
+      set xlabel 'reltime (s)'
+      set ylabel 'size (bytes)'
+      set datafile separator "\\t"
+      $data1 << EOD
+      0.0\t60
+      1.0\t50
+      3.0\t40
+      EOD
+      $pass1 << EOD
+      1.0\t50\t1
+      3.0\t40\t2
+      EOD
+      set terminal wxt size 1600,800 font "Arial,20"
+      set linetype 1 lw 2
+      plot $data1 using 1:2 with steps title 'passes.tsv' noenhanced, \\
+           $pass1 using 1:2:3 with labels point pt 7 lt 1 offset char 1,1 notitle noenhanced
+      pause mouse close
+      """))
+
+  def test_pass_col_absent(self) -> None:
+    # No row has column 20, so the script has no pass changes.
+    gp = self.dir / "plot.gp"
+    self.assertEqual(
+      self.run_main(["--pass-col", "20", "-o", str(gp),
+                     str(self.tsv_path)]), 0)
+    self.assertEqual(gp.read_text(), self.EXPECTED_SCRIPT)
+
+  def test_pass_col_invalid(self) -> None:
+    for value in ["0", "-1", "x", "1.5", ""]:
+      with self.subTest(value=value):
+        self.assertEqual(
+          self.run_main(["--pass-col", value, str(self.tsv_path)]), 2)
+        self.assertIn("invalid column number", self.err)
+    self.assertEqual(self.run_main([str(self.tsv_path), "--pass-col"]), 2)
 
   def test_usage_errors(self) -> None:
     self.assertEqual(self.run_main([]), 2)

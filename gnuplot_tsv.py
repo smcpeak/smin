@@ -17,6 +17,14 @@ Options:
 
     Write the gnuplot script to the specified file.
 
+  --pass-col N
+
+    Treat (1-based) column N as the "pass" column.  If a non-ignored row
+    has that column, and its value is different from its most recent
+    value (when it was present; or for its first appearance), plot a
+    single dot on top of the data line at the corresponding location,
+    and label that dot with the new value of "pass".
+
 Behavior:
 
   Read <tsvfile>s and construct a gnuplot script in memory.
@@ -68,7 +76,9 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Iterator
 from decimal import Decimal
+from typing import Optional
 
 
 # A well-formed timestamp field: a decimal number.
@@ -84,6 +94,9 @@ _NUM_COLUMNS = 3
 _TIMESTAMP_COL = 0
 _VERDICT_COL = 1
 _SIZE_COL = 2
+
+# A point where the pass changes: (reltime, B, new pass value).
+PassChange = tuple[Decimal, int, str]
 
 
 def main(argv: list[str]) -> int:
@@ -105,6 +118,9 @@ def main(argv: list[str]) -> int:
   # and its total number of rows.
   parsed: list[tuple[list[tuple[Decimal, int]], int]] = []
 
+  # With --pass-col, the pass changes for each element of `tsv_names`.
+  pass_changes: list[list[PassChange]] = []
+
   for tsv_name in tsv_names:
     try:
       # 'errors="replace"' means malformed UTF-8 is replaced rather than
@@ -116,10 +132,13 @@ def main(argv: list[str]) -> int:
             f"{e.strerror}", file=sys.stderr)
       return 2
     parsed.append(parse_tsv(text))
+    if args.pass_col is not None:
+      pass_changes.append(parse_pass_changes(text, args.pass_col))
 
-  script = make_script([
-    (os.path.basename(tsv_name), points)
-    for tsv_name, (points, _) in zip(tsv_names, parsed, strict=True)])
+  script = make_script(
+    [(os.path.basename(tsv_name), points)
+     for tsv_name, (points, _) in zip(tsv_names, parsed, strict=True)],
+    pass_changes if args.pass_col is not None else None)
 
   for tsv_name, (points, total_rows) in zip(tsv_names, parsed, strict=True):
     print(f"{tsv_name} has {len(points)} rows of well-formed data out of "
@@ -156,11 +175,50 @@ def parse_tsv(text: str) -> tuple[list[tuple[Decimal, int]], int]:
   number of rows.
   """
   rows = text.splitlines()
+  points = [(reltime, size) for reltime, size, _ in _accepted_rows(rows)]
+  return points, len(rows)
+
+
+def parse_pass_changes(text: str, pass_col: int) -> list[PassChange]:
+  """
+  Parse `text`, the contents of a TSV file, and return the points among
+  the well-formed rows with a "TRUE" verdict where the value in (1-based)
+  column `pass_col` differs from its most recent value, or appears for
+  the first time.  Rows that lack that column are skipped.
+
+  Rationale for ignoring false verdicts: Although a pass change can (and
+  often does) occur on a false verdict, and hence it's tempting to plot
+  that, the size is wrong in that case (since it's the size of a
+  non-accepted candidate).  The current approach delays the pass marker
+  to keep it on the line.
+  """
+  changes: list[PassChange] = []
+
+  # Most recent value of the pass column, if any.
+  prev: Optional[str] = None
+
+  for reltime, size, fields in _accepted_rows(text.splitlines()):
+    if len(fields) < pass_col:
+      continue
+    value = fields[pass_col - 1]
+    if value != prev:
+      changes.append((reltime, size, value))
+      prev = value
+
+  return changes
+
+
+def _accepted_rows(
+  rows: list[str],
+) -> Iterator[tuple[Decimal, int, list[str]]]:
+  """
+  Yield (reltime, B, fields) for each row in `rows` that is well-formed
+  and has a "TRUE" verdict, where `fields` are all of its fields.
+  """
 
   # Timestamp of the first well-formed, accepted row.
   first: Decimal | None = None
 
-  points: list[tuple[Decimal, int]] = []
   for row in rows:
     fields = row.split("\t")
     if len(fields) < _NUM_COLUMNS:
@@ -177,13 +235,12 @@ def parse_tsv(text: str) -> tuple[list[tuple[Decimal, int]], int]:
     t = Decimal(timestamp)
     if first is None:
       first = t
-    points.append((t - first, int(size)))
-
-  return points, len(rows)
+    yield t - first, int(size), fields
 
 
 def make_script(
   datasets: list[tuple[str, list[tuple[Decimal, int]]]],
+  pass_changes: Optional[list[list[PassChange]]] = None,
 ) -> str:
   """
   Return a gnuplot script that plots each of `datasets`, a (label,
@@ -192,9 +249,19 @@ def make_script(
   script, and the script waits for the plot window to be closed before
   exiting.
 
+  If `pass_changes` is not None, it has one element per dataset, and
+  each of its points is drawn as a dot, labeled with the pass value, in
+  the color of that dataset's line.
+
   Requires that `datasets` is not empty.
   """
   assert datasets
+  if pass_changes is not None:
+    assert len(pass_changes) == len(datasets)
+
+  # Indices (1-based) of the datasets that have pass changes to draw.
+  pass_indices = [
+    i for i, changes in enumerate(pass_changes or [], start=1) if changes]
 
   lines = [
     "set title 'Accepted Size vs. Time'",
@@ -202,10 +269,24 @@ def make_script(
     "set ylabel 'size (bytes)'",
   ]
 
+  if pass_indices:
+    # Separate data columns only by tabs so a pass value containing
+    # spaces or quotes is still a single label.
+    lines.append('set datafile separator "\\t"')
+
   # One data block per dataset, named "$data1", "$data2", etc.
   for i, (_, points) in enumerate(datasets, start=1):
     lines.append(f"$data{i} << EOD")
     lines.extend(f"{reltime}\t{size}" for reltime, size in points)
+    lines.append("EOD")
+
+  # One block of pass changes per dataset that has any, named "$pass1",
+  # etc., with the same number as the dataset.
+  for i in pass_indices:
+    assert pass_changes is not None
+    lines.append(f"$pass{i} << EOD")
+    lines.extend(f"{reltime}\t{size}\t{value}"
+                 for reltime, size, value in pass_changes[i-1])
     lines.append("EOD")
 
   # Use a larger default size and font since I'm using a 4k monitor.
@@ -222,6 +303,15 @@ def make_script(
   plot_elements = [
     f"$data{i} using 1:2 with steps title {_quote(label)} noenhanced"
     for i, (label, _) in enumerate(datasets, start=1)]
+
+  # Each pass change is a dot in its dataset's line color, labeled with
+  # the new pass value above and to the right.  These come after all of
+  # the data lines so they do not affect the default line colors.
+  plot_elements += [
+    f"$pass{i} using 1:2:3 with labels point pt 7 lt {i} "
+    f"offset char 1,1 notitle noenhanced"
+    for i in pass_indices]
+
   lines.append("plot " + ", \\\n     ".join(plot_elements))
 
   # Tell gnuplot to wait for the user to close the plot window.
@@ -237,6 +327,18 @@ def _quote(s: str) -> str:
   return "'" + s.replace("'", "''") + "'"
 
 
+def _column_number(s: str) -> int:
+  """Parse `s` as a 1-based column number, for argparse."""
+  try:
+    n = int(s)
+  except ValueError:
+    n = 0
+  if n < 1:
+    raise argparse.ArgumentTypeError(
+      f"invalid column number: {s!r} (must be a positive integer)")
+  return n
+
+
 def _parse_command_line(argv: list[str]) -> argparse.Namespace:
   """Parse `argv`, exiting via SystemExit on error or --help."""
   parser = argparse.ArgumentParser(
@@ -249,6 +351,9 @@ def _parse_command_line(argv: list[str]) -> argparse.Namespace:
   parser.add_argument(
     "--output", "-o", metavar="FNAME.gp",
     help="Write the gnuplot script to FNAME.gp.")
+  parser.add_argument(
+    "--pass-col", metavar="N", type=_column_number,
+    help="Mark where the value in (1-based) column N changes.")
   parser.add_argument(
     "tsvfile", nargs="+",
     help="TSV file to read.  Each is plotted as its own line.")
