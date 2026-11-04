@@ -76,7 +76,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Iterator
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Optional
 
@@ -99,6 +99,42 @@ _SIZE_COL = 2
 PassChange = tuple[Decimal, int, str]
 
 
+@dataclass
+class DataSeries:
+  """
+  Data for one TSV file.
+  """
+
+  # Name of the file, as given on the command line (including any path
+  # information).
+  tsv_name: str
+
+  # Total number of rows in the file.
+  num_rows: int = 0
+
+  # Points to plot as a stepped line, as (reltime, B) pairs, showing
+  # where the input file was successfully reduced in size.
+  #
+  # The number of points is typically less than `num_rows` because it
+  # only includes data for rows whose verdict was "TRUE".
+  points: list[tuple[Decimal, int]] = field(default_factory=list)
+
+  # A point corresponding to a change in the --pass-col value.  We plot
+  # a labeled point on each one.  This is empty if --pass-col was not
+  # passed.
+  pass_changes: list[PassChange] = field(default_factory=list)
+
+
+  def series_label(self) -> str:
+    """
+    Return the label to use for this series in the gnuplot legend,
+    quoted in gnuplot syntax.
+    """
+    # We strip the path info since my current naming convention has all
+    # the info in the basename.
+    return _quote(os.path.basename(self.tsv_name))
+
+
 def main(argv: list[str]) -> int:
   """
   Parse the command line `argv` (which excludes the program name),
@@ -112,37 +148,22 @@ def main(argv: list[str]) -> int:
     # argparse exits on error (status 2) and for --help (status 0).
     return e.code if isinstance(e.code, int) else 2
 
-  tsv_names: list[str] = args.tsvfile
+  # The data for each TSV file, in command line order.
+  series: list[DataSeries] = []
 
-  # For each element of `tsv_names`, its well-formed (reltime, B) pairs
-  # and its total number of rows.
-  parsed: list[tuple[list[tuple[Decimal, int]], int]] = []
-
-  # With --pass-col, the pass changes for each element of `tsv_names`.
-  pass_changes: list[list[PassChange]] = []
-
-  for tsv_name in tsv_names:
+  for tsv_name in args.tsvfile:
     try:
-      # 'errors="replace"' means malformed UTF-8 is replaced rather than
-      # failing the decode operation, making this script more tolerant.
-      with open(tsv_name, "r", encoding="utf-8", errors="replace") as f:
-        text = f.read()
+      series.append(parse_tsv(tsv_name, args.pass_col))
     except OSError as e:
       print(f"gnuplot_tsv.py: error: cannot read {tsv_name!r}: "
             f"{e.strerror}", file=sys.stderr)
       return 2
-    parsed.append(parse_tsv(text))
-    if args.pass_col is not None:
-      pass_changes.append(parse_pass_changes(text, args.pass_col))
 
-  script = make_script(
-    [(os.path.basename(tsv_name), points)
-     for tsv_name, (points, _) in zip(tsv_names, parsed, strict=True)],
-    pass_changes if args.pass_col is not None else None)
+  script = make_script(series)
 
-  for tsv_name, (points, total_rows) in zip(tsv_names, parsed, strict=True):
-    print(f"{tsv_name} has {len(points)} rows of well-formed data out of "
-          f"{total_rows} rows in total.")
+  for ds in series:
+    print(f"{ds.tsv_name} has {len(ds.points)} rows of well-formed data "
+          f"out of {ds.num_rows} rows in total.")
 
   if args.output is not None:
     with open(args.output, "w", encoding="utf-8") as f:
@@ -168,23 +189,35 @@ def main(argv: list[str]) -> int:
   return 0
 
 
-def parse_tsv(text: str) -> tuple[list[tuple[Decimal, int]], int]:
+def parse_tsv(tsv_name: str, pass_col: Optional[int] = None) -> DataSeries:
   """
-  Parse `text`, the contents of a TSV file.  Return the (reltime, B)
-  pairs of the well-formed rows with a "TRUE" verdict, and the total
-  number of rows.
+  Read and parse the TSV file `tsv_name`, and return its data, as
+  described for `parse_tsv_text`.  Raise OSError if it cannot be read.
   """
-  rows = text.splitlines()
-  points = [(reltime, size) for reltime, size, _ in _accepted_rows(rows)]
-  return points, len(rows)
+  # 'errors="replace"' means malformed UTF-8 is replaced rather than
+  # failing the decode operation, making this script more tolerant.
+  with open(tsv_name, "r", encoding="utf-8", errors="replace") as f:
+    text = f.read()
+
+  return parse_tsv_text(tsv_name, text, pass_col)
 
 
-def parse_pass_changes(text: str, pass_col: int) -> list[PassChange]:
+def parse_tsv_text(
+  tsv_name: str,
+  text: str,
+  pass_col: Optional[int] = None,
+) -> DataSeries:
   """
-  Parse `text`, the contents of a TSV file, and return the points among
-  the well-formed rows with a "TRUE" verdict where the value in (1-based)
-  column `pass_col` differs from its most recent value, or appears for
-  the first time.  Rows that lack that column are skipped.
+  Parse `text`, the contents of the TSV file `tsv_name`, and return its
+  data.
+
+  The points are the (reltime, B) pairs of the well-formed rows with a
+  "TRUE" verdict.
+
+  If `pass_col` is not None, the pass changes are the points among those
+  same rows where the value in (1-based) column `pass_col` differs from
+  its most recent value, or appears for the first time.  Rows that lack
+  that column are skipped for this purpose.
 
   Rationale for ignoring false verdicts: Although a pass change can (and
   often does) occur on a false verdict, and hence it's tempting to plot
@@ -192,37 +225,24 @@ def parse_pass_changes(text: str, pass_col: int) -> list[PassChange]:
   non-accepted candidate).  The current approach delays the pass marker
   to keep it on the line.
   """
-  changes: list[PassChange] = []
-
-  # Most recent value of the pass column, if any.
-  prev: Optional[str] = None
-
-  for reltime, size, fields in _accepted_rows(text.splitlines()):
-    if len(fields) < pass_col:
-      continue
-    value = fields[pass_col - 1]
-    if value != prev:
-      changes.append((reltime, size, value))
-      prev = value
-
-  return changes
-
-
-def _accepted_rows(
-  rows: list[str],
-) -> Iterator[tuple[Decimal, int, list[str]]]:
-  """
-  Yield (reltime, B, fields) for each row in `rows` that is well-formed
-  and has a "TRUE" verdict, where `fields` are all of its fields.
-  """
+  ds = DataSeries(tsv_name)
 
   # Timestamp of the first well-formed, accepted row.
-  first: Decimal | None = None
+  first: Optional[Decimal] = None
 
-  for row in rows:
+  # Most recent value of the pass column, if any.
+  prev_pass: Optional[str] = None
+
+  for row in text.splitlines():
+    ds.num_rows += 1
+
+    # Require sufficient columns.
     fields = row.split("\t")
     if len(fields) < _NUM_COLUMNS:
       continue
+
+    # Get time and size; and require a true verdict (since otherwise the
+    # size is of a non-accepted candidate, which does not tell us much).
     timestamp = fields[_TIMESTAMP_COL]
     size = fields[_SIZE_COL]
     if not (_TIMESTAMP_RE.fullmatch(timestamp) and
@@ -230,38 +250,42 @@ def _accepted_rows(
             fields[_VERDICT_COL] == "TRUE"):
       continue
 
-    # Using `Decimal` keeps the difference exact, so the script shows
-    # the same digits as the TSV.
+    # Compute "reltime" by subtracting the first time we saw.  (Using
+    # `Decimal` keeps the difference exact, so the script shows the same
+    # digits as the TSV.)
     t = Decimal(timestamp)
     if first is None:
       first = t
-    yield t - first, int(size), fields
+    point = (t - first, int(size))
+    ds.points.append(point)
+
+    # If requested, determine where the pass changes occur (except we
+    # don't notice until a verdict is true).
+    if pass_col is not None and len(fields) >= pass_col:
+      value = fields[pass_col - 1]
+      if value != prev_pass:
+        ds.pass_changes.append((*point, value))
+        prev_pass = value
+
+  return ds
 
 
-def make_script(
-  datasets: list[tuple[str, list[tuple[Decimal, int]]]],
-  pass_changes: Optional[list[list[PassChange]]] = None,
-) -> str:
+def make_script(datasets: list[DataSeries]) -> str:
   """
-  Return a gnuplot script that plots each of `datasets`, a (label,
-  points) pair where `points` are (reltime, B) pairs, as its own line
-  labeled with `label` in the legend.  The data is embedded in the
+  Return a gnuplot script that plots each of `datasets` as its own line,
+  labeled in the legend with its file name without path information.
+  Each of its pass changes is drawn as a dot, labeled with the
+  pass value, in the color of that line.  The data is embedded in the
   script, and the script waits for the plot window to be closed before
   exiting.
-
-  If `pass_changes` is not None, it has one element per dataset, and
-  each of its points is drawn as a dot, labeled with the pass value, in
-  the color of that dataset's line.
 
   Requires that `datasets` is not empty.
   """
   assert datasets
-  if pass_changes is not None:
-    assert len(pass_changes) == len(datasets)
 
   # Indices (1-based) of the datasets that have pass changes to draw.
   pass_indices = [
-    i for i, changes in enumerate(pass_changes or [], start=1) if changes]
+    i for i, ds in enumerate(datasets, start=1) if ds.pass_changes]
 
   lines = [
     "set title 'Accepted Size vs. Time'",
@@ -275,18 +299,17 @@ def make_script(
     lines.append('set datafile separator "\\t"')
 
   # One data block per dataset, named "$data1", "$data2", etc.
-  for i, (_, points) in enumerate(datasets, start=1):
+  for i, ds in enumerate(datasets, start=1):
     lines.append(f"$data{i} << EOD")
-    lines.extend(f"{reltime}\t{size}" for reltime, size in points)
+    lines.extend(f"{reltime}\t{size}" for reltime, size in ds.points)
     lines.append("EOD")
 
   # One block of pass changes per dataset that has any, named "$pass1",
   # etc., with the same number as the dataset.
   for i in pass_indices:
-    assert pass_changes is not None
     lines.append(f"$pass{i} << EOD")
     lines.extend(f"{reltime}\t{size}\t{value}"
-                 for reltime, size, value in pass_changes[i-1])
+                 for reltime, size, value in datasets[i-1].pass_changes)
     lines.append("EOD")
 
   # Use a larger default size and font since I'm using a 4k monitor.
@@ -301,8 +324,9 @@ def make_script(
   # e.g., "_" in a file name is not treated as a subscript marker.
   # (gnuplot skips a data block with no points, with a warning.)
   plot_elements = [
-    f"$data{i} using 1:2 with steps title {_quote(label)} noenhanced"
-    for i, (label, _) in enumerate(datasets, start=1)]
+    f"$data{i} using 1:2 with steps "
+    f"title {ds.series_label()} noenhanced"
+    for i, ds in enumerate(datasets, start=1)]
 
   # Each pass change is a dot in its dataset's line color, labeled with
   # the new pass value above and to the right.  These come after all of
