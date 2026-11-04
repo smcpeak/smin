@@ -296,7 +296,7 @@ class MakeScriptTest(unittest.TestCase):
       0\t10
       0.25\t6
       EOD
-      set terminal wxt size 1600,800 font "Arial,20"
+      set terminal qt size 1600,800 font "Arial,20"
       set linetype 1 lw 2
       plot $data1 using 1:2 with steps title 'log.tsv' noenhanced
       pause mouse close
@@ -323,7 +323,7 @@ class MakeScriptTest(unittest.TestCase):
       0\t7
       3\t5
       EOD
-      set terminal wxt size 1600,800 font "Arial,20"
+      set terminal qt size 1600,800 font "Arial,20"
       set linetype 1 lw 2
       set linetype 2 lw 2
       set linetype 3 lw 2
@@ -367,7 +367,7 @@ class MakeScriptTest(unittest.TestCase):
       $pass3 << EOD
       1\t8\tx y
       EOD
-      set terminal wxt size 1600,800 font "Arial,20"
+      set terminal qt size 1600,800 font "Arial,20"
       set linetype 1 lw 2
       set linetype 2 lw 2
       set linetype 3 lw 2
@@ -435,7 +435,7 @@ class MainTest(unittest.TestCase):
     0.0\t10
     1.5\t4
     EOD
-    set terminal wxt size 1600,800 font "Arial,20"
+    set terminal qt size 1600,800 font "Arial,20"
     set linetype 1 lw 2
     plot $data1 using 1:2 with steps title 'run_1.tsv' noenhanced
     pause mouse close
@@ -489,7 +489,7 @@ class MainTest(unittest.TestCase):
       3\t5
       4\t2
       EOD
-      set terminal wxt size 1600,800 font "Arial,20"
+      set terminal qt size 1600,800 font "Arial,20"
       set linetype 1 lw 2
       set linetype 2 lw 2
       plot $data1 using 1:2 with steps title 'run_1.tsv' noenhanced, \\
@@ -590,7 +590,7 @@ class MainTest(unittest.TestCase):
       1.0\t50\t1
       2.0\t50\t2
       EOD
-      set terminal wxt size 1600,800 font "Arial,20"
+      set terminal qt size 1600,800 font "Arial,20"
       set linetype 1 lw 2
       plot $data1 using 1:2 with steps title 'passes.tsv' noenhanced, \\
            $pass1 using 1:2:3 with labels point pt 7 lt 1 offset char 1,1 notitle noenhanced

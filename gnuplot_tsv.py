@@ -331,7 +331,12 @@ def make_script(datasets: list[DataSeries]) -> str:
     lines.append("EOD")
 
   # Use a larger default size and font since I'm using a 4k monitor.
-  lines.append('set terminal wxt size 1600,800 font "Arial,20"')
+  #
+  # The syntax for setting size and font also forces me to specify a
+  # terminal type.  Originally I had "wxt" (which uses wxWidgets) but
+  # that implementation seems extremely buggy when doing things like
+  # zooming.  The "qt" implementation works much better.
+  lines.append('set terminal qt size 1600,800 font "Arial,20"')
 
   # Increase the line thickness.
   for i in range(len(datasets)):
