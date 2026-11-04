@@ -341,13 +341,13 @@ def main(argv: list[str]) -> int:
 
     minimizer = Minimizer(
       tree_root                   = tree,
+      max_passes                  = args.max_passes,
       use_ma2_alg                 = args.ma2,
       test_acceptance             = checker.run_acceptance_test,
       get_non_trivial_replacement = language.get_non_trivial_replacement_func(),
       report_test_starting        = console.report_test_starting,
       report_test_finished        = console.report_test_finished,
       should_stop                 = time_limit_reached,
-      max_passes                  = args.max_passes,
     )
     result = minimizer.run_minimizer()
 

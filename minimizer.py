@@ -104,6 +104,10 @@ class Minimizer:
   # The root of the token tree representing the original input.
   tree_root: TTNode
 
+  # Optional user-provided limit on the number of passes.  The precise
+  # meaning of "pass" depends on the algorithm being used.
+  max_passes: Optional[int]
+
   # True to use Minimization Algorithm 2 (MA2) rather than MA1.
   use_ma2_alg: bool
 
@@ -212,25 +216,22 @@ class Minimizer:
     self,
     *,
     tree_root: TTNode,
+    max_passes: Optional[int] = None,
     use_ma2_alg: bool = False,
     test_acceptance: AcceptanceTestFunc,
     get_non_trivial_replacement: NTReplacementFunc,
     should_stop: Optional[StopQueryFunc] = None,
     report_test_starting: TestStartReportFunc,
     report_test_finished: TestFinishedReportFunc,
-    max_passes: Optional[int] = None,
   ) -> None:
     """
     Prepare to minimize the input represented by `tree_root`.
 
     Requires that the acceptance test has already accepted that input.
-
-    If `max_passes` is not None, make at most that many passes.  If
-    `should_stop` is not None, it is called after each candidate, and
-    minimization stops if it returns True.
     """
 
     self.tree_root = tree_root
+    self.max_passes = max_passes
     self.use_ma2_alg = use_ma2_alg
     self.test_acceptance = test_acceptance
     self.get_non_trivial_replacement = get_non_trivial_replacement
@@ -259,8 +260,8 @@ class Minimizer:
       # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
       self.total_num_passes = len(self.tokens).bit_length()
 
-    if max_passes is not None:
-      self.total_num_passes = min(self.total_num_passes, max_passes)
+    if self.max_passes is not None:
+      self.total_num_passes = min(self.total_num_passes, self.max_passes)
 
     self.pass_index = 0
     self.ma2_granularity = 0
