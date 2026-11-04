@@ -7,8 +7,10 @@ if [ "x$1" = "x" ]; then
   echo ""
   echo "<minimizer> is one of:"
   echo "  smin"
+  echo "  smin-ma2"
   echo "  delta"
   echo "  creduce"
+  echo "  cvise"
   exit 2
 fi
 
@@ -21,7 +23,7 @@ fi
 # Validate the minimizer.
 minimizer="$1"
 case "$minimizer" in
-  smin|delta|creduce|cvise)
+  smin|smin-ma2|delta|creduce|cvise)
     ;;
 
   *)
@@ -89,6 +91,10 @@ echo_exec() {
 case "$minimizer" in
   smin)
     echo_exec time ../../../../smin.py ./test.sh -- input
+    ;;
+
+  smin-ma2)
+    echo_exec time ../../../../smin.py --ma2 ./test.sh -- input
     ;;
 
   delta)
