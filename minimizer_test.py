@@ -263,7 +263,7 @@ class ReportCheckingTestCase(unittest.TestCase):
     prev: TestStartReport | None = None
     for i, r in enumerate(rec.starts):
       self.assertEqual(r.sequence_num, i + 1)
-      self.assertEqual(r.total_num_passes, m.total_num_passes)
+      self.assertEqual(r.total_num_passes, m._total_num_passes())
       if m.use_ma2_alg:
         # The granularity is a number of nodes.
         self.assertEqual(r.granularity, int(r.granularity))
@@ -310,7 +310,7 @@ class MinimizerTest(ReportCheckingTestCase):
       b"int a;\nint keep;\nint b;\n")))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"\nkeep\n")
-    self.assertEqual(m.total_num_passes, 4)
+    self.assertEqual(m._total_num_passes(), 4)
     self.assertEqual(len(rec.tested), 7)
     self.assertEqual(rec.tested[0], b"\n")
     self.check_reports(rec, m)
@@ -319,7 +319,7 @@ class MinimizerTest(ReportCheckingTestCase):
     src = b"int a;\nint keep;\nint b;\n"
     rec = Recorder(lambda d: b"keep" in d)
     m = rec.make_minimizer(build_tree(tokenize_cpp(src)), max_passes=2)
-    self.assertEqual(m.total_num_passes, 2)
+    self.assertEqual(m._total_num_passes(), 2)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"\nint keep;\n")
     self.assertEqual(max(r.pass_num for r in rec.starts), 2)
@@ -328,7 +328,7 @@ class MinimizerTest(ReportCheckingTestCase):
     # A limit above the usual number of passes has no effect.
     rec = Recorder(lambda d: b"keep" in d)
     m = rec.make_minimizer(build_tree(tokenize_cpp(src)), max_passes=5)
-    self.assertEqual(m.total_num_passes, 4)
+    self.assertEqual(m._total_num_passes(), 4)
 
   def test_non_trivial_replacement(self) -> None:
     # Removing the function body is rejected, but replacing it with ";"
@@ -556,7 +556,7 @@ class MA2Test(ReportCheckingTestCase):
 
   def test_empty_input(self) -> None:
     rec, m = self.run_ma2(b"", lambda d: True)
-    self.assertEqual(m.total_num_passes, 0)
+    self.assertEqual(m._total_num_passes(), 0)
     self.assertEqual(m.get_minimized_test_input(), b"")
     self.assertEqual(rec.starts, [])
 
@@ -574,7 +574,7 @@ class MA2Test(ReportCheckingTestCase):
     rec, m = self.run_ma2(b"int a;\nint keep;\nint b;\n",
                           lambda d: b"keep" in d)
     self.assertEqual(m.get_minimized_test_input(), b"\nkeep\n")
-    self.assertEqual(m.total_num_passes, 2)
+    self.assertEqual(m._total_num_passes(), 2)
     self.assertEqual(rec.tested, [
       # Pass 1.  Since the root is not a delimiter group, the first
       # candidate removes only half of its children.  That is accepted,
@@ -604,14 +604,14 @@ class MA2Test(ReportCheckingTestCase):
     # With one pass, only the children of the root are considered.
     rec, m = self.run_ma2(b"int a;\nint keep;\nint b;\n",
                           lambda d: b"keep" in d, max_passes=1)
-    self.assertEqual(m.total_num_passes, 1)
+    self.assertEqual(m._total_num_passes(), 1)
     self.assertEqual(m.get_minimized_test_input(), b"\nint keep;\n")
     self.assertEqual({r.pass_num for r in rec.starts}, {1})
 
     # A limit above the tree depth has no effect.
     rec, m = self.run_ma2(b"int a;\nint keep;\nint b;\n",
                           lambda d: b"keep" in d, max_passes=5)
-    self.assertEqual(m.total_num_passes, 2)
+    self.assertEqual(m._total_num_passes(), 2)
     self.assertEqual(m.get_minimized_test_input(), b"\nkeep\n")
 
   def test_nothing_removable(self) -> None:

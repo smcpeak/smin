@@ -186,12 +186,6 @@ class Minimizer:
   # This is incremented in _try_candidate and read in _make_report.
   sequence_num: int
 
-  # Number of passes the algorithm will make.
-  #
-  # This is calculated in the constructor, then used to control
-  # algorithm termination, and is included in the progress reports.
-  total_num_passes: int
-
   # Index of the current pass, starting at 0.  With MA1, the
   # granularity of pass k is `len(tokens) / 2**k`.  With MA2, pass k
   # considers nodes up to depth k+1.
@@ -252,17 +246,6 @@ class Minimizer:
     self.minimizer_invoked = False
 
     self.sequence_num = 0
-
-    if use_ma2_alg:
-      # MA2 makes one pass per level of the tree.
-      self.total_num_passes = tree_root.depth()
-    else:
-      # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
-      self.total_num_passes = len(self.tokens).bit_length()
-
-    if self.max_passes is not None:
-      self.total_num_passes = min(self.total_num_passes, self.max_passes)
-
     self.pass_index = 0
     self.ma2_granularity = 0
 
@@ -273,6 +256,27 @@ class Minimizer:
     self.memoized_accept = {
       _digest(initial_text): AcceptanceTestResult.ACCEPT,
     }
+
+
+  def _total_num_passes(self) -> int:
+    """
+    Return the total number of passes to run.  This is used for the
+    progress reports and to control the algorithm outer loop.
+    """
+
+    ret: int
+
+    if self.use_ma2_alg:
+      # MA2 makes one pass per level of the tree.
+      ret = self.tree_root.depth()
+    else:
+      # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
+      ret = len(self.tokens).bit_length()
+
+    if self.max_passes is not None:
+      ret = min(ret, self.max_passes)
+
+    return ret
 
 
   def run_minimizer(self) -> AcceptanceTestResult:
@@ -290,7 +294,7 @@ class Minimizer:
     self.minimizer_invoked = True
 
     try:
-      for k in range(self.total_num_passes):
+      for k in range(self._total_num_passes()):
         self.pass_index = k
         if self.use_ma2_alg:
           self._ma2_min_node(self.tree_root, k+1)
@@ -720,7 +724,7 @@ class Minimizer:
       sequence_num=self.sequence_num,
       last_accepted_tok_count=num_live,
       pass_num=self.pass_index + 1,
-      total_num_passes=self.total_num_passes,
+      total_num_passes=self._total_num_passes(),
       granularity=(
         float(self.ma2_granularity) if self.use_ma2_alg
         else len(self.tokens) / (1 << self.pass_index)),
