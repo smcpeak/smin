@@ -725,14 +725,23 @@ class Minimizer:
       last_accepted_tok_count=num_live,
       pass_num=self.pass_index + 1,
       total_num_passes=self._total_num_passes(),
-      granularity=(
-        float(self.ma2_granularity) if self.use_ma2_alg
-        else len(self.tokens) / (1 << self.pass_index)),
+      granularity=self._get_cur_granularity(),
       completion_fraction=(num_live - e) / num_live,
       removed_tok_count=sum(self.node_size(n) for n in nodes),
       initial_tok_count=len(self.tokens),
       changed_byte_range=changed,
     )
+
+
+  def _get_cur_granularity(self) -> float:
+    """
+    Return the current algorithm granularity for inclusion in the
+    progress report for the acceptance test we are about to perform.
+    The exact meaning depends on which algorithm is in use.
+    """
+    return (
+      float(self.ma2_granularity) if self.use_ma2_alg
+      else len(self.tokens) / (1 << self.pass_index))
 
 
 class _StopMinimization(Exception):
