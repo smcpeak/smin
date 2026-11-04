@@ -11,6 +11,7 @@ from collections.abc import Callable
 from acceptance_test_result import AcceptanceTestResult
 from build_tree import build_tree
 from ma_factory import make_minimizer
+from ma_kind import MinimizationAlgorithmKind
 from minimizer import (
   Minimizer,
   NTReplacementFunc,
@@ -100,8 +101,11 @@ class Recorder:
     nt: NTReplacementFunc = no_replacement,
     should_stop: StopQueryFunc | None = None,
   ) -> Minimizer:
+    alg_kind = (
+      MinimizationAlgorithmKind.MA2 if use_ma2_alg
+      else MinimizationAlgorithmKind.MA1)
     self.minimizer = make_minimizer(
-      use_ma2_alg                 = use_ma2_alg,
+      alg_kind                    = alg_kind,
       tree_root                   = root,
       max_passes                  = max_passes,
       test_acceptance             = self.test,
@@ -268,7 +272,7 @@ class ReportCheckingTestCase(unittest.TestCase):
 
       # TODO: Factor this logic so each branch can go into an
       # algorithm-specific test file.
-      if m.is_ma2_alg():
+      if m.get_ma_kind() == MinimizationAlgorithmKind.MA2:
         # The granularity is a number of nodes.
         self.assertEqual(r.granularity, int(r.granularity))
         self.assertGreaterEqual(r.granularity, 1)

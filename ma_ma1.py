@@ -5,6 +5,7 @@ Minimization algorithm 1 (MA1).
 
 from __future__ import annotations
 
+from ma_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
 
 
@@ -24,8 +25,8 @@ class MA1Minimizer(Minimizer):
   # subclass.
 
 
-  def is_ma2_alg(self) -> bool:
-    return False
+  def get_ma_kind(self) -> MinimizationAlgorithmKind:
+    return MinimizationAlgorithmKind.MA1
 
 
   def _total_num_passes(self) -> int:

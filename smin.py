@@ -41,6 +41,7 @@ from typing import Optional
 from acceptance_test_result import AcceptanceTestResult
 from build_tree import build_tree
 from check_accept import CheckAccept
+from ma_kind import MinimizationAlgorithmKind
 from ma_factory import make_minimizer
 from minimizer import Minimizer
 from start_report import TestStartReport
@@ -340,8 +341,12 @@ def main(argv: list[str]) -> int:
     def time_limit_reached() -> bool:
       return deadline is not None and time.monotonic() >= deadline
 
+    alg_kind = (
+      MinimizationAlgorithmKind.MA2 if args.ma2
+      else MinimizationAlgorithmKind.MA1)
+
     minimizer = make_minimizer(
-      use_ma2_alg                 = args.ma2,
+      alg_kind                    = alg_kind,
       tree_root                   = tree,
       max_passes                  = args.max_passes,
       test_acceptance             = checker.run_acceptance_test,

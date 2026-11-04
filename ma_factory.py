@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from ma_kind import MinimizationAlgorithmKind
 from ma_ma1 import MA1Minimizer
 from ma_ma2 import MA2Minimizer
 from minimizer import (
@@ -22,7 +23,7 @@ from token_tree import TTNode
 
 def make_minimizer(
   *,
-  use_ma2_alg: bool = False,
+  alg_kind: MinimizationAlgorithmKind,
   tree_root: TTNode,
   max_passes: Optional[int] = None,
   test_acceptance: AcceptanceTestFunc,
@@ -32,16 +33,21 @@ def make_minimizer(
   report_test_finished: TestFinishedReportFunc,
 ) -> Minimizer:
   """
-  Create a Minimizer object.  Uses `use_ma2_alg` to decide which class.
+  Create a Minimizer object.  Uses `alg_kind` to decide which class.
   """
-  # TODO: Generalize the boolean to allow more than two algorithms.
 
   # Get the arguments except for the algorithm selector.
   all_args = locals()
-  del all_args["use_ma2_alg"]
+  del all_args["alg_kind"]
 
   # Choose which class to create.
-  cls = MA2Minimizer if use_ma2_alg else MA1Minimizer
+  cls: type[MA1Minimizer | MA2Minimizer]
+  if alg_kind == MinimizationAlgorithmKind.MA1:
+    cls = MA1Minimizer
+  elif alg_kind == MinimizationAlgorithmKind.MA2:
+    cls = MA2Minimizer
+  else:
+    assert False, f"Bad alg_kind: {alg_kind}"
 
   # Forward the arguments to that constructor.
   return cls(**all_args)

@@ -45,6 +45,7 @@ PYTHON_SRCS += lang_cpp_delims.py
 PYTHON_SRCS += lang_cpp.py
 PYTHON_SRCS += language.py
 PYTHON_SRCS += ma_factory.py
+PYTHON_SRCS += ma_kind.py
 PYTHON_SRCS += ma_ma1.py
 PYTHON_SRCS += ma_ma2.py
 PYTHON_SRCS += minimizer.py
