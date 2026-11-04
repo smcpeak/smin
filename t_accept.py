@@ -29,8 +29,12 @@ Options:
 
   --before-after <before> <after>
 
-    Require that some line contain <before> as a substring, and that
-    some strictly later line contain <after> as a substring.
+    Require that <before> occur somewhere in the file (a substring), and
+    that <after> occur later in the file (either later on the same line,
+    or on a subsequent line) without overlapping the first occurrence of
+    <before>.  Note that <before> and <after> could be the same string,
+    and acceptance would then require that string to occur at least
+    twice.
 
   --clang
 
@@ -348,9 +352,9 @@ def _first_failure(
                 f" ({n_opener} vs. {n_closer})")
 
   for before, after in args.before_after:
-    if not _has_before_after(lines, os.fsencode(before),
+    if not _has_before_after(data, os.fsencode(before),
                              os.fsencode(after)):
-      return f"no line contains {before!r} followed by one with {after!r}"
+      return f"no {before!r} followed later by {after!r}"
 
   if args.clang:
     # Passing -w is useful because (1) we don't care, and (2) when
@@ -366,18 +370,17 @@ def _first_failure(
   return None
 
 
-def _has_before_after(lines: list[bytes], before: bytes,
-                      after: bytes) -> bool:
+def _has_before_after(data: bytes, before: bytes, after: bytes) -> bool:
   """
-  True if some element of `lines` contains `before` and a later one
-  contains `after`.
+  True if `data` contains `before`, and `after` occurs somewhere after
+  the end of that occurrence (so the two do not overlap).
   """
-  for i, line in enumerate(lines):
-    if before in line:
-      # Only the first line containing `before` needs to be considered,
-      # since it has the most lines after it.
-      return any(after in later for later in lines[i+1:])
-  return False
+  # Only the first occurrence of `before` needs to be considered, since
+  # it leaves the most room after it.
+  start = data.find(before)
+  if start < 0:
+    return False
+  return data.find(after, start + len(before)) >= 0
 
 
 if __name__ == "__main__":

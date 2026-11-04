@@ -115,12 +115,33 @@ class TAcceptTest(unittest.TestCase):
     argv = ["--before-after", "decl", "use"]
     self.check(argv, b"decl\nother\nuse\n", 0)
     self.check(argv, b"use\ndecl\n", 1)
-    # Strictly later: the same line does not count.
-    self.check(argv, b"decl use\n", 1)
-    # Any line with `before` will do, not just the last.
+    self.assertEqual(self.out,
+                     "reject: no 'decl' followed later by 'use'\n")
+    # Any occurrence of `before` will do, not just the last.
     self.check(argv, b"decl\nuse\ndecl\n", 0)
     self.check(argv, b"use\n", 1)
     self.check(argv, b"decl\n", 1)
+
+  def test_before_after_same_line(self) -> None:
+    argv = ["--before-after", "decl", "use"]
+    self.check(argv, b"decl use\n", 0)
+    self.check(argv, b"decluse", 0)
+    self.check(argv, b"use decl\n", 1)
+    self.check(argv, b"x use decl use\n", 0)
+
+  def test_before_after_overlap(self) -> None:
+    # `after` must begin after the end of `before`.
+    self.check(["--before-after", "ab", "bc"], b"abc", 1)
+    self.check(["--before-after", "ab", "bc"], b"abbc", 0)
+
+  def test_before_after_same_string(self) -> None:
+    # The string must occur twice, without overlapping.
+    argv = ["--before-after", "x", "x"]
+    self.check(argv, b"x\n", 1)
+    self.check(argv, b"xx", 0)
+    self.check(argv, b"x\nx\n", 0)
+    self.check(["--before-after", "aa", "aa"], b"aaa", 1)
+    self.check(["--before-after", "aa", "aa"], b"aaaa", 0)
 
   def test_before_after_repeated(self) -> None:
     argv = ["--before-after", "a", "b", "--before-after", "b", "c"]
