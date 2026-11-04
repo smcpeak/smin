@@ -115,11 +115,6 @@ class Minimizer(ABC):
   # meaning of "pass" depends on the algorithm being used.
   max_passes: Optional[int]
 
-  # True to use Minimization Algorithm 2 (MA2) rather than MA1.
-  #
-  # TODO: Remove this field once I have two subclasses.
-  use_ma2_alg: bool
-
   # ---- Primary input and output callback ----
   # Check if a given candidate is accepted.  In normal operation, this
   # will spawn and wait for a child process.
@@ -220,7 +215,6 @@ class Minimizer(ABC):
     *,
     tree_root: TTNode,
     max_passes: Optional[int] = None,
-    use_ma2_alg: bool = False,
     test_acceptance: AcceptanceTestFunc,
     get_non_trivial_replacement: NTReplacementFunc,
     should_stop: Optional[StopQueryFunc] = None,
@@ -235,7 +229,6 @@ class Minimizer(ABC):
 
     self.tree_root = tree_root
     self.max_passes = max_passes
-    self.use_ma2_alg = use_ma2_alg
     self.test_acceptance = test_acceptance
     self.get_non_trivial_replacement = get_non_trivial_replacement
     self.should_stop = should_stop
@@ -265,6 +258,16 @@ class Minimizer(ABC):
     self.memoized_accept = {
       _digest(initial_text): AcceptanceTestResult.ACCEPT,
     }
+
+
+  @abstractmethod
+  def is_ma2_alg(self) -> bool:
+    """
+    True if this is MA2, false if it is MA1.
+
+    TODO: Remove the need for this method.
+    """
+    pass
 
 
   @abstractmethod

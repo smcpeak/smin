@@ -10,7 +10,7 @@ from collections.abc import Callable
 
 from acceptance_test_result import AcceptanceTestResult
 from build_tree import build_tree
-from ma_ma1 import MA1Minimizer
+from ma_factory import make_minimizer
 from minimizer import (
   Minimizer,
   NTReplacementFunc,
@@ -100,11 +100,11 @@ class Recorder:
     nt: NTReplacementFunc = no_replacement,
     should_stop: StopQueryFunc | None = None,
   ) -> Minimizer:
-    self.minimizer = MA1Minimizer(
+    self.minimizer = make_minimizer(
+      use_ma2_alg                 = use_ma2_alg,
       tree_root                   = root,
       max_passes                  = max_passes,
       test_acceptance             = self.test,
-      use_ma2_alg                 = use_ma2_alg,
       get_non_trivial_replacement = nt,
       should_stop                 = should_stop,
       report_test_starting        = self.starts.append,
@@ -265,13 +265,17 @@ class ReportCheckingTestCase(unittest.TestCase):
     for i, r in enumerate(rec.starts):
       self.assertEqual(r.sequence_num, i + 1)
       self.assertEqual(r.total_num_passes, m._total_num_passes())
-      if m.use_ma2_alg:
+
+      # TODO: Factor this logic so each branch can go into an
+      # algorithm-specific test file.
+      if m.is_ma2_alg():
         # The granularity is a number of nodes.
         self.assertEqual(r.granularity, int(r.granularity))
         self.assertGreaterEqual(r.granularity, 1)
       else:
         self.assertEqual(r.granularity,
                          len(m.tokens) / 2 ** (r.pass_num - 1))
+
       self.assertTrue(0 <= r.completion_fraction <= 1)
       if prev is not None:
         self.assertGreaterEqual(r.pass_num, prev.pass_num)
