@@ -94,6 +94,20 @@ size, although Perses, Pardis, and WDD each address part of that.
   replacement" (e.g., ";") plays the role of HDD's minimal syntactic
   replacement.  The key difference is that smin needs no grammar.
 
+  smcpeak:
+
+    The HDD loop sits sort of in between MA1 and MA2.  If both are
+    restricted to a single level, MA1 and HDD should behave the same.
+    One-level MA2 is different because it zooms in on each individually
+    required node before trying larger chunks higher up.
+
+    MA2 has a similar level-by-level structure to HDD, but MA2 re-tests
+    the higher nodes, whereas HDD does not.
+
+    This suggests several avenues for exploration and comparison to fill
+    out the space of choices in the convex hull of these three
+    algorithms.
+
 2.2 Picireny, and the Szeged HDD papers
 
   Renáta Hodován and Ákos Kiss.  "Modernizing Hierarchical Delta
