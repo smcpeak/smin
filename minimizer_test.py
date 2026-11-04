@@ -6,7 +6,6 @@ Unit tests for minimizer.
 from __future__ import annotations
 
 import unittest
-from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 from acceptance_test_result import AcceptanceTestResult
@@ -255,15 +254,19 @@ class RenderCandidateTest(unittest.TestCase):
       b"f() ;")
 
 
-class ReportCheckingTestCase(unittest.TestCase, ABC):
+class ReportCheckingTestCase(unittest.TestCase):
   """Base class for tests that check the progress reports."""
 
-  @abstractmethod
   def check_granularity(self, r: TestStartReport, m: Minimizer) -> None:
     """
     Check that `r.granularity` is consistent with the algorithm used by
     `m`.
+
+    The default implementation checks the MA1 formula because it is
+    treated as the default in this file.
     """
+    # MA1 granularity is a number of tokens, halved on each pass.
+    self.assertEqual(r.granularity, len(m.tokens) / 2 ** (r.pass_num - 1))
 
   def check_reports(self, rec: Recorder, m: Minimizer) -> None:
     """Check the consistency of the reports in `rec`."""
@@ -302,10 +305,6 @@ class MinimizerTest(ReportCheckingTestCase):
   Tests of behavior that is mostly independent of the minimization
   algorithm.  They use MA1, the default.
   """
-
-  def check_granularity(self, r: TestStartReport, m: Minimizer) -> None:
-    # MA1 granularity is a number of tokens, halved on each pass.
-    self.assertEqual(r.granularity, len(m.tokens) / 2 ** (r.pass_num - 1))
 
   def test_empty_input(self) -> None:
     rec = Recorder(lambda d: True)

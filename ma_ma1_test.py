@@ -8,24 +8,18 @@ from __future__ import annotations
 import unittest
 
 from build_tree import build_tree
-from minimizer import Minimizer
 from minimizer_test import (
   ACCEPT,
   INTERRUPTED,
   Recorder,
   ReportCheckingTestCase,
 )
-from start_report import TestStartReport
 from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
 
 
 class MA1Test(ReportCheckingTestCase):
   """Tests of Minimization Algorithm 1."""
-
-  def check_granularity(self, r: TestStartReport, m: Minimizer) -> None:
-    # The granularity is a number of tokens, halved on each pass.
-    self.assertEqual(r.granularity, len(m.tokens) / 2 ** (r.pass_num - 1))
 
   def test_accept_everything(self) -> None:
     # The first candidate removes every child of the root, at which
