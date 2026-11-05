@@ -24,6 +24,11 @@ Options:
 
     Use Minimization Algorithm 2 (MA2) as described in the spec.
 
+  --hdd
+
+    Use Hierarchical Delta Debugging (HDD) as described in
+    doc/hdd-algorithm.txt.  This cannot be combined with --ma2.
+
 See spec in minimization-algorithm.txt.
 """
 
@@ -156,10 +161,19 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
       already stopped by then.
     """)
 
-  parser.add_argument(
+  algorithm_group = parser.add_mutually_exclusive_group()
+
+  algorithm_group.add_argument(
     "--ma2", action="store_true",
     help="""
       Use Minimization Algorithm 2 (MA2) rather than the default, MA1.
+    """)
+
+  algorithm_group.add_argument(
+    "--hdd", action="store_true",
+    help="""
+      Use Hierarchical Delta Debugging (HDD) rather than the default,
+      MA1.
     """)
 
   # The test command, separator, and input file are all collected into
@@ -343,6 +357,7 @@ def main(argv: list[str]) -> int:
 
     alg_kind = (
       MinimizationAlgorithmKind.MA2 if args.ma2
+      else MinimizationAlgorithmKind.HDD if args.hdd
       else MinimizationAlgorithmKind.MA1)
 
     minimizer = make_minimizer(

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from ma_hdd import HDDMinimizer
 from ma_kind import MinimizationAlgorithmKind
 from ma_ma1 import MA1Minimizer
 from ma_ma2 import MA2Minimizer
@@ -41,11 +42,13 @@ def make_minimizer(
   del all_args["alg_kind"]
 
   # Choose which class to create.
-  cls: type[MA1Minimizer | MA2Minimizer]
+  cls: type[MA1Minimizer | MA2Minimizer | HDDMinimizer]
   if alg_kind == MinimizationAlgorithmKind.MA1:
     cls = MA1Minimizer
   elif alg_kind == MinimizationAlgorithmKind.MA2:
     cls = MA2Minimizer
+  elif alg_kind == MinimizationAlgorithmKind.HDD:
+    cls = HDDMinimizer
   else:
     assert False, f"Bad alg_kind: {alg_kind}"
 

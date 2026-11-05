@@ -84,6 +84,17 @@ class ParseCommandLineTest(unittest.TestCase):
     self.assertTrue(args.ma2)
     self.assertEqual(args.test_command, ["./test.sh", "--ma2"])
 
+  def test_hdd(self) -> None:
+    args = parse_command_line(["./test.sh", "--", "in.cc"])
+    self.assertFalse(args.hdd)
+    args = parse_command_line(["--hdd", "./test.sh", "--hdd", "--", "in.cc"])
+    self.assertTrue(args.hdd)
+    self.assertFalse(args.ma2)
+    self.assertEqual(args.test_command, ["./test.sh", "--hdd"])
+
+  def test_ma2_and_hdd_conflict(self) -> None:
+    self.check_error(["--ma2", "--hdd", "./test.sh", "--", "in.cc"])
+
   def test_help(self) -> None:
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
@@ -233,6 +244,26 @@ class MainTest(unittest.TestCase):
     self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
     status, out, _ = self.run_main(self.KEEP_CODE,
                                    ("--ma2", "--max-passes", "1"))
+    self.assertEqual(status, 0)
+    self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
+    self.assertEqual(self.progress_passes(out), ["P=(1/1)"] * 4)
+
+  def test_hdd(self) -> None:
+    # HDD makes one pass per tree level, here two.
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, err = self.run_main(self.KEEP_CODE, ("--hdd",))
+    self.assertEqual(status, 0)
+    self.assertEqual(err, "")
+    self.assertEqual(self.input_path.read_bytes(), b"\nkeep\n")
+    self.assertEqual(self.best_path.read_bytes(), b"\nkeep\n")
+    self.assertEqual(self.progress_passes(out),
+                     ["P=(1/2)"] * 4 + ["P=(2/2)"] * 3)
+    self.assertIn("to 1 tokens (6 bytes).", out)
+
+  def test_hdd_max_passes(self) -> None:
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, _ = self.run_main(self.KEEP_CODE,
+                                   ("--hdd", "--max-passes", "1"))
     self.assertEqual(status, 0)
     self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
     self.assertEqual(self.progress_passes(out), ["P=(1/1)"] * 4)

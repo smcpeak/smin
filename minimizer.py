@@ -199,10 +199,11 @@ class Minimizer(ABC):
 
   # Index of the current pass, starting at 0.  With MA1, the
   # granularity of pass k is `len(tokens) / 2**k`.  With MA2, pass k
-  # considers nodes up to depth k+1.
+  # considers nodes up to depth k+1.  With HDD, pass k considers nodes
+  # at depth k+1.
   #
   # This is maintained by the outer loop, used to compute the
-  # granularity for MA1, and included in progress reports for both.
+  # granularity for MA1, and included in progress reports for all.
   pass_index: int
 
   # With MA2, the granularity, in nodes, of the candidate being tested.
@@ -399,6 +400,29 @@ class Minimizer(ABC):
     return sum(self.token_live[span.start : span.stop])
 
 
+  def _get_surviving_nondelim_children(
+    self,
+    node: TTNode,
+  ) -> list[TTNode]:
+    """
+    Return the children of `node` that are not replaced, excluding the
+    delimiters if `node` is a delimiter group.
+    """
+
+    all_children: list[TTNode] = node.children
+
+    # Range of non-delimiter children.
+    lo, hi = ((1, len(all_children)-1) if node.delim_group
+              else (0, len(all_children)))
+
+    # Filter the range for having not been replaced.
+    return [
+      c
+      for c in all_children[lo:hi]
+      if id(c) not in self.cur_replacement
+    ]
+
+
   def _compute_spans(self, node: TTNode, start: int) -> int:
     """
     Populate `node_span` for `node` and its descendants, given that its
@@ -521,22 +545,13 @@ class Minimizer(ABC):
     modifies the `changed` bytes of the most recently accepted input.
     """
 
-    # `e` (called "E" in the spec) is the 1-based index, among the live
-    # tokens, of the last live token in the candidate, or of the live
-    # token to its left if it has none.  Either way, it is the number of
-    # live tokens before the end of the rightmost node.
-    end = max(self.node_span[id(n)].stop for n in nodes)
-    e = sum(self.token_live[:end])
-
-    num_live = self.live_tok_count
-
     return TestStartReport(
       sequence_num=self.sequence_num,
-      last_accepted_tok_count=num_live,
+      last_accepted_tok_count=self.live_tok_count,
       pass_num=self.pass_index + 1,
       total_num_passes=self._total_num_passes(),
       granularity=self._get_cur_granularity(),
-      completion_fraction=(num_live - e) / num_live,
+      completion_fraction=self._get_cur_completion_fraction(nodes),
       removed_tok_count=sum(self.node_size(n) for n in nodes),
       initial_tok_count=len(self.tokens),
       changed_byte_range=changed,
@@ -551,6 +566,28 @@ class Minimizer(ABC):
     The exact meaning depends on which algorithm is in use.
     """
     pass
+
+
+  def _get_cur_completion_fraction(self, nodes: list[TTNode]) -> float:
+    """
+    Return the fraction of the current pass that has been completed,
+    for inclusion in the progress report for the test of the candidate
+    replacing `nodes`.
+
+    By default, this is based on the position of the candidate within
+    the file, for an algorithm that works from its end to its start.
+    """
+
+    # `e` (called "E" in the spec) is the 1-based index, among the live
+    # tokens, of the last live token in the candidate, or of the live
+    # token to its left if it has none.  Either way, it is the number of
+    # live tokens before the end of the rightmost node.
+    end = max(self.node_span[id(n)].stop for n in nodes)
+    e = sum(self.token_live[:end])
+
+    num_live = self.live_tok_count
+
+    return (num_live - e) / num_live
 
 
 class _StopMinimization(Exception):
