@@ -40,6 +40,16 @@ commits are made directly by a human, and that person takes full
 responsibility for all committed content, regardless of the level of AI
 involvement, to the same degree as if there was no AI involvement.
 
+Exception: Sometimes a git commit message will explicitly say that some
+AI-generated material being committed has not yet been reviewed by the
+committer.  Such a commit must either be amended, or followed by a
+commit (typically with an edit) that indicates approval of the AI
+material (as edited), before pushing.  This enables the workflow of
+committing a large chunk of AI work first, then reviewing and editing
+afterward, both to accurately record the provenance of each code
+fragment, and to guard against accidentally breaking working code and
+not having an easy way to recover.
+
 Any prose that includes AI-generated text is disclosed as such at the
 top of the file (in addition to provenance in git commit messages).
 Currently, that only applies to doc/related-work.txt.
