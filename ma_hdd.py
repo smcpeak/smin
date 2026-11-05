@@ -1,6 +1,8 @@
 # ma_hdd.py
 """
 Hierarchical Delta Debugging (HDD) minimization algorithm.
+
+See doc/hdd-algorithm.txt.
 """
 
 from __future__ import annotations
@@ -14,8 +16,9 @@ from token_tree import TTNode
 
 def compute_candidate_numbers(n: int) -> tuple[int, dict[int, int]]:
   """
-  Return Cm for a `_ddmin` pass whose input is a list of length `n`, and
-  a map from G to the C for that iteration's starting candidate number.
+  Return Cm (maximum candidate number) for a `_ddmin` pass whose input
+  is a list of length `n`, and a map from G (granularity) to the C
+  (candidate number) for that iteration's starting candidate number.
   """
   c: int = 0
   c_for_g: dict[int, int] = {}
