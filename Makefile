@@ -21,7 +21,7 @@ PYTHON = python3
 #   $ sudo apt install pipx
 #   $ pipx install mypy
 MYPY = mypy
-MYPY_OPTS = --strict
+MYPY_OPTS = --strict --explicit-package-bases
 
 # $ pipx install ruff
 RUFF = ruff
@@ -30,6 +30,7 @@ RUFF = ruff
 PYTHON_SRCS :=
 PYTHON_SRCS += abstract_range.py
 PYTHON_SRCS += acceptance_test_result.py
+PYTHON_SRCS += bm/run_bm.py
 PYTHON_SRCS += build_tree.py
 PYTHON_SRCS += build_tree_util.py
 PYTHON_SRCS += byte_range.py
@@ -63,6 +64,7 @@ PYTHON_SRCS += whitespace.py
 
 PYTHON_TESTS :=
 PYTHON_TESTS += abstract_range_test.py
+PYTHON_TESTS += bm/run_bm_test.py
 PYTHON_TESTS += build_tree_test.py
 PYTHON_TESTS += check_accept_test.py
 PYTHON_TESTS += diff_lines_test.py
