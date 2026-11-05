@@ -33,7 +33,8 @@ pseudo-Python, it is:
 The text explains that TagNodes gathers all of the nodes on a given
 level in the tree into a single list for minimization by ddmin.  I think
 "tagging" simply means having a means to associate the elements of the
-flat list with the tree nodes they came from.
+flat list with the tree nodes they came from.  (The text describes both
+"naming" and tagging nodes, but their relation is not completely clear.)
 
 
 Algorithm within smin
