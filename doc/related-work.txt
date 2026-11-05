@@ -116,6 +116,10 @@ size, although Perses, Pardis, and WDD each address part of that.
     I have written a specification for an adaptation of HDD for use in
     smin; see hdd-algorithm.txt.
 
+    It is now implemented as ma_hdd.py.  On hello-cpp-E, its first pass
+    is somewhat worse than MA1, and its later passes are considerably
+    worse, I think because those do not respect the tree boundaries.
+
 2.2 Picireny, and the Szeged HDD papers
 
   Renáta Hodován and Ákos Kiss.  "Modernizing Hierarchical Delta
