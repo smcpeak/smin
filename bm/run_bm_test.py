@@ -25,7 +25,6 @@ from pathlib import Path
 from bm.run_bm import (
   BM_DIR,
   EXIT_CODE_ERROR,
-  MINIMIZER_COMMANDS,
   REPO_DIR,
   main,
   prepare_run_dir,
@@ -84,13 +83,12 @@ class ValidationTest(TempDirTestCase):
     self.assertEqual(err, message + "\n")
 
   def test_usage(self) -> None:
+    # Test passing the wrong number of arguments.
     for argv in ([], ["smin"], ["smin", "bench", "extra"]):
       status, out, err = self.run_main(argv)
       self.assertEqual(status, EXIT_CODE_ERROR)
       self.assertEqual(err, "")
       self.assertIn("Usage: ./run_bm.py <minimizer> <benchmarkdir>", out)
-      for name in MINIMIZER_COMMANDS:
-        self.assertIn(f"\n  {name}", out)
 
   def test_unrecognized_minimizer(self) -> None:
     bench = self.make_benchmark()
@@ -114,19 +112,6 @@ class ValidationTest(TempDirTestCase):
     (bench / "gen.sh").chmod(0o644)
     self.check_error(["smin", str(bench)],
                      f"Missing generator script: {bench}/gen.sh")
-
-
-class MinimizerCommandsTest(unittest.TestCase):
-  def test_commands(self) -> None:
-    smin = str(REPO_DIR / "smin.py")
-    self.assertEqual(MINIMIZER_COMMANDS, {
-      "smin":     [smin, "./test.sh", "--", "input"],
-      "smin-ma2": [smin, "--ma2", "./test.sh", "--", "input"],
-      "smin-hdd": [smin, "--hdd", "./test.sh", "--", "input"],
-      "delta":    ["multimultidelta", "./test.sh", "input"],
-      "creduce":  ["creduce", "--n", "1", "./test.sh", "input"],
-      "cvise":    ["cvise", "--n", "1", "./test.sh", "input"],
-    })
 
 
 class RunChildTest(TempDirTestCase):

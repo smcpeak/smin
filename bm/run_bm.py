@@ -90,6 +90,8 @@ def run_child(
   is forwarded to the child.
   """
 
+  # Print the command to run, with shell quoting as needed.
+  #
   # Flush so our output does not appear after that of the child.
   print(shlex.join(command), flush=True)
 
