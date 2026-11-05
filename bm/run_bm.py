@@ -10,8 +10,8 @@ Usage:
 The results go into out/<benchmark>/<minimizer>, relative to the current
 directory, replacing any prior run there.
 
-The exit status is that of the minimizer, or 2 for a usage error, or
-that of the first preparatory step to fail.
+The exit status is that of the minimizer if it ran, or 2 for any error
+that prevented that, or 128+N if a child was killed by signal N.
 """
 
 from __future__ import annotations
@@ -31,16 +31,8 @@ from typing import Optional
 BM_DIR: Path = Path(__file__).resolve().parent
 REPO_DIR: Path = BM_DIR.parent
 
-# Exit status for a usage error.
-EXIT_USAGE = 2
-
-# Exit status for a failed step that does not have its own status.
-EXIT_FAILURE = 1
-
-# Exit statuses for a program that could not be started, following the
-# shell convention.
-EXIT_CANNOT_EXECUTE = 126
-EXIT_NOT_FOUND = 127
+# Exit status for any fatal error.
+EXIT_CODE_ERROR = 2
 
 # The test script and the input it checks, within a run directory.
 TEST_SH = "./test.sh"
@@ -103,12 +95,9 @@ def run_child(
 
   try:
     proc = subprocess.Popen(command, cwd=cwd, env=env)
-  except FileNotFoundError as e:
-    print(f"Cannot run {command[0]}: {e}", file=sys.stderr)
-    return EXIT_NOT_FOUND
   except OSError as e:
     print(f"Cannot run {command[0]}: {e}", file=sys.stderr)
-    return EXIT_CANNOT_EXECUTE
+    return EXIT_CODE_ERROR
 
   def forward_signal(signum: int, frame: Optional[FrameType]) -> None:
     proc.send_signal(signum)
@@ -176,18 +165,18 @@ def main(argv: list[str]) -> int:
 
   if len(argv) != 2:
     print(usage_text())
-    return EXIT_USAGE
+    return EXIT_CODE_ERROR
 
   minimizer, benchmark_arg = argv
 
   if minimizer not in MINIMIZER_COMMANDS:
     print(f"Unrecognized minimizer: {minimizer}", file=sys.stderr)
-    return EXIT_USAGE
+    return EXIT_CODE_ERROR
 
   error = validate_benchmark_dir(benchmark_arg)
   if error is not None:
     print(error, file=sys.stderr)
-    return EXIT_USAGE
+    return EXIT_CODE_ERROR
 
   # The benchmark's name is the last component of its directory.  Making
   # the path absolute handles trailing slashes and names like ".".
@@ -202,7 +191,7 @@ def main(argv: list[str]) -> int:
     prepare_run_dir(benchmark_dir, run_dir)
   except OSError as e:
     print(f"Cannot prepare {run_dir}: {e}", file=sys.stderr)
-    return EXIT_FAILURE
+    return EXIT_CODE_ERROR
 
   # Location of the acceptance test script, exported so test.sh can find
   # it from anywhere.
@@ -212,7 +201,11 @@ def main(argv: list[str]) -> int:
   # Generate the input to minimize.
   status = run_child(["./gen.sh"], run_dir, env)
   if status != 0:
-    return status
+    print(f"Generating the input failed with status {status}.",
+          file=sys.stderr)
+
+    # A status above 128 means the generator was killed by a signal.
+    return status if status > 128 else EXIT_CODE_ERROR
 
   # Export the name of the log file so test.sh can log to it from
   # anywhere.  (creduce runs the program in a temporary directory.)

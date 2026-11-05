@@ -24,9 +24,7 @@ from pathlib import Path
 
 from bm.run_bm import (
   BM_DIR,
-  EXIT_CANNOT_EXECUTE,
-  EXIT_NOT_FOUND,
-  EXIT_USAGE,
+  EXIT_CODE_ERROR,
   MINIMIZER_COMMANDS,
   REPO_DIR,
   main,
@@ -81,14 +79,14 @@ class ValidationTest(TempDirTestCase):
 
   def check_error(self, argv: list[str], message: str) -> None:
     status, out, err = self.run_main(argv)
-    self.assertEqual(status, EXIT_USAGE)
+    self.assertEqual(status, EXIT_CODE_ERROR)
     self.assertEqual(out, "")
     self.assertEqual(err, message + "\n")
 
   def test_usage(self) -> None:
     for argv in ([], ["smin"], ["smin", "bench", "extra"]):
       status, out, err = self.run_main(argv)
-      self.assertEqual(status, EXIT_USAGE)
+      self.assertEqual(status, EXIT_CODE_ERROR)
       self.assertEqual(err, "")
       self.assertIn("Usage: ./run_bm.py <minimizer> <benchmarkdir>", out)
       for name in MINIMIZER_COMMANDS:
@@ -158,7 +156,7 @@ class RunChildTest(TempDirTestCase):
 
   def test_not_found(self) -> None:
     status, _, err = self.run_child([str(self.tmp / "missing")])
-    self.assertEqual(status, EXIT_NOT_FOUND)
+    self.assertEqual(status, EXIT_CODE_ERROR)
     self.assertIn("Cannot run", err)
 
   def test_not_executable(self) -> None:
@@ -166,7 +164,7 @@ class RunChildTest(TempDirTestCase):
     prog.write_text("")
     prog.chmod(0o644)
     status, _, err = self.run_child([str(prog)])
-    self.assertEqual(status, EXIT_CANNOT_EXECUTE)
+    self.assertEqual(status, EXIT_CODE_ERROR)
     self.assertIn("Cannot run", err)
 
   def test_restores_sigterm_handler(self) -> None:
@@ -319,14 +317,22 @@ class ScriptTest(TempDirTestCase):
     bench = self.make_benchmark()
     self.env["PATH"] = str(self.bin_dir)
     proc = self.run_script("delta", str(bench))
-    self.assertEqual(proc.returncode, EXIT_NOT_FOUND)
+    self.assertEqual(proc.returncode, EXIT_CODE_ERROR)
     self.assertIn("Cannot run multimultidelta", proc.stderr)
 
   def test_gen_failure_stops(self) -> None:
     bench = self.make_benchmark(gen_body="exit 5")
     self.fake_delta(": > ran")
     proc = self.run_script("delta", str(bench))
-    self.assertEqual(proc.returncode, 5)
+    self.assertEqual(proc.returncode, EXIT_CODE_ERROR)
+    self.assertIn("failed with status 5", proc.stderr)
+    self.assertFalse((self.run_dir() / "ran").exists())
+
+  def test_gen_killed_by_signal(self) -> None:
+    bench = self.make_benchmark(gen_body="kill -9 $$")
+    self.fake_delta(": > ran")
+    proc = self.run_script("delta", str(bench))
+    self.assertEqual(proc.returncode, 128 + 9)
     self.assertFalse((self.run_dir() / "ran").exists())
 
   def test_prepare_failure(self) -> None:
@@ -334,7 +340,7 @@ class ScriptTest(TempDirTestCase):
     bench = self.make_benchmark()
     (self.cwd / "out").write_text("")
     proc = self.run_script("delta", str(bench))
-    self.assertEqual(proc.returncode, 1)
+    self.assertEqual(proc.returncode, EXIT_CODE_ERROR)
     self.assertIn("Cannot prepare", proc.stderr)
 
   def start_sleeping_minimizer(self) -> subprocess.Popen[str]:
