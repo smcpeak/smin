@@ -1,11 +1,11 @@
 This directory holds some benchmarks, and the scripts to run them on
 some chosen minimizers.
 
-The main script is run-bm.sh.  Run it without arguments to see usage.
+The main script is run_bm.py.  Run it without arguments to see usage.
 
 Individual benchmarks are in subdirectories of this one.
 
-When run-bm.sh runs a benchmark, it puts a TSV into:
+When run_bm.py runs a benchmark, it puts a TSV into:
 
   out/$benchmark/$minimizer/$benchmark-$minimizer.tsv
 
