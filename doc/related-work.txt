@@ -62,6 +62,11 @@ size, although Perses, Pardis, and WDD each address part of that.
   28(2):183-200, February 2002.  DOI 10.1109/32.988498.
   https://www.st.cs.uni-saarland.de/papers/tse2002/tse2002.pdf
 
+  smcpeak:
+
+    Working link:
+    https://www.cs.purdue.edu/homes/xyzhang/fall07/Papers/delta-debugging.pdf
+
   Introduces ddmin, which splits the input into n chunks, tries
   removing each chunk (and each complement), and increases n when
   nothing works.  Defines 1-minimality: removing any single element

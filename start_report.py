@@ -26,8 +26,9 @@ class TestStartReport:
   # S: Number of live tokens in the most recently accepted input.
   last_accepted_tok_count: int
 
-  # P: Outer loop pass number, starting with 1, and ending with
-  # `total_num_passes`.
+  # P: Outer loop pass number, starting with 1, and typically ending
+  # with `total_num_passes` (although, depending on the algorithm,
+  # stopping earlier than that might be possible).
   pass_num: int
 
   # Pm: The total number of passes we expect to perform.
