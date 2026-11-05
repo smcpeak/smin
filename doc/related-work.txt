@@ -113,6 +113,9 @@ size, although Perses, Pardis, and WDD each address part of that.
     out the space of choices in the convex hull of these three
     algorithms.
 
+    I have written a specification for an adaptation of HDD for use in
+    smin; see hdd-algorithm.txt.
+
 2.2 Picireny, and the Szeged HDD papers
 
   Renáta Hodován and Ákos Kiss.  "Modernizing Hierarchical Delta
