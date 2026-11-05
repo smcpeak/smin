@@ -1,0 +1,180 @@
+Hierarchical Delta Debugging (HDD) Algorithm
+--------------------------------------------
+
+This is a specification of the HDD for implementation within smin.
+
+
+Background
+----------
+
+HDD is described in the paper:
+
+  Ghassan Misherghi and Zhendong Su.  "HDD: Hierarchical Delta
+  Debugging."  ICSE 2006, pp. 142-151.
+  https://www.cs.ucdavis.edu/~su/publications/icse06-hdd.pdf
+
+In that paper, Algorithm 1 contains the HDD pseudocode.  Translated to
+pseudo-Python, it is:
+
+  def HDD(input_tree):
+    level = 0
+    nodes = TagNodes(input_tree, level)
+
+    while nodes is not empty:
+      # Apply classic delta-debug flat list minimization.
+      minconfig = ddmin(nodes)
+
+      # Update the tree accordingly.
+      prune(input_tree, level, minconfig)
+
+      level += 1
+      nodes = TagNodes(input_tree, level)
+
+The text explains that TagNodes gathers all of the nodes on a given
+level in the tree into a single list for minimization by ddmin.  I think
+"tagging" simply means having a means to associate the elements of the
+flat list with the tree nodes they came from.
+
+
+Algorithm within smin
+---------------------
+
+Let's elaborate this for use with the smin token tree:
+
+  def nodes_at_level(root: TTNode, level: int) -> list[TTNode]:
+    """
+    Return a list containing every node at the specified level, where 0
+    means the root node, 1 means the root's children, etc., in left to
+    right order.
+    """
+    # details omitted here
+
+  def ddmin(nodes: list[TTNode]) -> list[TTNode]:
+    """
+    Minimize `nodes` w.r.t. the (implicit) acceptance check using
+    classic delta debugging algorithm, except skip the practically
+    useless step of checking for a single node being accepted in
+    isolation.
+
+    The elements of `nodes` do not necessarily have the same parent, and
+    those with the same parent are not necessarily contiguous because
+    they do not contain nodes that have already been replaced by a
+    previous pass.
+    """
+
+    # Current granularity.
+    G: int = len(nodes)
+
+    while nodes is not empty and G > 0:
+      runs: list[list[TTNodes]] = partition `nodes` into runs of length
+        G, with a possibly shorter run last
+
+      for run in reverse(runs):
+        candidate = tree where every node in `run` is replaced by the
+          empty string
+        if candidate is accepted:
+          permanently mark all nodes in `run` as replaced (by empty)
+          continue
+
+        if (there is only one node `N` in `run` and
+            `N` has a non-trivial candidate replacement):
+          candidate = tree where `N` is replaced by its non-trivial
+            replacement
+          if candidate is accepted:
+            permanently mark `N` as replaced by its non-trivial
+              replacement
+            continue
+
+      G //= 2
+
+  def hdd_minimize(root: TTNode) -> None:
+    """
+    Apply HDD to tree rooted at `root`, modifying its replacement
+    mapping (smin `cur_replacement` map).
+    """
+
+    # Start with level 1 rather than 0 because 0 is redundant (all
+    # passes initially try removing all nodes), and starting at 1
+    # matches MA2.
+    level: int = 1
+
+    nodes: list[TTNode] = nodes_at_level(root, level)
+
+    while nodes is not empty:
+      # Minimize and prune in one step.
+      ddmin(nodes)
+
+      level += 1
+      nodes = nodes_at_level(root, level)
+
+
+Progress report
+---------------
+
+The progress report fields are as follows:
+
+  P:  level
+  Pm: MAX_DEPTH
+  G:  G
+  F:  <see next>
+  R:  number of tokens replaced by candidate
+
+F, the completion fraction for a given `ddmin` pass, is calculated as
+the candidate number C divided by the maximum number Cm of candidates,
+where Cm ignores tests with non-trivial replacements.
+
+For example, if `nodes` contains 4 elements [1,2,3,4], and no candidate
+were accepted, and we ignore non-trivial replacements, the tested
+candidates would be:
+
+  At G=4:
+    []             # All nodes removed.
+  At G=2:
+    [1,2]          # Try removing [3,4] first.
+    [3,4]
+  At G=1:
+    [1,2,3]
+    [1,2,4]
+    [1,3,4]
+    [2,3,4]
+
+Thus, Cm = 7, and we number the candidates 0 through 6 (so F is always
+less than 1).
+
+When we do try a non-trivial replacement, it uses the C from its
+trivial replacement candidate, plus 0.5.
+
+As the `ddmin` algorithm runs, C reflects where the candidate is in
+relation to the original complete list of possible candidates, meaning
+it jumps forward when we skip previously replaced nodes.
+
+We can calculate Cm and the starting C for each iteration with a loop:
+
+  def compute_candidate_numbers(n: int) -> int, dict[int, int:
+    """
+    Return Cm for a `ddmin` pass whose input is a list of length `n`,
+    and a map from G to the C for that iteration's starting candidate
+    number.
+    """
+    C: int = 0
+    C_for_G: dict[int, int] = {}
+
+    G = n
+    while G > 0:
+      # Candidate number at the start of pass with granularity G.
+      C_for_G[G] = C
+
+      # Number of candidates we would test if (1) all were rejected and
+      # (2) no non-trivial replacements were tried.
+      C += ceil(n / G)
+
+      # Reduce the granularity the same way `ddmin` does.
+      G //= 2
+
+    return C, C_for_G
+
+Call this at the start of `ddmin` and use its results to feed into the
+progress report.
+
+
+EOF
