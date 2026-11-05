@@ -102,6 +102,9 @@ def run_child(
   def forward_signal(signum: int, frame: Optional[FrameType]) -> None:
     proc.send_signal(signum)
 
+  # Arrange to send SIGTERM to the child if we receive it so the child
+  # (which is often long-running) will not just keep running after this
+  # script dies.
   old_handler = signal.signal(signal.SIGTERM, forward_signal)
   try:
     while True:
