@@ -382,6 +382,7 @@ class ScriptTest(TempDirTestCase):
     self.assertIn("Minimizer time:", out)
 
 
+@unittest.skipUnless(os.environ.get("SLOW") == "1", "requires SLOW=1")
 @unittest.skipUnless(shutil.which("clang"), "requires clang")
 class EndToEndTest(TempDirTestCase):
   def test_smin_on_hello_cpp(self) -> None:
