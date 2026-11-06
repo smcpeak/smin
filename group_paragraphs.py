@@ -23,7 +23,7 @@ def group_paragraphs(node: TTNode, skip_toplevel: bool = False) -> TTNode:
   `node`, so none of those children are grouped together.
   """
   if skip_toplevel and node.token is None:
-    return TTNode.make_group(TTNodeKind.PARAGRAPH,
+    return TTNode.make_group(TTNodeKind.ROOT,
       [recursively_group_sequences(c, _group_paragraph_sequence)
        for c in node.children]
     )

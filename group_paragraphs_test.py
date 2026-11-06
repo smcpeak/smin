@@ -388,8 +388,6 @@ class GroupParagraphsTest(unittest.TestCase):
     # Same input as `test_delimiters_excluded`, but the root's children
     # are not grouped into paragraphs.  The lines inside the braces
     # still are.  (The header and brace group are grouped by Phase 4.5.)
-    #
-    # TODO: Why is the root a PARAGRAPH rather than ROOT?
     self.check("""
       x;
 
@@ -399,7 +397,7 @@ class GroupParagraphsTest(unittest.TestCase):
         b;
       }
       """, r"""
-      PARAGRAPH[
+      ROOT[
         LINE[
           "x"
           ";"
@@ -432,9 +430,8 @@ class GroupParagraphsTest(unittest.TestCase):
       """, skip_toplevel=True)
 
   def test_skip_toplevel_empty(self) -> None:
-    # TODO: Why is the root a PARAGRAPH rather than ROOT?
     self.check("", """
-      PARAGRAPH[
+      ROOT[
       ]
       """, skip_toplevel=True)
 
