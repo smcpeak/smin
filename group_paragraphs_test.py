@@ -308,7 +308,11 @@ class GroupParagraphsTest(unittest.TestCase):
     # Within the braces, " a" and ";" are not first on their line, so
     # they are not part of the paragraph formed by the "b" and "c" lines.
     #
-    # TODO: Why is group containing "c" INDENTATION rather than LINE?
+    # The group containing "c" is INDENTATION rather than LINE because,
+    # after the delimiter pass, the "}" is above the "c" and ";",
+    # neither of which are last on their line, so the lines pass does
+    # nothing.  The indentation pass then groups them because there is
+    # no intervening token with equal or lower indentation level.
     self.check("""
       { a;
         b;
