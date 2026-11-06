@@ -68,9 +68,10 @@ class HDDTest(ReportCheckingTestCase):
     max_passes: int | None = None,
   ) -> Minimizer:
     """Make an HDD minimizer for `src` that reports to `rec`."""
-    return rec.mk_minimizer(build_tree(tokenize_cpp(src)), nt=nt,
-                            max_passes=max_passes,
-                            alg_kind=MinimizationAlgorithmKind.HDD)
+    return rec.mk_min_for_text(src,
+      nt=nt,
+      max_passes=max_passes,
+      alg_kind=MinimizationAlgorithmKind.HDD)
 
   def run_hdd(
     self,

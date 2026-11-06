@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import unittest
 
-from build_tree import build_tree
 from minimizer_test import (
   ACCEPT,
   INTERRUPTED,
@@ -15,7 +14,6 @@ from minimizer_test import (
   ReportCheckingTestCase,
 )
 from token_tree import TTNode
-from tokenize_cpp import tokenize_cpp
 
 
 class MA1Test(ReportCheckingTestCase):
@@ -25,7 +23,7 @@ class MA1Test(ReportCheckingTestCase):
     # The first candidate removes every child of the root, at which
     # point minimization stops.
     rec = Recorder(lambda d: True)
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(b"a b c")))
+    m = rec.mk_min_for_text(b"a b c")
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"")
     self.assertEqual(rec.tested, [b""])
@@ -33,8 +31,7 @@ class MA1Test(ReportCheckingTestCase):
 
   def test_keep_one_identifier(self) -> None:
     rec = Recorder(lambda d: b"keep" in d)
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(
-      b"int a;\nint keep;\nint b;\n")))
+    m = rec.mk_min_for_text(b"int a;\nint keep;\nint b;\n")
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"\nkeep\n")
     self.assertEqual(m._total_num_passes(), 4)
@@ -45,7 +42,7 @@ class MA1Test(ReportCheckingTestCase):
   def test_max_passes(self) -> None:
     src = b"int a;\nint keep;\nint b;\n"
     rec = Recorder(lambda d: b"keep" in d)
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)), max_passes=2)
+    m = rec.mk_min_for_text(src, max_passes=2)
     self.assertEqual(m._total_num_passes(), 2)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"\nint keep;\n")
@@ -54,7 +51,7 @@ class MA1Test(ReportCheckingTestCase):
 
     # A limit above the usual number of passes has no effect.
     rec = Recorder(lambda d: b"keep" in d)
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)), max_passes=5)
+    m = rec.mk_min_for_text(src, max_passes=5)
     self.assertEqual(m._total_num_passes(), 4)
 
   def test_non_trivial_replacement(self) -> None:
@@ -67,16 +64,16 @@ class MA1Test(ReportCheckingTestCase):
       return None
 
     rec = Recorder(lambda d: b"keep" in d and b"f();" in d)
-    m = rec.mk_minimizer(
-      build_tree(tokenize_cpp(b"void f() { x; }\nint keep;\n")), nt=nt)
+    m = rec.mk_min_for_text(
+      b"void f() { x; }\nint keep;\n",
+      nt=nt)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b" f();\nkeep\n")
     self.check_reports(rec, m)
 
   def test_interrupted(self) -> None:
     rec = Recorder(lambda d: b"keep" in d, interrupt_at=4)
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(
-      b"int a;\nint keep;\nint b;\n")))
+    m = rec.mk_min_for_text(b"int a;\nint keep;\nint b;\n")
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
     self.assertEqual(rec.finishes[-1], (INTERRUPTED, False))
     self.assertEqual(len(rec.tested), 4)
@@ -119,7 +116,7 @@ int main()
               d.count(b"(") == d.count(b")"))
 
     rec = Recorder(accept)
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)))
+    m = rec.mk_min_for_text(src)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     result = m.get_minimized_test_input()
     self.assertTrue(accept(result))

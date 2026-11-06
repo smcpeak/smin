@@ -122,6 +122,31 @@ class Recorder:
     )
     return self.minimizer
 
+  def mk_min_for_text(
+    self,
+    src: bytes,
+    *,
+    # TODO: Factor these as a new MinimizerOptions class.
+    max_passes: int | None = None,
+    alg_kind: MinimizationAlgorithmKind = MinimizationAlgorithmKind.MA1,
+    nt: NTReplacementFunc = no_replacement,
+    should_stop: StopQueryFunc | None = None,
+    ma2_brace_group_func: BraceGroupFunc | None = None,
+  ) -> Minimizer:
+    """
+    Return `mk_minimizer(build_tree(tokenize_cpp(src)), <args>)`.
+    """
+    tree: TTNode = build_tree(tokenize_cpp(src))
+
+    return self.mk_minimizer(
+      tree,
+      max_passes           = max_passes,
+      alg_kind             = alg_kind,
+      nt                   = nt,
+      should_stop          = should_stop,
+      ma2_brace_group_func = ma2_brace_group_func,
+    )
+
   def finish(self, result: AcceptanceTestResult, memoized: bool) -> None:
     self.finishes.append((result, memoized))
 
@@ -311,7 +336,7 @@ class MinimizerTest(ReportCheckingTestCase):
 
   def test_empty_input(self) -> None:
     rec = Recorder(lambda d: True)
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(b"")))
+    m = rec.mk_min_for_text(b"")
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"")
     self.assertEqual(rec.tested, [])
@@ -323,7 +348,7 @@ class MinimizerTest(ReportCheckingTestCase):
     # rendering restores it.)
     src = b"a;\nb;\nc;\nd;"
     rec = Recorder(lambda d: d == src)
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)))
+    m = rec.mk_min_for_text(src)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.check_reports(rec, m)
 
@@ -335,7 +360,7 @@ class MinimizerTest(ReportCheckingTestCase):
   def test_initial_input_memoized(self) -> None:
     rec = Recorder(lambda d: True)
     src = b"a;\nb;\n"
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)))
+    m = rec.mk_min_for_text(src)
     self.assertEqual(list(m.memoized_accept.values()), [ACCEPT])
     self.assertEqual(m.render_candidate({}), src)
 
@@ -355,7 +380,7 @@ class MinimizerTest(ReportCheckingTestCase):
 
   def test_run_twice_fails(self) -> None:
     rec = Recorder(lambda d: True)
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(b"a")))
+    m = rec.mk_min_for_text(b"a")
     m.run_minimizer()
     with self.assertRaises(AssertionError):
       m.run_minimizer()
@@ -373,12 +398,11 @@ class ShouldStopTest(unittest.TestCase):
     src: bytes = SRC,
   ) -> tuple[Recorder, Minimizer]:
     """
-    Make a minimizer for `src` that stops when `should_stop`, given the
-    recorder, returns True.
+    Make a minimizer for `src` that stops when `should_stop` returns
+    True.
     """
     rec = Recorder(accept)
-    m = rec.mk_minimizer(
-      build_tree(tokenize_cpp(src)),
+    m = rec.mk_min_for_text(src,
       should_stop = lambda: should_stop(rec),
     )
     return rec, m
@@ -443,8 +467,7 @@ class ShouldStopTest(unittest.TestCase):
       calls.append(None)
       return True
 
-    m = rec.mk_minimizer(build_tree(tokenize_cpp(self.SRC)),
-                         should_stop=should_stop)
+    m = rec.mk_min_for_text(self.SRC, should_stop=should_stop)
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
     self.assertFalse(m.stop_requested)
     self.assertEqual(calls, [])
