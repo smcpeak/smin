@@ -16,7 +16,6 @@ from typing import Optional
 from abstract_range import AbstractRange
 from acceptance_test_result import AcceptanceTestResult
 from byte_range import ByteRange
-from ma_kind import MinimizationAlgorithmKind
 from smin_token import SMToken
 from start_report import TestStartReport
 from token_tree import TTNode
@@ -271,16 +270,6 @@ class Minimizer(ABC):
     self.memoized_accept = {
       _digest(initial_text): AcceptanceTestResult.ACCEPT,
     }
-
-
-  @abstractmethod
-  def get_ma_kind(self) -> MinimizationAlgorithmKind:
-    """
-    Return which algorithm this object implements.
-
-    TODO: Remove the need for this method.
-    """
-    pass
 
 
   @abstractmethod

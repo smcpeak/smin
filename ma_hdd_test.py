@@ -90,11 +90,6 @@ class HDDTest(ReportCheckingTestCase):
     self.check_reports(rec, m)
     return rec, m
 
-  def test_kind(self) -> None:
-    m = self.make_hdd(Recorder(lambda d: True), b"a")
-    self.assertIsInstance(m, HDDMinimizer)
-    self.assertEqual(m.get_ma_kind(), MinimizationAlgorithmKind.HDD)
-
   def test_empty_input(self) -> None:
     rec, m = self.run_hdd(b"", lambda d: True)
     self.assertEqual(m._total_num_passes(), 0)

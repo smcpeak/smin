@@ -5,7 +5,6 @@ Minimization algorithm 1 (MA1).
 
 from __future__ import annotations
 
-from ma_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
 from token_tree import TTNode
 
@@ -24,10 +23,6 @@ class MA1Minimizer(Minimizer):
   # TODO: The base class has the meat of both MA1 and MA2.  After
   # splitting this class, move those methods to the appropriate
   # subclass.
-
-
-  def get_ma_kind(self) -> MinimizationAlgorithmKind:
-    return MinimizationAlgorithmKind.MA1
 
 
   def _total_num_passes(self) -> int:

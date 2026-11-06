@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import math
 
-from ma_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
 from token_tree import TTNode
 
@@ -61,10 +60,6 @@ class HDDMinimizer(Minimizer):
   # Cm: The maximum number of candidates in the current `_ddmin` call,
   # ignoring those with non-trivial replacements.
   hdd_max_candidates: int = 0
-
-
-  def get_ma_kind(self) -> MinimizationAlgorithmKind:
-    return MinimizationAlgorithmKind.HDD
 
 
   def _total_num_passes(self) -> int:

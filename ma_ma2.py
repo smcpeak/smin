@@ -8,7 +8,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any, Optional
 
-from ma_kind import MinimizationAlgorithmKind
 from minimizer import BraceGroupFunc, Minimizer
 from token_tree import TTNode
 
@@ -54,10 +53,6 @@ class MA2Minimizer(Minimizer):
     self.max_depth = (
       self.tree_root.depth() if is_brace_group is None
       else self._brace_depth(self.tree_root))
-
-
-  def get_ma_kind(self) -> MinimizationAlgorithmKind:
-    return MinimizationAlgorithmKind.MA2
 
 
   def _total_num_passes(self) -> int:
