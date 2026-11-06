@@ -6,6 +6,8 @@ Utilities shared by the unit tests.
 from __future__ import annotations
 
 import textwrap
+import unittest
+from collections.abc import Callable
 
 from token_tree import TTNode
 
@@ -37,6 +39,43 @@ def all_nodes(node: TTNode) -> list[TTNode]:
   for child in node.children:
     nodes.extend(all_nodes(child))
   return nodes
+
+
+def check_grouping_phase(
+  tc: unittest.TestCase,
+  data: bytes,
+  input_tree: TTNode,
+  phase: Callable[[TTNode], TTNode],
+  expect: str,
+) -> TTNode:
+  """
+  Using the assertions of `tc`, check that applying the grouping
+  `phase` to `input_tree`, which was built from `data` by the earlier
+  phases, yields a tree whose debug string is `expect` (dedented).
+  Also check the properties every grouping phase must have.  Return the
+  tree.
+  """
+  input_debug = input_tree.to_debug_string()
+
+  tree = phase(input_tree)
+
+  tc.assertEqual(tree.to_debug_string(), dedent(expect))
+  tc.assertEqual(tree.text(), data)
+  tree.self_check()
+
+  # The input tree is unchanged, and shares no nodes with the output,
+  # but the tokens themselves are shared.
+  tc.assertEqual(input_tree.to_debug_string(), input_debug)
+  input_ids = {id(n) for n in all_nodes(input_tree)}
+  tc.assertFalse(any(id(n) in input_ids for n in all_nodes(tree)))
+  for t1, t2 in zip(input_tree.tokens(), tree.tokens(), strict=True):
+    tc.assertIs(t1, t2)
+
+  # The grouping phases neither create nor destroy delimiter groups.
+  tc.assertFalse(tree.is_delim_group())
+  tc.assertEqual(delim_group_texts(tree), delim_group_texts(input_tree))
+
+  return tree
 
 
 # EOF

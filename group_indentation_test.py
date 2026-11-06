@@ -10,7 +10,7 @@ import unittest
 from group_delimiters import group_delimiters
 from group_indentation import group_indentation
 from group_lines import group_lines
-from test_util import all_nodes, dedent, delim_group_texts
+from test_util import check_grouping_phase, dedent
 from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
 
@@ -24,27 +24,8 @@ class GroupIndentationTest(unittest.TestCase):
     """
     data = dedent(src).encode("utf-8")
     input_tree = group_lines(group_delimiters(tokenize_cpp(data)))
-    input_debug = input_tree.to_debug_string()
-
-    tree = group_indentation(input_tree)
-
-    self.assertEqual(tree.to_debug_string(), dedent(expect))
-    self.assertEqual(tree.text(), data)
-    tree.self_check()
-
-    # The input tree is unchanged, and shares no nodes with the output,
-    # but the tokens themselves are shared.
-    self.assertEqual(input_tree.to_debug_string(), input_debug)
-    input_ids = {id(n) for n in all_nodes(input_tree)}
-    self.assertFalse(any(id(n) in input_ids for n in all_nodes(tree)))
-    for t1, t2 in zip(input_tree.tokens(), tree.tokens(), strict=True):
-      self.assertIs(t1, t2)
-
-    # Phase 4 neither creates nor destroys delimiter groups.
-    self.assertFalse(tree.is_delim_group())
-    self.assertEqual(delim_group_texts(tree), delim_group_texts(input_tree))
-
-    return tree
+    return check_grouping_phase(self, data, input_tree, group_indentation,
+                                expect)
 
   def test_empty(self) -> None:
     self.check("", """
