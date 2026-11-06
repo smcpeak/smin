@@ -39,6 +39,7 @@ EXIT_CODE_ERROR = 2
 TEST_SH = "./test.sh"
 INPUT = "input"
 
+
 @dataclass(frozen=True)
 class MinimizerSpec:
   """How to run one minimizer."""
@@ -53,8 +54,6 @@ class MinimizerSpec:
 
 # Map from minimizer name to how to run it.
 _SMIN_PY: str = str(REPO_DIR / "smin.py")
-_SMIN_MA2_BG: list[str] = [
-  _SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT]
 MINIMIZERS: dict[str, MinimizerSpec] = {
   "smin":     MinimizerSpec([_SMIN_PY, TEST_SH, "--", INPUT]),
   "smin-ma2": MinimizerSpec([_SMIN_PY, "--ma2", TEST_SH, "--", INPUT]),
@@ -65,10 +64,12 @@ MINIMIZERS: dict[str, MinimizerSpec] = {
   "creduce":  MinimizerSpec(["creduce", "--n", "1", TEST_SH, INPUT]),
   "cvise":    MinimizerSpec(["cvise", "--n", "1", TEST_SH, INPUT]),
 
-  "smin-ma2-bg": MinimizerSpec(_SMIN_MA2_BG),
+  "smin-ma2-bg": MinimizerSpec(
+    [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT]),
 
-  # Like smin-ma2-bg, but skipping the paragraph grouping phase.
-  "smin-ma2-bg-sp": MinimizerSpec(_SMIN_MA2_BG, env={"SKIP_PARA": "1"}),
+  "smin-ma2-bg-sp": MinimizerSpec(
+    [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT],
+    env={"SKIP_PARA": "1"}),
 }
 
 
