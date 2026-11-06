@@ -5,6 +5,8 @@ Unit tests for build_tree.
 
 from __future__ import annotations
 
+import os
+import sys
 import unittest
 
 from build_tree import build_tree
@@ -254,8 +256,24 @@ class BuildTreeTest(unittest.TestCase):
     self.assertEqual(build_tree(tokenize_cpp(b"f(g(x))")).depth(), 3)
 
 
+def print_tree_for_file(fname: str) -> None:
+  """
+  Build the token tree for the C++ file `fname`, and print its debug
+  string.  This is a debugging aid, not a test.
+  """
+  with open(fname, "rb") as f:
+    data = f.read()
+  print(build_tree(tokenize_cpp(data)).to_debug_string(), end="")
+
+
 if __name__ == "__main__":
-  unittest.main()
+  # With a single argument that names a file, print its tree.  Otherwise,
+  # run the tests, passing any arguments to unittest (which accepts test
+  # names, which are unlikely to also be file names).
+  if len(sys.argv) == 2 and os.path.isfile(sys.argv[1]):
+    print_tree_for_file(sys.argv[1])
+  else:
+    unittest.main()
 
 
 # EOF
