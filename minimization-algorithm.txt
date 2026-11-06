@@ -492,6 +492,78 @@ Motivation:
   name is sufficiently distinct from the primary MA1 function.
 
 
+Minimization Algorithm 3 (MA3)
+------------------------------
+
+MA3 IS WORK IN PROGRESS; IGNORE FOR NOW
+
+MA3 operates on a subset of token tree nodes we call the "brace tree
+nodes".  At level 1, it has all nodes that are the child of the root.
+At level 2, it has all nodes that are the child of a brace-delimited
+group node (BDGN) that is not a descendant of any BDGN, excluding the
+delimiter tokens.  At level N, it has all nodes that are the child of a
+BDGN B for which the path from the root to B goes through N-2 BDGNs.
+
+For example, if the input is:
+
+  int foo()
+  {
+    return 0;
+  }
+
+  int bar()
+  {
+    while (1) {
+      g();
+      h();
+
+      if (1) {
+        j();
+      }
+    }
+    return 1;
+  }
+
+then:
+
+* The level 1 nodes are the definitions of "foo" and "bar".
+
+* The level 2 nodes are "return 0;", "while ...", and "return 1;".
+
+* The level 3 nodes are "g();", "h();", and "if ...".
+
+* The level 4 node is "j();".
+
+The nodes of the brace tree are organized into parent-child
+relationships in the obvious way:
+
+  - "int foo() ..."
+    - "return 0;"
+  - "int bar() ..."
+    - "while ..."
+      - "g();"
+      - "h();"
+      - "if ..."
+        - "j();"
+    - "return 1;
+
+MA3 begins by attempting to remove the last level 1 node from the input.
+If this is successful, it increases its removal granularity to 2, then
+tries to remove the last 2 level 1 nodes.  Each time removal is
+successful, the granularity of removal attempts doubles.  When a removal
+attempt is unsuccessful, the granularity is halved.
+
+MA3 works like MA2 except:
+
+* It operates on the brace tree nodes.
+
+* Once a certain number, max_necessary (default: 10) of nodes are found
+  to be necessary, it increases the target_depth by 1.
+
+* When target_depth hits its limit, increase max_necessary by its
+  initial value (default 10) and reset target_depth to 1.
+
+
 Candidate testing
 -----------------
 
