@@ -492,6 +492,43 @@ Motivation:
   name is sufficiently distinct from the primary MA1 function.
 
 
+MA2 --ma2-brace-groups
+----------------------
+
+If MA2 is used, and the --ma2-brace-groups option is passed to smin,
+then MA2 will exclusively operate on nodes that are either a child of
+the root, or are directly contained by a brace-delimited group node.
+
+Specifically, at the point we recursively call `ma2_min_node`:
+
+  If `max_depth` > 1:
+
+    Invoke `ma2_min_node(c, max_depth-1)`.
+
+instead, invoke a new function:
+
+  def get_brace_groups(n: TTNode) -> Iterator[TTNode]:
+    """
+    If `n` is a brace group, yield it alone.  Otherwise, perform a
+    depth-first search of `n`, in right-to-left child order, yielding
+    every node that is a descendant of `n`, is a brace-delimited group,
+    and does not have a brace-delimited group between it and `n`.
+    """
+    # details omitted here
+
+and invoke the recursive call on all of the yielded brace groups:
+
+  If `max_depth` > 1:
+
+    For `bg` in `get_brace_groups(c)`:
+      Invoke `ma2_min_node(bg, max_depth-1)`.
+
+When --ma2-brace-groups is specified, use an altered definition of
+MAX_DEPTH that only counts edges that either (1) connect the root node
+to one of its children, or (2) connect some node to a child that is a
+brace-delimited group.
+
+
 Minimization Algorithm 3 (MA3)
 ------------------------------
 
