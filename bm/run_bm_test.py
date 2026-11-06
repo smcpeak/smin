@@ -21,11 +21,14 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from bm.run_bm import (
   BM_DIR,
   EXIT_CODE_ERROR,
+  MINIMIZERS,
   REPO_DIR,
+  MinimizerSpec,
   main,
   prepare_run_dir,
   run_child,
@@ -371,6 +374,40 @@ class ScriptTest(TempDirTestCase):
     self.assertEqual(proc.returncode, 128 + signal.SIGINT)
     self.assertEqual(err, "")
     self.assertIn("Minimizer time:", out)
+
+
+
+class MinimizerEnvTest(TempDirTestCase):
+  """Tests of the extra environment variables a minimizer can specify."""
+
+  def test_env_is_set(self) -> None:
+    # Run `main` in-process, with a stand-in minimizer added to the
+    # table, and the temporary directory as the current directory.
+    bench = self.make_benchmark(gen_body=(
+      'echo "gen=$MY_VAR" > gen.log\n'
+      ': > input'))
+    fake = self.tmp / "fake-minimizer"
+    write_script(fake, 'echo "min=$MY_VAR" > min.log')
+    spec = MinimizerSpec([str(fake)], env={"MY_VAR": "a b"})
+
+    out = io.StringIO()
+    with mock.patch.dict(MINIMIZERS, {"fake": spec}), \
+         contextlib.chdir(self.tmp), \
+         contextlib.redirect_stdout(out):
+      status = main(["fake", str(bench)])
+
+    self.assertEqual(status, 0)
+    self.assertIn("export 'MY_VAR=a b'\n", out.getvalue())
+    run_dir = self.tmp / "out" / "bench" / "fake"
+    self.assertEqual((run_dir / "gen.log").read_text(), "gen=a b\n")
+    self.assertEqual((run_dir / "min.log").read_text(), "min=a b\n")
+
+  def test_smin_ma2_bg_sp(self) -> None:
+    bg = MINIMIZERS["smin-ma2-bg"]
+    sp = MINIMIZERS["smin-ma2-bg-sp"]
+    self.assertEqual(sp.command, bg.command)
+    self.assertEqual(bg.env, {})
+    self.assertEqual(sp.env, {"SKIP_PARA": "1"})
 
 
 @unittest.skipUnless(os.environ.get("SLOW") == "1", "requires SLOW=1")

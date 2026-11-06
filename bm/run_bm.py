@@ -22,6 +22,7 @@ import shutil
 import signal
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import FrameType
 from typing import Optional
@@ -38,20 +39,36 @@ EXIT_CODE_ERROR = 2
 TEST_SH = "./test.sh"
 INPUT = "input"
 
-# Map from minimizer name to the command that runs it in a run directory.
+@dataclass(frozen=True)
+class MinimizerSpec:
+  """How to run one minimizer."""
+
+  # The command that runs it in a run directory.
+  command: list[str]
+
+  # Additional environment variables to set while running the benchmark,
+  # typically to enable experimental behavior.
+  env: dict[str, str] = field(default_factory=dict)
+
+
+# Map from minimizer name to how to run it.
 _SMIN_PY: str = str(REPO_DIR / "smin.py")
-MINIMIZER_COMMANDS: dict[str, list[str]] = {
-  "smin":     [_SMIN_PY, TEST_SH, "--", INPUT],
-  "smin-ma2": [_SMIN_PY, "--ma2", TEST_SH, "--", INPUT],
-  "smin-hdd": [_SMIN_PY, "--hdd", TEST_SH, "--", INPUT],
-  "delta":    ["multimultidelta", TEST_SH, INPUT],
+_SMIN_MA2_BG: list[str] = [
+  _SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT]
+MINIMIZERS: dict[str, MinimizerSpec] = {
+  "smin":     MinimizerSpec([_SMIN_PY, TEST_SH, "--", INPUT]),
+  "smin-ma2": MinimizerSpec([_SMIN_PY, "--ma2", TEST_SH, "--", INPUT]),
+  "smin-hdd": MinimizerSpec([_SMIN_PY, "--hdd", TEST_SH, "--", INPUT]),
+  "delta":    MinimizerSpec(["multimultidelta", TEST_SH, INPUT]),
 
   # --n 1 causes these to run sequentially.
-  "creduce":  ["creduce", "--n", "1", TEST_SH, INPUT],
-  "cvise":    ["cvise", "--n", "1", TEST_SH, INPUT],
+  "creduce":  MinimizerSpec(["creduce", "--n", "1", TEST_SH, INPUT]),
+  "cvise":    MinimizerSpec(["cvise", "--n", "1", TEST_SH, INPUT]),
 
-  "smin-ma2-bg":
-    [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT],
+  "smin-ma2-bg": MinimizerSpec(_SMIN_MA2_BG),
+
+  # Like smin-ma2-bg, but skipping the paragraph grouping phase.
+  "smin-ma2-bg-sp": MinimizerSpec(_SMIN_MA2_BG, env={"SKIP_PARA": "1"}),
 }
 
 
@@ -62,7 +79,7 @@ def usage_text() -> str:
     "",
     "<minimizer> is one of:",
   ]
-  lines += [f"  {name}" for name in MINIMIZER_COMMANDS]
+  lines += [f"  {name}" for name in MINIMIZERS]
   return "\n".join(lines)
 
 
@@ -177,7 +194,8 @@ def main(argv: list[str]) -> int:
 
   minimizer, benchmark_arg = argv
 
-  if minimizer not in MINIMIZER_COMMANDS:
+  spec = MINIMIZERS.get(minimizer)
+  if spec is None:
     print(f"Unrecognized minimizer: {minimizer}", file=sys.stderr)
     return EXIT_CODE_ERROR
 
@@ -206,6 +224,11 @@ def main(argv: list[str]) -> int:
   env = dict(os.environ)
   env["T_ACCEPT_PY"] = str(REPO_DIR / "t_accept.py")
 
+  # Variables specific to this minimizer.
+  for name, value in spec.env.items():
+    print(f"export {shlex.quote(f'{name}={value}')}")
+    env[name] = value
+
   # Generate the input to minimize.
   status = run_child(["./gen.sh"], run_dir, env)
   if status != 0:
@@ -219,7 +242,7 @@ def main(argv: list[str]) -> int:
   # anywhere.  (creduce runs the program in a temporary directory.)
   env["T_ACCEPT_LOG_TSV"] = str(run_dir / f"{benchmark}-{minimizer}.tsv")
 
-  return run_minimizer(MINIMIZER_COMMANDS[minimizer], run_dir, env)
+  return run_minimizer(spec.command, run_dir, env)
 
 
 if __name__ == "__main__":
