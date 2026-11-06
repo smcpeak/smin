@@ -525,8 +525,8 @@ and invoke the recursive call on all of the yielded brace groups:
 
 When --ma2-brace-groups is specified, use an altered definition of
 MAX_DEPTH that only counts edges that either (1) connect the root node
-to one of its children, or (2) connect some node to a child that is a
-brace-delimited group.
+to one of its children, or (2) connect a brace group to a child other
+than its delimiters.
 
 
 Minimization Algorithm 3 (MA3)
