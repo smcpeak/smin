@@ -16,9 +16,10 @@ from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
 
 
+# TODO: This function is duplicated in multiple tests.
 def delim_group_texts(node: TTNode) -> list[bytes]:
   """Return the text of each delimiter group under `node`, in preorder."""
-  return [g.text() for g in all_groups(node) if g.delim_group]
+  return [g.text() for g in all_groups(node) if g.is_delim_group()]
 
 
 class GroupHeadBodyTest(unittest.TestCase):
@@ -47,7 +48,7 @@ class GroupHeadBodyTest(unittest.TestCase):
       self.assertIs(t1, t2)
 
     # Phase 4.5 neither creates nor destroys delimiter groups.
-    self.assertFalse(tree.delim_group)
+    self.assertFalse(tree.is_delim_group())
     self.assertEqual(delim_group_texts(tree), delim_group_texts(input_tree))
 
     return tree
@@ -58,7 +59,7 @@ class GroupHeadBodyTest(unittest.TestCase):
 
   def test_empty(self) -> None:
     self.check("", """
-      [
+      ROOT[
       ]
       """)
 
@@ -70,22 +71,22 @@ class GroupHeadBodyTest(unittest.TestCase):
         a;
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           ";"
         ]
-        [
-          [
+        HEAD_BODY[
+          LINE[
             "\nf"
-            [
+            DELIMITER[
               "("
               ")"
             ]
           ]
-          [
+          DELIMITER[
             "\n{"
-            [
+            LINE[
               "\n  a"
               ";"
             ]
@@ -105,18 +106,18 @@ class GroupHeadBodyTest(unittest.TestCase):
         }
       }
       """, r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "{"
-          [
-            [
+          HEAD_BODY[
+            LINE[
               "\n  f"
-              [
+              DELIMITER[
                 "("
                 ")"
               ]
             ]
-            [
+            DELIMITER[
               "\n  {"
               "\n  }"
             ]
@@ -130,18 +131,18 @@ class GroupHeadBodyTest(unittest.TestCase):
   def test_spaces_and_tabs_equivalent(self) -> None:
     # The head is indented with one tab, the body with one space.
     self.check_bytes(b"{\n\tf()\n {\n }\n}\n", r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "{"
-          [
-            [
+          HEAD_BODY[
+            LINE[
               "\n\tf"
-              [
+              DELIMITER[
                 "("
                 ")"
               ]
             ]
-            [
+            DELIMITER[
               "\n {"
               "\n }"
             ]
@@ -160,17 +161,17 @@ class GroupHeadBodyTest(unittest.TestCase):
         }
       }
       """, r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "{"
-          [
+          LINE[
             "\n    f"
-            [
+            DELIMITER[
               "("
               ")"
             ]
           ]
-          [
+          DELIMITER[
             "\n  {"
             "\n  }"
           ]
@@ -188,16 +189,16 @@ class GroupHeadBodyTest(unittest.TestCase):
       {
       }
       """, r"""
-      [
-        [
-          [
+      ROOT[
+        HEAD_BODY[
+          LINE[
             "f"
-            [
+            DELIMITER[
               "("
               ")"
             ]
           ]
-          [
+          DELIMITER[
             "\n{"
             "\n}"
           ]
@@ -209,16 +210,16 @@ class GroupHeadBodyTest(unittest.TestCase):
   def test_first_token_in_file_indented(self) -> None:
     # The first token's indentation is all of its leading whitespace.
     self.check_bytes(b"  f()\n  {\n  }\n", r"""
-      [
-        [
-          [
+      ROOT[
+        HEAD_BODY[
+          LINE[
             "  f"
-            [
+            DELIMITER[
               "("
               ")"
             ]
           ]
-          [
+          DELIMITER[
             "\n  {"
             "\n  }"
           ]
@@ -229,15 +230,15 @@ class GroupHeadBodyTest(unittest.TestCase):
 
   def test_first_token_in_file_more_indented_than_body(self) -> None:
     self.check_bytes(b"  f()\n{\n}\n", r"""
-      [
-        [
+      ROOT[
+        LINE[
           "  f"
-          [
+          DELIMITER[
             "("
             ")"
           ]
         ]
-        [
+        DELIMITER[
           "\n{"
           "\n}"
         ]
@@ -254,11 +255,11 @@ class GroupHeadBodyTest(unittest.TestCase):
       }
       }
       """, r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "{"
           " f"
-          [
+          DELIMITER[
             "\n{"
             "\n}"
           ]
@@ -277,19 +278,19 @@ class GroupHeadBodyTest(unittest.TestCase):
       {
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           ";"
         ]
-        [
+        LINE[
           "\nf"
-          [
+          DELIMITER[
             "("
             ")"
           ]
         ]
-        [
+        DELIMITER[
           "\n\n{"
           "\n}"
         ]
@@ -300,20 +301,20 @@ class GroupHeadBodyTest(unittest.TestCase):
   def test_crlf_before_body(self) -> None:
     # A CRLF line break before the body's opener is treated like LF.
     self.check_bytes(b"x;\r\nf()\r\n{\r\n}\r\n", r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           ";"
         ]
-        [
-          [
+        HEAD_BODY[
+          LINE[
             "\r\nf"
-            [
+            DELIMITER[
               "("
               ")"
             ]
           ]
-          [
+          DELIMITER[
             "\r\n{"
             "\r\n}"
           ]
@@ -324,19 +325,19 @@ class GroupHeadBodyTest(unittest.TestCase):
 
   def test_crlf_blank_line_before_body(self) -> None:
     self.check_bytes(b"x;\r\nf()\r\n\r\n{\r\n}\r\n", r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           ";"
         ]
-        [
+        LINE[
           "\r\nf"
-          [
+          DELIMITER[
             "("
             ")"
           ]
         ]
-        [
+        DELIMITER[
           "\r\n\r\n{"
           "\r\n}"
         ]
@@ -352,18 +353,18 @@ class GroupHeadBodyTest(unittest.TestCase):
       f() {
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           ";"
         ]
-        [
+        LINE[
           "\nf"
-          [
+          DELIMITER[
             "("
             ")"
           ]
-          [
+          DELIMITER[
             " {"
             "\n}"
           ]
@@ -378,19 +379,19 @@ class GroupHeadBodyTest(unittest.TestCase):
       f()
       y;
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           ";"
         ]
-        [
+        LINE[
           "\nf"
-          [
+          DELIMITER[
             "("
             ")"
           ]
         ]
-        [
+        LINE[
           "\ny"
           ";"
         ]
@@ -405,12 +406,12 @@ class GroupHeadBodyTest(unittest.TestCase):
       {
       }
       """, r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "("
           ")"
         ]
-        [
+        DELIMITER[
           "\n{"
           "\n}"
         ]
@@ -429,25 +430,25 @@ class GroupHeadBodyTest(unittest.TestCase):
       {
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           ";"
         ]
-        [
-          [
+        HEAD_BODY[
+          LINE[
             "\nf"
-            [
+            DELIMITER[
               "("
               ")"
             ]
           ]
-          [
+          DELIMITER[
             "\n{"
             "\n}"
           ]
         ]
-        [
+        DELIMITER[
           "\n{"
           "\n}"
         ]

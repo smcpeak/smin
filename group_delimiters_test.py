@@ -27,21 +27,21 @@ class GroupDelimitersTest(unittest.TestCase):
     tree.self_check()
 
     # Phase 2 creates only delimiter groups, under a root that is not.
-    self.assertFalse(tree.delim_group)
+    self.assertFalse(tree.is_delim_group())
     for group in all_groups(tree)[1:]:
-      self.assertTrue(group.delim_group)
+      self.assertTrue(group.is_delim_group())
 
     return tree
 
   def test_empty(self) -> None:
     self.check("", """
-      [
+      ROOT[
       ]
       """)
 
   def test_no_delimiters(self) -> None:
     self.check("a b;", r"""
-      [
+      ROOT[
         "a"
         " b"
         ";"
@@ -50,9 +50,9 @@ class GroupDelimitersTest(unittest.TestCase):
 
   def test_simple(self) -> None:
     tree = self.check("f(x);", r"""
-      [
+      ROOT[
         "f"
-        [
+        DELIMITER[
           "("
           "x"
           ")"
@@ -60,22 +60,22 @@ class GroupDelimitersTest(unittest.TestCase):
         ";"
       ]
       """)
-    self.assertTrue(tree.children[1].delim_group)
+    self.assertTrue(tree.children[1].is_delim_group())
 
   def test_nested(self) -> None:
     self.check("a[(b)]{}", r"""
-      [
+      ROOT[
         "a"
-        [
+        DELIMITER[
           "["
-          [
+          DELIMITER[
             "("
             "b"
             ")"
           ]
           "]"
         ]
-        [
+        DELIMITER[
           "{"
           "}"
         ]
@@ -84,8 +84,8 @@ class GroupDelimitersTest(unittest.TestCase):
 
   def test_eof_whitespace(self) -> None:
     self.check("()\n", r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "("
           ")"
         ]
@@ -99,9 +99,9 @@ class GroupDelimitersTest(unittest.TestCase):
         ")"
       )
       """, r"""
-      [
+      ROOT[
         "f"
-        [
+        DELIMITER[
           "("
           " // )"
           "\n  \")\""
@@ -113,7 +113,7 @@ class GroupDelimitersTest(unittest.TestCase):
 
   def test_unpaired_closer_at_top_level(self) -> None:
     tree = self.check("a)", r"""
-      [
+      ROOT[
         "a"
         ")"
       ]
@@ -122,7 +122,7 @@ class GroupDelimitersTest(unittest.TestCase):
 
   def test_unpaired_opener_at_eof(self) -> None:
     self.check("f(a[b", r"""
-      [
+      ROOT[
         "f"
         "("
         "a"
@@ -133,8 +133,8 @@ class GroupDelimitersTest(unittest.TestCase):
 
   def test_unpaired_closer_inside_group(self) -> None:
     self.check("(a ] b)", r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "("
           "a"
           " ]"
@@ -148,8 +148,8 @@ class GroupDelimitersTest(unittest.TestCase):
     # The "}" is not first on its line, and the top of the stack is "(",
     # so the stack is searched for a "{" with the same indentation.
     self.check("{ ( }", r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "{"
           " ("
           " }"
@@ -162,7 +162,7 @@ class GroupDelimitersTest(unittest.TestCase):
       {
         ( }
       """, r"""
-      [
+      ROOT[
         "{"
         "\n  ("
         " }"
@@ -176,7 +176,7 @@ class GroupDelimitersTest(unittest.TestCase):
         (
       }
       """, r"""
-      [
+      ROOT[
         "["
         "\n  ("
         "\n}"
@@ -193,11 +193,11 @@ class GroupDelimitersTest(unittest.TestCase):
           y; }
       }
       """, r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "{"
           "\n  if"
-          [
+          DELIMITER[
             " {"
             "\n    y"
             ";"
@@ -216,11 +216,11 @@ class GroupDelimitersTest(unittest.TestCase):
             a
           );
       """, r"""
-      [
+      ROOT[
         "x"
         " ="
         " f"
-        [
+        DELIMITER[
           "("
           "\n      a"
           "\n    )"
@@ -236,13 +236,13 @@ class GroupDelimitersTest(unittest.TestCase):
         g(
       }
       """, r"""
-      [
+      ROOT[
         "f"
-        [
+        DELIMITER[
           "("
           ")"
         ]
-        [
+        DELIMITER[
           " {"
           "\n  g"
           "("
@@ -258,8 +258,8 @@ class GroupDelimitersTest(unittest.TestCase):
         [
       )
       """, r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "("
           "\n  ["
           "\n)"
@@ -281,18 +281,18 @@ class GroupDelimitersTest(unittest.TestCase):
         }
       }
       """, r"""
-      [
+      ROOT[
         "void"
         " f"
-        [
+        DELIMITER[
           "("
           ")"
         ]
-        [
+        DELIMITER[
           " {"
           "\n#if A"
           "\n  if"
-          [
+          DELIMITER[
             " ("
             "a"
             ")"
@@ -300,16 +300,16 @@ class GroupDelimitersTest(unittest.TestCase):
           " {"
           "\n#else"
           "\n  if"
-          [
+          DELIMITER[
             " ("
             "b"
             ")"
           ]
-          [
+          DELIMITER[
             " {"
             "\n#endif"
             "\n    x"
-            [
+            DELIMITER[
               "("
               ")"
             ]
@@ -342,12 +342,12 @@ class GroupDelimitersTest(unittest.TestCase):
         return 0;
       }
       """, r"""
-      [
+      ROOT[
         "#include <iostream>"
         "        // std::cout"
         "\n\nint"
         " main"
-        [
+        DELIMITER[
           "("
           "int"
           " argc"
@@ -358,7 +358,7 @@ class GroupDelimitersTest(unittest.TestCase):
           "argv"
           ")"
         ]
-        [
+        DELIMITER[
           "\n{"
           "\n  std"
           "::"

@@ -30,7 +30,7 @@ KEEP_SRC = b"int a;\nint keep;\nint b;\n"
 
 def brace_to_semicolon(node: TTNode) -> bytes | None:
   """Non-trivial replacement function: replace a brace group with ";"."""
-  if node.delim_group and node.first_token().text.strip() == b"{":
+  if node.is_delim_group() and node.first_token().text.strip() == b"{":
     return b";"
   return None
 

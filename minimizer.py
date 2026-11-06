@@ -417,7 +417,7 @@ class Minimizer(ABC):
     all_children: list[TTNode] = node.children
 
     # Range of non-delimiter children.
-    lo, hi = ((1, len(all_children)-1) if node.delim_group
+    lo, hi = ((1, len(all_children)-1) if node.is_delim_group()
               else (0, len(all_children)))
 
     # Filter the range for having not been replaced.

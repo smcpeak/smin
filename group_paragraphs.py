@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from build_tree_util import recursively_group_sequences
 from smin_token import SMToken
-from token_tree import TTNode
+from token_tree import TTNode, TTNodeKind
 from whitespace import WHITESPACE_BYTES_SET
 
 
@@ -23,10 +23,10 @@ def group_paragraphs(node: TTNode, skip_toplevel: bool = False) -> TTNode:
   `node`, so none of those children are grouped together.
   """
   if skip_toplevel and node.token is None:
-    return TTNode.make_group(
+    return TTNode.make_group(TTNodeKind.PARAGRAPH,
       [recursively_group_sequences(c, _group_paragraph_sequence)
-       for c in node.children],
-      delim_group=node.delim_group)
+       for c in node.children]
+    )
 
   return recursively_group_sequences(node, _group_paragraph_sequence)
 
@@ -72,7 +72,7 @@ def _flush(result: list[TTNode], paragraph: list[TTNode]) -> None:
   if len(paragraph) == 1:
     result.append(paragraph[0])
   elif len(paragraph) > 1:
-    result.append(TTNode.make_group(paragraph))
+    result.append(TTNode.make_group(TTNodeKind.PARAGRAPH, paragraph))
 
 
 def _follows_blank_line(token: SMToken) -> bool:

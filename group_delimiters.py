@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from smin_token import SMToken
-from token_tree import TTNode
+from token_tree import TTNode, TTNodeKind
 
 
 @dataclass
@@ -62,18 +62,18 @@ def group_delimiters(tokens: list[SMToken]) -> TTNode:
     assert frame.opener is not None
 
     # Build a delimiter group for the matched delimiter pair.
-    stack[-1].children.append(TTNode.make_group(
+    stack[-1].children.append(TTNode.make_group(TTNodeKind.DELIMITER,
       [TTNode.make_token(frame.opener)] +
         frame.children +
-        [TTNode.make_token(token)],
-      delim_group=True))
+        [TTNode.make_token(token)]
+    ))
 
   # At EOF, deal with any openers that never got paired.
   while len(stack) > 1:
     _pop_unpaired(stack)
 
   # Build and return the root node of the tree.
-  return TTNode.make_group(stack[0].children)
+  return TTNode.make_group(TTNodeKind.ROOT, stack[0].children)
 
 
 def _find_opener(stack: list[_Frame], closer: SMToken) -> int | None:

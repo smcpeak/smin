@@ -9,7 +9,7 @@ import unittest
 
 from smin_token import SMToken
 from test_util import all_groups, all_nodes, dedent
-from token_tree import TTNode
+from token_tree import TTNode, TTNodeKind
 
 
 def tok(text: bytes) -> TTNode:
@@ -58,11 +58,11 @@ class TreeTraversalTest(unittest.TestCase):
 
       [ a [ b [ c ] ] d ]
     """
-    return TTNode.make_group([
+    return TTNode.make_group(TTNodeKind.ROOT, [
       tok(b"a"),
-      TTNode.make_group([
+      TTNode.make_group(TTNodeKind.INDENTATION, [
         tok(b"b"),
-        TTNode.make_group([tok(b"c")]),
+        TTNode.make_group(TTNodeKind.LINE, [tok(b"c")]),
       ]),
       tok(b"d"),
     ])
@@ -77,7 +77,7 @@ class TreeTraversalTest(unittest.TestCase):
     self.assertEqual(all_groups(tok(b"a")), [])
 
   def test_empty_group(self) -> None:
-    g = TTNode.make_group([])
+    g = TTNode.make_group(TTNodeKind.ROOT, [])
     self.assertEqual([id(n) for n in all_nodes(g)], [id(g)])
     self.assertEqual([id(n) for n in all_groups(g)], [id(g)])
 

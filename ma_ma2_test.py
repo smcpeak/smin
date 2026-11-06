@@ -154,7 +154,7 @@ class MA2Test(ReportCheckingTestCase):
     # Removing the function body is rejected, but replacing it with ";"
     # is accepted.
     def nt(node: TTNode) -> bytes | None:
-      if node.delim_group and node.first_token().text.strip() == b"{":
+      if node.is_delim_group() and node.first_token().text.strip() == b"{":
         return b";"
       return None
 

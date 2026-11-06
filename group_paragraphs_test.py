@@ -17,9 +17,10 @@ from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
 
 
+# TODO: This function is duplicated in multiple tests.
 def delim_group_texts(node: TTNode) -> list[bytes]:
   """Return the text of each delimiter group under `node`, in preorder."""
-  return [g.text() for g in all_groups(node) if g.delim_group]
+  return [g.text() for g in all_groups(node) if g.is_delim_group()]
 
 
 class GroupParagraphsTest(unittest.TestCase):
@@ -49,7 +50,7 @@ class GroupParagraphsTest(unittest.TestCase):
       self.assertIs(t1, t2)
 
     # Phase 5 neither creates nor destroys delimiter groups.
-    self.assertFalse(tree.delim_group)
+    self.assertFalse(tree.is_delim_group())
     self.assertEqual(delim_group_texts(tree), delim_group_texts(input_tree))
 
     return tree
@@ -62,7 +63,7 @@ class GroupParagraphsTest(unittest.TestCase):
 
   def test_empty(self) -> None:
     self.check("", """
-      [
+      ROOT[
       ]
       """)
 
@@ -74,12 +75,12 @@ class GroupParagraphsTest(unittest.TestCase):
       a;
       b;
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           ";"
         ]
-        [
+        LINE[
           "\nb"
           ";"
         ]
@@ -95,23 +96,23 @@ class GroupParagraphsTest(unittest.TestCase):
       c;
       d;
       """, r"""
-      [
-        [
-          [
+      ROOT[
+        PARAGRAPH[
+          LINE[
             "a"
             ";"
           ]
-          [
+          LINE[
             "\nb"
             ";"
           ]
         ]
-        [
-          [
+        PARAGRAPH[
+          LINE[
             "\n\nc"
             ";"
           ]
-          [
+          LINE[
             "\nd"
             ";"
           ]
@@ -127,17 +128,17 @@ class GroupParagraphsTest(unittest.TestCase):
       b;
       c;
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           ";"
         ]
-        [
-          [
+        PARAGRAPH[
+          LINE[
             "\n\nb"
             ";"
           ]
-          [
+          LINE[
             "\nc"
             ";"
           ]
@@ -155,23 +156,23 @@ class GroupParagraphsTest(unittest.TestCase):
       c;
       d;
       """, r"""
-      [
-        [
-          [
+      ROOT[
+        PARAGRAPH[
+          LINE[
             "  a"
             ";"
           ]
-          [
+          LINE[
             "\n  b"
             ";"
           ]
         ]
-        [
-          [
+        PARAGRAPH[
+          LINE[
             "\nc"
             ";"
           ]
-          [
+          LINE[
             "\nd"
             ";"
           ]
@@ -183,17 +184,17 @@ class GroupParagraphsTest(unittest.TestCase):
   def test_blank_line_with_whitespace(self) -> None:
     # A line containing only spaces and tabs is blank.
     self.check_bytes(b"a;\n  \t\nb;\nc;\n", r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           ";"
         ]
-        [
-          [
+        PARAGRAPH[
+          LINE[
             "\n  \t\nb"
             ";"
           ]
-          [
+          LINE[
             "\nc"
             ";"
           ]
@@ -204,17 +205,17 @@ class GroupParagraphsTest(unittest.TestCase):
 
   def test_crlf_blank_line(self) -> None:
     self.check_bytes(b"a;\r\n\r\nb;\r\nc;\r\n", r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           ";"
         ]
-        [
-          [
+        PARAGRAPH[
+          LINE[
             "\r\n\r\nb"
             ";"
           ]
-          [
+          LINE[
             "\r\nc"
             ";"
           ]
@@ -234,21 +235,21 @@ class GroupParagraphsTest(unittest.TestCase):
       );
       b;
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           ";"
         ]
-        [
-          [
+        PARAGRAPH[
+          LINE[
             "\n\na"
-            [
+            DELIMITER[
               "("
               "\n\n)"
             ]
             ";"
           ]
-          [
+          LINE[
             "\nb"
             ";"
           ]
@@ -261,13 +262,13 @@ class GroupParagraphsTest(unittest.TestCase):
     # The whitespace at EOF follows a blank line, so it is not part of
     # the paragraph.
     self.check_bytes(b"a;\nb;\n\n", r"""
-      [
-        [
-          [
+      ROOT[
+        PARAGRAPH[
+          LINE[
             "a"
             ";"
           ]
-          [
+          LINE[
             "\nb"
             ";"
           ]
@@ -284,17 +285,17 @@ class GroupParagraphsTest(unittest.TestCase):
       // d
       b;
       """, r"""
-      [
-        [
-          [
+      ROOT[
+        PARAGRAPH[
+          LINE[
             "a"
             ";"
           ]
           "\n// c"
         ]
-        [
+        PARAGRAPH[
           "\n\n// d"
-          [
+          LINE[
             "\nb"
             ";"
           ]
@@ -306,22 +307,24 @@ class GroupParagraphsTest(unittest.TestCase):
   def test_node_not_first_on_line_excluded(self) -> None:
     # Within the braces, " a" and ";" are not first on their line, so
     # they are not part of the paragraph formed by the "b" and "c" lines.
+    #
+    # TODO: Why is group containing "c" INDENTATION rather than LINE?
     self.check("""
       { a;
         b;
         c; }
       """, r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "{"
           " a"
           ";"
-          [
-            [
+          PARAGRAPH[
+            LINE[
               "\n  b"
               ";"
             ]
-            [
+            INDENTATION[
               "\n  c"
               ";"
             ]
@@ -347,28 +350,28 @@ class GroupParagraphsTest(unittest.TestCase):
         b;
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           ";"
         ]
-        [
-          [
-            [
+        PARAGRAPH[
+          HEAD_BODY[
+            LINE[
               "\n\nf"
-              [
+              DELIMITER[
                 "("
                 ")"
               ]
             ]
-            [
+            DELIMITER[
               "\n{"
-              [
-                [
+              PARAGRAPH[
+                LINE[
                   "\n  a"
                   ";"
                 ]
-                [
+                LINE[
                   "\n  b"
                   ";"
                 ]
@@ -385,6 +388,8 @@ class GroupParagraphsTest(unittest.TestCase):
     # Same input as `test_delimiters_excluded`, but the root's children
     # are not grouped into paragraphs.  The lines inside the braces
     # still are.  (The header and brace group are grouped by Phase 4.5.)
+    #
+    # TODO: Why is the root a PARAGRAPH rather than ROOT?
     self.check("""
       x;
 
@@ -394,27 +399,27 @@ class GroupParagraphsTest(unittest.TestCase):
         b;
       }
       """, r"""
-      [
-        [
+      PARAGRAPH[
+        LINE[
           "x"
           ";"
         ]
-        [
-          [
+        HEAD_BODY[
+          LINE[
             "\n\nf"
-            [
+            DELIMITER[
               "("
               ")"
             ]
           ]
-          [
+          DELIMITER[
             "\n{"
-            [
-              [
+            PARAGRAPH[
+              LINE[
                 "\n  a"
                 ";"
               ]
-              [
+              LINE[
                 "\n  b"
                 ";"
               ]
@@ -427,8 +432,9 @@ class GroupParagraphsTest(unittest.TestCase):
       """, skip_toplevel=True)
 
   def test_skip_toplevel_empty(self) -> None:
+    # TODO: Why is the root a PARAGRAPH rather than ROOT?
     self.check("", """
-      [
+      PARAGRAPH[
       ]
       """, skip_toplevel=True)
 

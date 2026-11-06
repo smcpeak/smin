@@ -70,7 +70,7 @@ class MA1Minimizer(Minimizer):
 
     # Range [lo, hi) of children to consider, excluding delimiters.
     children = parent.children
-    lo, hi = (1, len(children)-1) if parent.delim_group else (0, len(children))
+    lo, hi = (1, len(children)-1) if parent.is_delim_group() else (0, len(children))
 
     # Index in `children` of the next node to process.  It walks the
     # list backwards.

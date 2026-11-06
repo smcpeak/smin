@@ -46,7 +46,7 @@ def recursively_group_sequences(
   children: list[TTNode] = [
     recursively_group_sequences(c, group_sequence) for c in node.children]
 
-  if node.delim_group:
+  if node.is_delim_group():
     # The delimiters at either end are not placed into groups.
     children = (
       [children[0]] +
@@ -73,7 +73,7 @@ def recursively_group_sequences(
     if len(children) == 1 and len(node.children) > 1:
       children = children[0].children
 
-  return TTNode.make_group(children, node.delim_group)
+  return TTNode.make_group(node.kind, children)
 
 
 # EOF

@@ -14,9 +14,10 @@ from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
 
 
+# TODO: This function is duplicated in multiple tests.
 def delim_group_texts(node: TTNode) -> list[bytes]:
   """Return the text of each delimiter group under `node`, in preorder."""
-  return [g.text() for g in all_groups(node) if g.delim_group]
+  return [g.text() for g in all_groups(node) if g.is_delim_group()]
 
 
 class GroupLinesTest(unittest.TestCase):
@@ -45,21 +46,21 @@ class GroupLinesTest(unittest.TestCase):
       self.assertIs(t1, t2)
 
     # Phase 3 neither creates nor destroys delimiter groups.
-    self.assertFalse(tree.delim_group)
+    self.assertFalse(tree.is_delim_group())
     self.assertEqual(delim_group_texts(tree), delim_group_texts(input_tree))
 
     return tree
 
   def test_empty(self) -> None:
     self.check("", """
-      [
+      ROOT[
       ]
       """)
 
   def test_one_line(self) -> None:
     # The line would span the whole root, so it is not made into a group.
     self.check("a b;", r"""
-      [
+      ROOT[
         "a"
         " b"
         ";"
@@ -68,8 +69,8 @@ class GroupLinesTest(unittest.TestCase):
 
   def test_one_line_then_newline(self) -> None:
     tree = self.check("a b;\n", r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           " b"
           ";"
@@ -77,19 +78,19 @@ class GroupLinesTest(unittest.TestCase):
         "\n"
       ]
       """)
-    self.assertFalse(tree.children[0].delim_group)
+    self.assertFalse(tree.children[0].is_delim_group())
 
   def test_several_lines(self) -> None:
     self.check("""
       a;
       b c;
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           ";"
         ]
-        [
+        LINE[
           "\nb"
           " c"
           ";"
@@ -100,8 +101,8 @@ class GroupLinesTest(unittest.TestCase):
 
   def test_several_statements_on_one_line(self) -> None:
     self.check("a; b;\n", r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           ";"
           " b"
@@ -116,9 +117,9 @@ class GroupLinesTest(unittest.TestCase):
       a
       b c
       """, r"""
-      [
+      ROOT[
         "a"
-        [
+        LINE[
           "\nb"
           " c"
         ]
@@ -131,13 +132,13 @@ class GroupLinesTest(unittest.TestCase):
       a; // c
       b;
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           ";"
           " // c"
         ]
-        [
+        LINE[
           "\nb"
           ";"
         ]
@@ -147,8 +148,8 @@ class GroupLinesTest(unittest.TestCase):
 
   def test_eof_whitespace_without_newline(self) -> None:
     self.check("a; ", r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           ";"
         ]
@@ -164,13 +165,13 @@ class GroupLinesTest(unittest.TestCase):
        */ a;
       b;
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "/* x\n */"
           " a"
           ";"
         ]
-        [
+        LINE[
           "\nb"
           ";"
         ]
@@ -186,17 +187,17 @@ class GroupLinesTest(unittest.TestCase):
         x;
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "void"
           " f"
-          [
+          DELIMITER[
             "("
             ")"
           ]
-          [
+          DELIMITER[
             " {"
-            [
+            LINE[
               "\n  x"
               ";"
             ]
@@ -207,9 +208,9 @@ class GroupLinesTest(unittest.TestCase):
       ]
       """)
     line = tree.children[0]
-    self.assertFalse(line.delim_group)
-    self.assertTrue(line.children[3].delim_group)
-    self.assertFalse(line.children[3].children[1].delim_group)
+    self.assertFalse(line.is_delim_group())
+    self.assertTrue(line.children[3].is_delim_group())
+    self.assertFalse(line.children[3].children[1].is_delim_group())
 
   def test_function_next_line_brace(self) -> None:
     # The opening brace is on its own line, so the header and body are
@@ -221,18 +222,18 @@ class GroupLinesTest(unittest.TestCase):
         return 0;
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "int"
           " main"
-          [
+          DELIMITER[
             "("
             ")"
           ]
         ]
-        [
+        DELIMITER[
           "\n{"
-          [
+          LINE[
             "\n  return"
             " 0"
             ";"
@@ -250,10 +251,10 @@ class GroupLinesTest(unittest.TestCase):
       foo(a,
           b);
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "foo"
-          [
+          DELIMITER[
             "("
             "a"
             ","
@@ -273,8 +274,8 @@ class GroupLinesTest(unittest.TestCase):
       { a;
         b; }
       """, r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "{"
           " a"
           ";"
@@ -291,12 +292,12 @@ class GroupLinesTest(unittest.TestCase):
       a (
       b;
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           " ("
         ]
-        [
+        LINE[
           "\nb"
           ";"
         ]
@@ -312,28 +313,28 @@ class GroupLinesTest(unittest.TestCase):
         b;
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "if"
-          [
+          DELIMITER[
             " ("
             "x"
             ")"
           ]
-          [
+          DELIMITER[
             " {"
-            [
+            LINE[
               "\n  a"
               " ="
               " f"
-              [
+              DELIMITER[
                 "("
                 "\n    1"
                 ")"
               ]
               ";"
             ]
-            [
+            LINE[
               "\n  b"
               ";"
             ]

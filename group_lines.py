@@ -8,7 +8,7 @@ See structure-deduction-algorithm.txt, phase 3.
 from __future__ import annotations
 
 from build_tree_util import recursively_group_sequences
-from token_tree import TTNode
+from token_tree import TTNode, TTNodeKind
 
 
 def group_lines(node: TTNode) -> TTNode:
@@ -44,7 +44,8 @@ def _group_line_sequence(nodes: list[TTNode]) -> list[TTNode]:
       if end is None:
         may_find_end = False
       elif end > i:
-        result.append(TTNode.make_group(nodes[i:end+1]))
+        result.append(TTNode.make_group(TTNodeKind.LINE,
+                                        nodes[i : end+1]))
         i = end + 1
         continue
 

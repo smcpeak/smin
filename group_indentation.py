@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from build_tree_util import recursively_group_sequences
-from token_tree import TTNode
+from token_tree import TTNode, TTNodeKind
 
 
 def group_indentation(node: TTNode) -> TTNode:
@@ -75,7 +75,8 @@ def _close_top(stack: list[_Frame]) -> None:
   if len(frame.children) == 1:
     stack[-1].children.append(frame.children[0])
   else:
-    stack[-1].children.append(TTNode.make_group(frame.children))
+    stack[-1].children.append(TTNode.make_group(TTNodeKind.INDENTATION,
+                                                frame.children))
 
 
 # EOF

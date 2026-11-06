@@ -31,7 +31,7 @@ class BuildTreeTest(unittest.TestCase):
     tree.self_check()
     for t1, t2 in zip(tokens, tree.tokens(), strict=True):
       self.assertIs(t1, t2)
-    self.assertFalse(tree.delim_group)
+    self.assertFalse(tree.is_delim_group())
 
     # Phase 6 is unnecessary because no non-root group has a single
     # child.
@@ -43,7 +43,7 @@ class BuildTreeTest(unittest.TestCase):
 
   def test_empty(self) -> None:
     self.check("", """
-      [
+      ROOT[
       ]
       """)
 
@@ -51,8 +51,8 @@ class BuildTreeTest(unittest.TestCase):
     # The one place a single-child group can appear is the root, when
     # the input consists of a single delimiter group.
     self.check("()", """
-      [
-        [
+      ROOT[
+        DELIMITER[
           "("
           ")"
         ]
@@ -72,17 +72,17 @@ class BuildTreeTest(unittest.TestCase):
         return 0;
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "#include <iostream>"
           "        // std::cout"
         ]
-        [
-          [
-            [
+        PARAGRAPH[
+          HEAD_BODY[
+            LINE[
               "\n\nint"
               " main"
-              [
+              DELIMITER[
                 "("
                 "int"
                 " argc"
@@ -94,10 +94,10 @@ class BuildTreeTest(unittest.TestCase):
                 ")"
               ]
             ]
-            [
+            DELIMITER[
               "\n{"
-              [
-                [
+              PARAGRAPH[
+                LINE[
                   "\n  std"
                   "::"
                   "cout"
@@ -105,7 +105,7 @@ class BuildTreeTest(unittest.TestCase):
                   " \"Hello\\n\""
                   ";"
                 ]
-                [
+                LINE[
                   "\n  return"
                   " 0"
                   ";"
@@ -141,14 +141,14 @@ class BuildTreeTest(unittest.TestCase):
         return true;
       }
       """, r"""
-      [
-        [
-          [
+      ROOT[
+        HEAD_BODY[
+          LINE[
             "bool"
             " GetDepsVisitor"
             "::"
             "isRefactoringDN"
-            [
+            DELIMITER[
               "("
               "DependencyNode"
               " dn"
@@ -156,13 +156,13 @@ class BuildTreeTest(unittest.TestCase):
             ]
             " const"
           ]
-          [
+          DELIMITER[
             "\n{"
-            [
+            PARAGRAPH[
               "\n  // Must be a named declaration."
-              [
+              LINE[
                 "\n  if"
-                [
+                DELIMITER[
                   " ("
                   "!"
                   "isa"
@@ -171,7 +171,7 @@ class BuildTreeTest(unittest.TestCase):
                   "::"
                   "NamedDecl"
                   ">"
-                  [
+                  DELIMITER[
                     "("
                     "dn"
                     "."
@@ -180,9 +180,9 @@ class BuildTreeTest(unittest.TestCase):
                   ]
                   ")"
                 ]
-                [
+                DELIMITER[
                   " {"
-                  [
+                  LINE[
                     "\n    return"
                     " false"
                     ";"
@@ -191,10 +191,10 @@ class BuildTreeTest(unittest.TestCase):
                 ]
               ]
             ]
-            [
+            PARAGRAPH[
               "\n\n  // What is its syntactic parent?"
-              [
-                [
+              INDENTATION[
+                LINE[
                   "\n  clang"
                   "::"
                   "NamedDecl"
@@ -203,9 +203,9 @@ class BuildTreeTest(unittest.TestCase):
                   "parent"
                   " ="
                 ]
-                [
+                LINE[
                   "\n    getNamedParentDeclOpt_templateAdjustment"
-                  [
+                  DELIMITER[
                     "("
                     "dn"
                     "."
@@ -215,19 +215,19 @@ class BuildTreeTest(unittest.TestCase):
                   ";"
                 ]
               ]
-              [
+              LINE[
                 "\n  if"
-                [
+                DELIMITER[
                   " ("
                   "!"
                   "parent"
                   ")"
                 ]
-                [
+                DELIMITER[
                   " {"
-                  [
+                  PARAGRAPH[
                     "\n    // The parent is the TU."
-                    [
+                    LINE[
                       "\n    return"
                       " true"
                       ";"
@@ -237,7 +237,7 @@ class BuildTreeTest(unittest.TestCase):
                 ]
               ]
             ]
-            [
+            LINE[
               "\n\n  return"
               " true"
               ";"

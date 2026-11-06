@@ -15,9 +15,10 @@ from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
 
 
+# TODO: This function is duplicated in multiple tests.
 def delim_group_texts(node: TTNode) -> list[bytes]:
   """Return the text of each delimiter group under `node`, in preorder."""
-  return [g.text() for g in all_groups(node) if g.delim_group]
+  return [g.text() for g in all_groups(node) if g.is_delim_group()]
 
 
 class GroupIndentationTest(unittest.TestCase):
@@ -46,14 +47,14 @@ class GroupIndentationTest(unittest.TestCase):
       self.assertIs(t1, t2)
 
     # Phase 4 neither creates nor destroys delimiter groups.
-    self.assertFalse(tree.delim_group)
+    self.assertFalse(tree.is_delim_group())
     self.assertEqual(delim_group_texts(tree), delim_group_texts(input_tree))
 
     return tree
 
   def test_empty(self) -> None:
     self.check("", """
-      [
+      ROOT[
       ]
       """)
 
@@ -63,12 +64,12 @@ class GroupIndentationTest(unittest.TestCase):
       a;
       b;
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           ";"
         ]
-        [
+        LINE[
           "\nb"
           ";"
         ]
@@ -82,26 +83,26 @@ class GroupIndentationTest(unittest.TestCase):
         5;
       y;
       """, r"""
-      [
-        [
-          [
+      ROOT[
+        INDENTATION[
+          LINE[
             "int"
             " x"
             " ="
           ]
-          [
+          LINE[
             "\n  5"
             ";"
           ]
         ]
-        [
+        LINE[
           "\ny"
           ";"
         ]
         "\n"
       ]
       """)
-    self.assertFalse(tree.children[0].delim_group)
+    self.assertFalse(tree.children[0].is_delim_group())
 
   def test_nested(self) -> None:
     self.check("""
@@ -111,28 +112,28 @@ class GroupIndentationTest(unittest.TestCase):
         d;
       e;
       """, r"""
-      [
-        [
-          [
+      ROOT[
+        INDENTATION[
+          LINE[
             "a"
             ";"
           ]
-          [
-            [
+          INDENTATION[
+            LINE[
               "\n  b"
               ";"
             ]
-            [
+            LINE[
               "\n    c"
               ";"
             ]
           ]
-          [
+          LINE[
             "\n  d"
             ";"
           ]
         ]
-        [
+        LINE[
           "\ne"
           ";"
         ]
@@ -149,22 +150,22 @@ class GroupIndentationTest(unittest.TestCase):
         c;
       d;
       """, r"""
-      [
-        [
-          [
+      ROOT[
+        INDENTATION[
+          LINE[
             "a"
             ";"
           ]
-          [
+          LINE[
             "\n    b"
             ";"
           ]
-          [
+          LINE[
             "\n  c"
             ";"
           ]
         ]
-        [
+        LINE[
           "\nd"
           ";"
         ]
@@ -183,27 +184,27 @@ class GroupIndentationTest(unittest.TestCase):
         c;
       }
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "f"
-          [
+          DELIMITER[
             "("
             ")"
           ]
         ]
-        [
+        DELIMITER[
           "\n{"
-          [
-            [
+          INDENTATION[
+            LINE[
               "\n  a"
               ";"
             ]
-            [
+            LINE[
               "\n    b"
               ";"
             ]
           ]
-          [
+          LINE[
             "\n  c"
             ";"
           ]
@@ -220,13 +221,13 @@ class GroupIndentationTest(unittest.TestCase):
         1,
         2]
       """, r"""
-      [
-        [
+      ROOT[
+        LINE[
           "x"
           " ="
-          [
+          DELIMITER[
             " ["
-            [
+            LINE[
               "\n  1"
               ","
             ]
@@ -242,10 +243,12 @@ class GroupIndentationTest(unittest.TestCase):
     # The trailing whitespace token is not first on its line, so it
     # belongs to the innermost open group.  The group starting with "a"
     # would span the whole root, so it is not made.
+    #
+    # TODO: Why is the inner group INDENTATION and not LINE?
     self.check("a\n  b ", r"""
-      [
+      ROOT[
         "a"
-        [
+        INDENTATION[
           "\n  b"
           " "
         ]
@@ -257,13 +260,13 @@ class GroupIndentationTest(unittest.TestCase):
     # line, so the whole line would form an indentation group, which
     # would be redundant.
     tree = self.check("a b;\nc;", r"""
-      [
-        [
+      ROOT[
+        LINE[
           "a"
           " b"
           ";"
         ]
-        [
+        LINE[
           "\nc"
           ";"
         ]
@@ -281,15 +284,15 @@ class GroupIndentationTest(unittest.TestCase):
           b;
       )
       """, r"""
-      [
-        [
+      ROOT[
+        DELIMITER[
           "("
-          [
-            [
+          INDENTATION[
+            LINE[
               "\n  a"
               ";"
             ]
-            [
+            LINE[
               "\n    b"
               ";"
             ]
@@ -307,33 +310,33 @@ class GroupIndentationTest(unittest.TestCase):
         for n in comp:
           node_to_scc[n] = i
       """, r"""
-      [
-        [
-          [
+      ROOT[
+        INDENTATION[
+          LINE[
             "for"
             " i"
             ","
             " comp"
             " in"
             " enumerate"
-            [
+            DELIMITER[
               "("
               "sccs"
               ")"
             ]
             ":"
           ]
-          [
-            [
+          INDENTATION[
+            LINE[
               "\n  for"
               " n"
               " in"
               " comp"
               ":"
             ]
-            [
+            LINE[
               "\n    node_to_scc"
-              [
+              DELIMITER[
                 "["
                 "n"
                 "]"

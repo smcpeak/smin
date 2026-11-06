@@ -98,7 +98,7 @@ class MA2Minimizer(Minimizer):
     # the same as removing `node`, which the caller just tried, so start
     # with half.  Clamp to 1 so a lone surviving child is still tried.
     granularity: int = (
-      len(children) if node.delim_group else len(children) // 2)
+      len(children) if node.is_delim_group() else len(children) // 2)
     granularity = max(1, granularity)
 
     # Number of children in scope for removal.  Those at or beyond this

@@ -11,7 +11,7 @@ from typing import Optional
 
 from build_tree_util import recursively_group_sequences
 from smin_token import SMToken
-from token_tree import TTNode
+from token_tree import TTNode, TTNodeKind
 from whitespace import (
   CRLF_BYTES,
   LF_BYTES,
@@ -55,7 +55,8 @@ def _group_head_body_sequence(
       # is not.  Checking `nodes[i-1]` rather than `result[-1]` ensures
       # a newly made pair is not then treated as the head of a following
       # body.
-      result[-1] = TTNode.make_group([result[-1], node])
+      result[-1] = TTNode.make_group(TTNodeKind.HEAD_BODY,
+                     [result[-1], node])
     else:
       result.append(node)
 
@@ -68,7 +69,7 @@ def _body_indentation(node: TTNode) -> Optional[int]:
   the line break (LF or CRLF) in its opening delimiter's leading
   whitespace.  Otherwise, return None.
   """
-  if not node.delim_group:
+  if not node.is_delim_group():
     return None
 
   ws = leading_whitespace(node.first_token().text)
@@ -92,7 +93,7 @@ def _is_head(
   True if `node` could be the head for a body whose opening delimiter
   has `body_indentation`.  `file_first` is the first token in the file.
   """
-  if node.delim_group:
+  if node.is_delim_group():
     return False
 
   first = node.first_token()

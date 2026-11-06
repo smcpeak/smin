@@ -29,7 +29,7 @@ class CPPLanguage:
   @staticmethod
   def is_brace_group(node: TTNode) -> bool:
     """The `BraceGroupFunc` for C++: True for a "{...}" group."""
-    if node.delim_group:
+    if node.is_delim_group():
       opener = node.children[0].token
       assert opener is not None
       return opener.delimiter_kind == -CPP_BRACE
