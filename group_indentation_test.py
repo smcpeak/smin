@@ -244,7 +244,10 @@ class GroupIndentationTest(unittest.TestCase):
     # belongs to the innermost open group.  The group starting with "a"
     # would span the whole root, so it is not made.
     #
-    # TODO: Why is the inner group INDENTATION and not LINE?
+    # The inner group is INDENTATION and not LINE because LINE requires
+    # the last token be "last on its line", and the definition of that
+    # excludes the EOF WS token (although I don't recall why I defined
+    # it like that).
     self.check("a\n  b ", r"""
       ROOT[
         "a"
