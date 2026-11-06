@@ -20,11 +20,6 @@ class MA1Minimizer(Minimizer):
   """
 
 
-  # TODO: The base class has the meat of both MA1 and MA2.  After
-  # splitting this class, move those methods to the appropriate
-  # subclass.
-
-
   def _total_num_passes(self) -> int:
 
     # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
