@@ -26,6 +26,11 @@ def all_groups(node: TTNode) -> list[TTNode]:
   return groups
 
 
+def delim_group_texts(node: TTNode) -> list[bytes]:
+  """Return the text of each delimiter group under `node`, in preorder."""
+  return [g.text() for g in all_groups(node) if g.is_delim_group()]
+
+
 def all_nodes(node: TTNode) -> list[TTNode]:
   """Return all nodes under (and including) `node`, in preorder."""
   nodes = [node]

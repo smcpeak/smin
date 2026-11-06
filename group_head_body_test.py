@@ -11,15 +11,9 @@ from group_delimiters import group_delimiters
 from group_head_body import group_head_body
 from group_indentation import group_indentation
 from group_lines import group_lines
-from test_util import all_groups, all_nodes, dedent
+from test_util import all_nodes, dedent, delim_group_texts
 from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
-
-
-# TODO: This function is duplicated in multiple tests.
-def delim_group_texts(node: TTNode) -> list[bytes]:
-  """Return the text of each delimiter group under `node`, in preorder."""
-  return [g.text() for g in all_groups(node) if g.is_delim_group()]
 
 
 class GroupHeadBodyTest(unittest.TestCase):
