@@ -49,6 +49,9 @@ MINIMIZER_COMMANDS: dict[str, list[str]] = {
   # --n 1 causes these to run sequentially.
   "creduce":  ["creduce", "--n", "1", TEST_SH, INPUT],
   "cvise":    ["cvise", "--n", "1", TEST_SH, INPUT],
+
+  "smin-ma2-bg":
+    [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT],
 }
 
 
