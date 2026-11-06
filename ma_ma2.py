@@ -5,8 +5,11 @@ Minimization algorithm 2 (MA2).
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from typing import Any, Optional
+
 from ma_kind import MinimizationAlgorithmKind
-from minimizer import Minimizer
+from minimizer import BraceGroupFunc, Minimizer
 from token_tree import TTNode
 
 
@@ -22,6 +25,36 @@ class MA2Minimizer(Minimizer):
   See minimization-algorithm.txt for details.
   """
 
+  # If not None, this implements --ma2-brace-groups: only the children
+  # of the root and of brace groups, as identified by this function, are
+  # candidates for removal.  See minimization-algorithm.txt, "MA2
+  # --ma2-brace-groups".
+  is_brace_group: Optional[BraceGroupFunc]
+
+  # MAX_DEPTH in the spec, before applying `max_passes`.  This depends
+  # only on the original tree, so it is computed once.
+  max_depth: int
+
+
+  def __init__(
+    self,
+    *,
+    is_brace_group: Optional[BraceGroupFunc] = None,
+    **kwargs: Any,
+  ) -> None:
+    """
+    Accept `is_brace_group`, and pass the other arguments to the
+    `Minimizer` constructor.
+    """
+    super().__init__(**kwargs)
+    self.is_brace_group = is_brace_group
+
+    # MA2 makes one pass per level of the tree, or, with
+    # --ma2-brace-groups, per level of brace group nesting.
+    self.max_depth = (
+      self.tree_root.depth() if is_brace_group is None
+      else self._brace_depth(self.tree_root))
+
 
   def get_ma_kind(self) -> MinimizationAlgorithmKind:
     return MinimizationAlgorithmKind.MA2
@@ -29,8 +62,7 @@ class MA2Minimizer(Minimizer):
 
   def _total_num_passes(self) -> int:
 
-    # MA2 makes one pass per level of the tree.
-    ret: int = self.tree_root.depth()
+    ret: int = self.max_depth
 
     if self.max_passes is not None:
       ret = min(ret, self.max_passes)
@@ -121,7 +153,52 @@ class MA2Minimizer(Minimizer):
       # piece near the end could unlock many deletions higher up, so
       # it's worth spending more time here.
       if max_depth > 1:
-        self._ma2_min_node(c, max_depth-1)
+        if self.is_brace_group is None:
+          self._ma2_min_node(c, max_depth-1)
+        else:
+          for bg in self._get_brace_groups(c):
+            self._ma2_min_node(bg, max_depth-1)
+
+
+  def _get_brace_groups(self, n: TTNode) -> Iterator[TTNode]:
+    """
+    If `n` is a brace group, yield it alone.  Otherwise, perform a
+    depth-first search of `n`, in right-to-left child order, yielding
+    every node that is a descendant of `n`, is a brace-delimited group,
+    and does not have a brace-delimited group between it and `n`.
+
+    Replaced nodes, and their descendants, are skipped.
+    """
+    assert self.is_brace_group is not None
+
+    if self.is_brace_group(n):
+      yield n
+      return
+
+    for child in reversed(n.children):
+      if id(child) not in self.cur_replacement:
+        yield from self._get_brace_groups(child)
+
+
+  def _brace_depth(self, node: TTNode) -> int:
+    """
+    Return MAX_DEPTH for --ma2-brace-groups for the subtree rooted at
+    `node`: the maximum, over paths from `node` to a leaf, of the number
+    of edges that connect the root to a child, or connect a brace group
+    to a child other than one of its delimiters.  Equivalently, it is
+    the number of passes needed to reach every candidate.
+    """
+    assert self.is_brace_group is not None
+
+    children: list[TTNode] = node.children
+    is_root: bool = node is self.tree_root
+    is_bg: bool = self.is_brace_group(node)
+
+    ret: int = 0
+    for i, child in enumerate(children):
+      counted: bool = is_root or (is_bg and 0 < i < len(children)-1)
+      ret = max(ret, int(counted) + self._brace_depth(child))
+    return ret
 
 
   def _get_cur_granularity(self) -> float:

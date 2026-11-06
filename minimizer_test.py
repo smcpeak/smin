@@ -13,6 +13,7 @@ from build_tree import build_tree
 from ma_factory import make_minimizer
 from ma_kind import MinimizationAlgorithmKind
 from minimizer import (
+  BraceGroupFunc,
   Minimizer,
   NTReplacementFunc,
   StopQueryFunc,
@@ -100,6 +101,7 @@ class Recorder:
     alg_kind: MinimizationAlgorithmKind = MinimizationAlgorithmKind.MA1,
     nt: NTReplacementFunc = no_replacement,
     should_stop: StopQueryFunc | None = None,
+    ma2_brace_group_func: BraceGroupFunc | None = None,
   ) -> Minimizer:
     """
     Build a Minimizer object for testing.
@@ -116,6 +118,7 @@ class Recorder:
       should_stop                 = should_stop,
       report_test_starting        = self.starts.append,
       report_test_finished        = self.finish,
+      ma2_brace_group_func        = ma2_brace_group_func,
     )
     return self.minimizer
 

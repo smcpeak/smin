@@ -31,6 +31,19 @@ class CPPLanguageTest(unittest.TestCase):
     self.assertEqual(replaced, [(b" { return x; }", b";")])
 
 
+  def test_brace_group(self) -> None:
+    lang: Language = CPPLanguage()
+    tokenizer = lang.make_tokenizer()
+    is_bg = lang.get_brace_group_func()
+
+    # Only the brace groups, not the parentheses or brackets, nor the
+    # tokens or other groups.
+    tree = build_tree(tokenizer.tokenize(
+      b"int f(int x) { return x; }\nint a[2] = {1};\n"))
+    self.assertEqual([n.text() for n in all_nodes(tree) if is_bg(n)],
+                     [b" { return x; }", b" {1}"])
+
+
 if __name__ == "__main__":
   unittest.main()
 

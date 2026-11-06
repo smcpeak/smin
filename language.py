@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from minimizer import NTReplacementFunc
+from minimizer import BraceGroupFunc, NTReplacementFunc
 from tokenizer import Tokenizer
 
 
@@ -23,6 +23,13 @@ class Language(Protocol):
     """
     Return the function that yields the non-trivial replacement text, if
     any, for a token tree node.
+    """
+    ...
+
+  def get_brace_group_func(self) -> BraceGroupFunc:
+    """
+    Return the function that says whether a token tree node is a
+    brace-delimited group, for --ma2-brace-groups.
     """
     ...
 

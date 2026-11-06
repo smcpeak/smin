@@ -92,6 +92,18 @@ class ParseCommandLineTest(unittest.TestCase):
     self.assertFalse(args.ma2)
     self.assertEqual(args.test_command, ["./test.sh", "--hdd"])
 
+  def test_ma2_brace_groups(self) -> None:
+    args = parse_command_line(["--ma2", "./test.sh", "--", "in.cc"])
+    self.assertFalse(args.ma2_brace_groups)
+    args = parse_command_line(
+      ["--ma2", "--ma2-brace-groups", "./test.sh", "--", "in.cc"])
+    self.assertTrue(args.ma2_brace_groups)
+
+  def test_ma2_brace_groups_requires_ma2(self) -> None:
+    self.check_error(["--ma2-brace-groups", "./test.sh", "--", "in.cc"])
+    self.check_error(
+      ["--hdd", "--ma2-brace-groups", "./test.sh", "--", "in.cc"])
+
   def test_ma2_and_hdd_conflict(self) -> None:
     self.check_error(["--ma2", "--hdd", "./test.sh", "--", "in.cc"])
 
@@ -239,6 +251,18 @@ class MainTest(unittest.TestCase):
     self.assertEqual(self.progress_passes(out),
                      ["P=(1/2)"] * 4 + ["P=(2/2)"] * 5)
     self.assertIn("to 1 tokens (6 bytes).", out)
+
+  def test_ma2_brace_groups(self) -> None:
+    # Only the root's children and the brace group's interior are
+    # candidates, so "int f()" stays.
+    self.input_path.write_bytes(b"int f() { a; keep; }\n")
+    status, out, err = self.run_main(self.KEEP_CODE,
+                                     ("--ma2", "--ma2-brace-groups"))
+    self.assertEqual(status, 0)
+    self.assertEqual(err, "")
+    self.assertEqual(self.input_path.read_bytes(), b"int f() { keep }\n")
+    self.assertEqual(self.progress_passes(out),
+                     ["P=(1/2)"] * 2 + ["P=(2/2)"] * 8)
 
   def test_ma2_max_passes(self) -> None:
     self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")

@@ -36,6 +36,11 @@ from whitespace import (
 NTReplacementFunc = Callable[[TTNode], Optional[bytes]]
 
 
+# Signature of a function that returns True if a token tree node is a
+# brace-delimited group.
+BraceGroupFunc = Callable[[TTNode], bool]
+
+
 # Signature of a function that checks a candidate input for acceptance
 # as "interesting" for minimization purposes.  The second argument is
 # the progress report for the candidate.  In normal operation, this

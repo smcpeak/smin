@@ -24,6 +24,11 @@ Options:
 
     Use Minimization Algorithm 2 (MA2) as described in the spec.
 
+  --ma2-brace-groups
+
+    With --ma2, only try to remove children of the root and of brace
+    groups.  See the spec section "MA2 --ma2-brace-groups".
+
   --hdd
 
     Use Hierarchical Delta Debugging (HDD) as described in
@@ -176,6 +181,13 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
       MA1.
     """)
 
+  parser.add_argument(
+    "--ma2-brace-groups", action="store_true",
+    help="""
+      With --ma2, only try to remove children of the root and of brace
+      groups.
+    """)
+
   # The test command, separator, and input file are all collected into
   # one list, and split below.  (With separate positional arguments,
   # argparse would discard a "--" immediately after `test_program`.)
@@ -189,6 +201,9 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
     """)
 
   args = parser.parse_args(argv)
+
+  if args.ma2_brace_groups and not args.ma2:
+    parser.error("--ma2-brace-groups requires --ma2")
   cmd_and_input: list[str] = args.cmd_and_input
 
   if cmd_and_input.count("--") != 1:
@@ -369,6 +384,9 @@ def main(argv: list[str]) -> int:
       report_test_starting        = console.report_test_starting,
       report_test_finished        = console.report_test_finished,
       should_stop                 = time_limit_reached,
+      ma2_brace_group_func        = (
+        language.get_brace_group_func() if args.ma2_brace_groups
+        else None),
     )
     result = minimizer.run_minimizer()
 

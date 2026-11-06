@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import unittest
 from collections.abc import Callable
+from unittest import mock
 
 from build_tree import build_tree
+from lang_cpp import CPPLanguage
+from ma_ma2 import MA2Minimizer
 from ma_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer, NTReplacementFunc
 from minimizer_test import (
@@ -19,6 +22,7 @@ from minimizer_test import (
   no_replacement,
 )
 from start_report import TestStartReport
+from test_util import all_nodes
 from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
 
@@ -209,6 +213,166 @@ int main()
 
     _, m = self.run_ma2(src, accept)
     self.assertLess(len(m.get_minimized_test_input()), len(src) // 4)
+
+
+is_brace_group = CPPLanguage.is_brace_group
+
+
+class MA2BraceGroupsTest(ReportCheckingTestCase):
+  """Tests of MA2 with --ma2-brace-groups."""
+
+  def check_granularity(self, r: TestStartReport, m: Minimizer) -> None:
+    # The granularity is a number of nodes.
+    self.assertEqual(r.granularity, int(r.granularity))
+    self.assertGreaterEqual(r.granularity, 1)
+
+  def make(
+    self,
+    rec: Recorder,
+    src: bytes,
+    max_passes: int | None = None,
+  ) -> MA2Minimizer:
+    """Make an MA2 minimizer for `src`, using brace group mode."""
+    m = rec.mk_minimizer(build_tree(tokenize_cpp(src)),
+                         max_passes=max_passes,
+                         alg_kind=MinimizationAlgorithmKind.MA2,
+                         ma2_brace_group_func=is_brace_group)
+    assert isinstance(m, MA2Minimizer)
+    return m
+
+  def num_passes(self, src: bytes, max_passes: int | None = None) -> int:
+    m = self.make(Recorder(lambda d: True), src, max_passes)
+    return m._total_num_passes()
+
+  def test_num_passes(self) -> None:
+    # Edges from the root count, but there are no brace groups.
+    self.assertEqual(self.num_passes(b""), 0)
+    self.assertEqual(self.num_passes(b"int a;\n"), 1)
+
+    # The edge from the brace group to its interior also counts.
+    self.assertEqual(self.num_passes(b"int f() { a; }\n"), 2)
+
+    # Each level of brace nesting adds one.
+    self.assertEqual(
+      self.num_passes(b"void f() {\n  if (x) {\n    y;\n  }\n}\n"), 3)
+
+    # The edges to delimiters do not count, so an empty brace group does
+    # not add a pass, since it has nothing to remove.
+    self.assertEqual(self.num_passes(b"void f() {}\n"), 1)
+
+    # A brace group that is a child of the root still adds a pass for
+    # its interior.  (Counting only the edges *into* brace groups would
+    # yield 1 here, and the interior would never be reached.)
+    src = b"{\n  x y;\n  keep;\n}\n"
+    self.assertEqual(self.num_passes(src), 2)
+    self.assertTrue(is_brace_group(build_tree(tokenize_cpp(src)).children[0]))
+
+  def test_num_passes_max_passes(self) -> None:
+    src = b"void f() {\n  if (x) {\n    y;\n  }\n}\n"
+    self.assertEqual(self.num_passes(src, max_passes=2), 2)
+    self.assertEqual(self.num_passes(src, max_passes=9), 3)
+
+  def test_get_brace_groups(self) -> None:
+    m = self.make(Recorder(lambda d: True),
+                  b"x = f({1}, {2}) { {4} } {3};\n")
+    line = m.tree_root.children[0]
+
+    def texts(n: TTNode) -> list[bytes]:
+      return [bg.text() for bg in m._get_brace_groups(n)]
+
+    # Right to left, searching inside the parentheses, but not inside a
+    # brace group.
+    self.assertEqual(texts(line), [b" {3}", b" { {4} }", b" {2}", b"{1}"])
+
+    # A brace group yields only itself.
+    outer = line.children[4]
+    self.assertEqual(texts(outer), [b" { {4} }"])
+
+    # Without any brace groups, nothing is yielded.
+    self.assertEqual(texts(line.children[0]), [])
+
+    # Replaced nodes are skipped.
+    m.cur_replacement[id(line.children[3])] = b""
+    self.assertEqual(texts(line), [b" {3}", b" { {4} }"])
+
+  def test_trace(self) -> None:
+    rec = Recorder(lambda d: b"keep" in d and d.count(b"{") == d.count(b"}"))
+    m = self.make(rec, b"int f() { a; keep; }\n")
+    self.assertEqual(m.run_minimizer(), ACCEPT)
+    self.check_reports(rec, m)
+
+    # Only the interior of the brace group gets minimized, since nothing
+    # else in the line is a child of the root or of a brace group.
+    self.assertEqual(m.get_minimized_test_input(), b"int f() { keep }\n")
+    self.assertEqual(rec.tested, [
+      # Pass 1: The children of the root: the line, then the newline,
+      # the latter being a memo hit.
+      b"\n",
+
+      # Pass 2: The line is necessary, so recurse into its brace group,
+      # and remove its interior from last to first.
+      b"int f() { }\n",
+      b"int f() { a; }\n",
+      b"int f() { a; keep }\n",
+      b"int f() { a }\n",
+      b"int f() { a keep }\n",
+      b"int f() { keep }\n",
+    ])
+    self.assertEqual([r.pass_num for r in rec.starts], [1] * 2 + [2] * 8)
+
+  def test_candidates(self) -> None:
+    # Every candidate replaces children of the root or of brace groups,
+    # but not their delimiters.
+    src = b"""\
+struct S {
+  int x;
+  int y;
+};
+
+int f(int a)
+{
+  if (a) {
+    return g({1, 2}, a);
+  }
+  return 0;
+}
+"""
+    rec = Recorder(lambda d: b"return 0" in d and b"g(" in d and
+                   d.count(b"{") == d.count(b"}"))
+    m = self.make(rec, src)
+    parent = {
+      id(c): n
+      for n in all_nodes(m.tree_root)
+      for c in n.children
+    }
+
+    with mock.patch.object(m, "_try_candidate",
+                           wraps=m._try_candidate) as spy:
+      self.assertEqual(m.run_minimizer(), ACCEPT)
+    self.check_reports(rec, m)
+
+    candidates = [n for call in spy.call_args_list for n in call.args[1]]
+    self.assertGreater(len(candidates), 0)
+    for n in candidates:
+      p = parent[id(n)]
+      if p is not m.tree_root:
+        self.assertTrue(is_brace_group(p), n.text())
+        self.assertIsNot(n, p.children[0])
+        self.assertIsNot(n, p.children[-1])
+
+    # Every level of brace nesting, down to "{1, 2}", was reached.
+    self.assertEqual(m._total_num_passes(), 4)
+    self.assertIn(b"{1, 2}",
+                  [parent[id(n)].text().strip() for n in candidates])
+    self.assertEqual(max(r.pass_num for r in rec.starts), 4)
+
+  def test_requires_ma2(self) -> None:
+    for kind in (MinimizationAlgorithmKind.MA1,
+                 MinimizationAlgorithmKind.HDD):
+      with self.assertRaises(AssertionError):
+        Recorder(lambda d: True).mk_minimizer(
+          build_tree(tokenize_cpp(b"a;\n")), alg_kind=kind,
+          ma2_brace_group_func=is_brace_group)
 
 
 if __name__ == "__main__":
