@@ -51,6 +51,7 @@ PYTHON_SRCS += ma_kind.py
 PYTHON_SRCS += ma_ma1.py
 PYTHON_SRCS += ma_ma2.py
 PYTHON_SRCS += minimizer.py
+PYTHON_SRCS += minimizer_options.py
 PYTHON_SRCS += smin.py
 PYTHON_SRCS += smin_token.py
 PYTHON_SRCS += start_report.py

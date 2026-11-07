@@ -8,7 +8,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any, Optional
 
-from minimizer import BraceGroupFunc, Minimizer
+from minimizer import Minimizer
+from minimizer_options import BraceGroupFunc
 from token_tree import TTNode
 
 

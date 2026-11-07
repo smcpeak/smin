@@ -12,9 +12,9 @@ from acceptance_test_result import AcceptanceTestResult
 from build_tree import build_tree
 from ma_factory import make_minimizer
 from ma_kind import MinimizationAlgorithmKind
-from minimizer import (
+from minimizer import Minimizer
+from minimizer_options import (
   BraceGroupFunc,
-  Minimizer,
   MinimizerOptions,
   NTReplacementFunc,
   StopQueryFunc,

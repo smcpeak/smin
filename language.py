@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from minimizer import BraceGroupFunc, NTReplacementFunc
+from minimizer_options import BraceGroupFunc, NTReplacementFunc
 from tokenizer import Tokenizer
 
 

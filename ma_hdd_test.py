@@ -11,7 +11,8 @@ from collections.abc import Callable
 from build_tree import build_tree
 from ma_hdd import HDDMinimizer, compute_candidate_numbers
 from ma_kind import MinimizationAlgorithmKind
-from minimizer import Minimizer, NTReplacementFunc
+from minimizer import Minimizer
+from minimizer_options import NTReplacementFunc
 from minimizer_test import (
   ACCEPT,
   INTERRUPTED,

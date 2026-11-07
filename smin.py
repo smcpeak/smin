@@ -53,7 +53,8 @@ from build_tree import build_tree
 from check_accept import CheckAccept
 from ma_kind import MinimizationAlgorithmKind
 from ma_factory import make_minimizer
-from minimizer import Minimizer, MinimizerOptions
+from minimizer import Minimizer
+from minimizer_options import MinimizerOptions
 from start_report import TestStartReport
 from lang_cpp import CPPLanguage
 from language import Language

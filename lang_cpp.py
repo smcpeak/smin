@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from lang_cpp_delims import CPP_BRACE
-from minimizer import BraceGroupFunc, NTReplacementFunc
+from minimizer_options import BraceGroupFunc, NTReplacementFunc
 from token_tree import TTNode
 from tokenize_cpp import CPPTokenizer
 from tokenizer import Tokenizer

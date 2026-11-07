@@ -9,10 +9,8 @@ from ma_hdd import HDDMinimizer
 from ma_kind import MinimizationAlgorithmKind
 from ma_ma1 import MA1Minimizer
 from ma_ma2 import MA2Minimizer
-from minimizer import (
-  Minimizer,
-  MinimizerOptions,
-)
+from minimizer import Minimizer
+from minimizer_options import MinimizerOptions
 from token_tree import TTNode
 
 
