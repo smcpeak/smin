@@ -9,22 +9,28 @@ import os
 import sys
 import unittest
 
-from build_tree import build_tree
+from build_tree import BuildTreeOptions, build_tree
 from test_util import all_groups, dedent
-from token_tree import TTNode
+from token_tree import TTNode, TTNodeKind
 from tokenize_cpp import tokenize_cpp
 
 
 class BuildTreeTest(unittest.TestCase):
-  def check(self, src: str, expect: str) -> TTNode:
+  def check(
+    self,
+    src: str,
+    expect: str,
+    options: BuildTreeOptions | None = None,
+  ) -> TTNode:
     """
-    Check that building the tree for `src` (dedented) yields a tree
-    whose debug string is `expect` (dedented).  Return the tree.
+    Check that building the tree for `src` (dedented), using `options`,
+    yields a tree whose debug string is `expect` (dedented).  Return the
+    tree.
     """
     data = dedent(src).encode("utf-8")
     tokens = tokenize_cpp(data)
 
-    tree = build_tree(tokens)
+    tree = build_tree(tokens, options)
 
     self.assertEqual(tree.to_debug_string(), dedent(expect))
     self.assertEqual(tree.text(), data)
@@ -254,6 +260,159 @@ class BuildTreeTest(unittest.TestCase):
     self.assertEqual(build_tree(tokenize_cpp(b"a b")).depth(), 1)
     # Root -> delimiter group -> delimiter group -> token.
     self.assertEqual(build_tree(tokenize_cpp(b"f(g(x))")).depth(), 3)
+
+  # Two top-level paragraphs, each with two lines.
+  TWO_PARAGRAPHS = """
+    int a;
+    int b;
+
+    int c;
+    int d;
+    """
+
+  # Like TWO_PARAGRAPHS, but within a function body.
+  NESTED_PARAGRAPHS = """
+    void f()
+    {
+      a;
+      b;
+
+      c;
+      d;
+    }
+    """
+
+  def test_use_paragraphs(self) -> None:
+    # By default, the blank line separates two paragraphs.
+    self.assertEqual(
+      group_kinds(self.TWO_PARAGRAPHS, BuildTreeOptions()).count(
+        TTNodeKind.PARAGRAPH),
+      2)
+
+    # Without paragraph grouping, the lines are children of the root.
+    self.check(self.TWO_PARAGRAPHS, r"""
+      ROOT[
+        LINE[
+          "int"
+          " a"
+          ";"
+        ]
+        LINE[
+          "\nint"
+          " b"
+          ";"
+        ]
+        LINE[
+          "\n\nint"
+          " c"
+          ";"
+        ]
+        LINE[
+          "\nint"
+          " d"
+          ";"
+        ]
+        "\n"
+      ]
+      """, BuildTreeOptions(use_paragraphs=False))
+
+    # Nor are there paragraphs at deeper levels.
+    self.assertNotIn(
+      TTNodeKind.PARAGRAPH,
+      group_kinds(self.NESTED_PARAGRAPHS,
+                  BuildTreeOptions(use_paragraphs=False)))
+
+  def test_skip_top_para(self) -> None:
+    # The top-level lines are not grouped into paragraphs.
+    options = BuildTreeOptions(skip_top_para=True)
+    self.assertNotIn(TTNodeKind.PARAGRAPH,
+                     group_kinds(self.TWO_PARAGRAPHS, options))
+
+    # But those in a function body are.
+    self.check(self.NESTED_PARAGRAPHS, r"""
+      ROOT[
+        HEAD_BODY[
+          LINE[
+            "void"
+            " f"
+            DELIMITER[
+              "("
+              ")"
+            ]
+          ]
+          DELIMITER[
+            "\n{"
+            PARAGRAPH[
+              LINE[
+                "\n  a"
+                ";"
+              ]
+              LINE[
+                "\n  b"
+                ";"
+              ]
+            ]
+            PARAGRAPH[
+              LINE[
+                "\n\n  c"
+                ";"
+              ]
+              LINE[
+                "\n  d"
+                ";"
+              ]
+            ]
+            "\n}"
+          ]
+        ]
+        "\n"
+      ]
+      """, options)
+
+  def test_use_head_body(self) -> None:
+    src = """
+      void f()
+      {
+        a;
+      }
+      """
+
+    # By default, the head and body are grouped.
+    self.assertIn(TTNodeKind.HEAD_BODY,
+                  group_kinds(src, BuildTreeOptions()))
+
+    # Without head-body grouping, they are separate children of the
+    # root.
+    self.check(src, r"""
+      ROOT[
+        LINE[
+          "void"
+          " f"
+          DELIMITER[
+            "("
+            ")"
+          ]
+        ]
+        DELIMITER[
+          "\n{"
+          LINE[
+            "\n  a"
+            ";"
+          ]
+          "\n}"
+        ]
+        "\n"
+      ]
+      """, BuildTreeOptions(use_head_body=False))
+
+
+def group_kinds(src: str, options: BuildTreeOptions) -> list[TTNodeKind]:
+  """
+  Return the kinds of the group nodes in the tree built from `src`
+  (dedented) using `options`, in preorder.
+  """
+  tree = build_tree(tokenize_cpp(dedent(src).encode("utf-8")), options)
+  return [g.kind for g in all_groups(tree)]
 
 
 def print_tree_for_file(fname: str) -> None:
