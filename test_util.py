@@ -18,6 +18,11 @@ def dedent(s: str) -> str:
   return s.removeprefix("\n")
 
 
+def dedent_enc(s: str) -> bytes:
+  """Dedent `s` and return its UTF-8 encoded bytes."""
+  return dedent(s).encode()
+
+
 def all_groups(node: TTNode) -> list[TTNode]:
   """Return all group nodes under (and including) `node`, in preorder."""
   if node.is_token():

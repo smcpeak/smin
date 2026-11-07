@@ -21,6 +21,7 @@ from smin import (
   main,
   parse_command_line,
 )
+from test_util import dedent, dedent_enc
 
 
 # Signals are only simulated on POSIX systems.
@@ -301,19 +302,29 @@ class MainTest(unittest.TestCase):
 
   def test_skip_paragraphs(self) -> None:
     # Accept an input that contains "keep1" and "keep2".
-    code = (
-      "import os, sys\n"
-      "d = open(os.environ['INPUT'], 'rb').read()\n"
-      "sys.exit(0 if b'keep1' in d and b'keep2' in d else 1)\n")
+    code = dedent("""
+      import os, sys
+      d = open(os.environ['INPUT'], 'rb').read()
+      sys.exit(0 if b'keep1' in d and b'keep2' in d else 1)
+    """)
 
     # With paragraphs, "a;" is in a paragraph with "int keep1;".  With
     # two passes, MA1 only tries to remove that paragraph as a whole,
     # which is rejected.  Without paragraphs, "a;" is a child of the
     # root, and can be removed by itself.
-    src = b"int keep1;\na;\n\nint keep2, b;\n"
+    src: bytes = dedent_enc("""
+      int keep1;
+      a;
+
+      int keep2, b;
+    """)
     for options, expect in [
       ((), src),
-      (("--skip-paragraphs",), b"int keep1;\n\nint keep2, b;\n"),
+      (("--skip-paragraphs",), dedent_enc("""
+        int keep1;
+
+        int keep2, b;
+      """)),
     ]:
       with self.subTest(options=options):
         self.input_path.write_bytes(src)
