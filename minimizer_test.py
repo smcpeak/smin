@@ -15,6 +15,7 @@ from ma_kind import MinimizationAlgorithmKind
 from minimizer import (
   BraceGroupFunc,
   Minimizer,
+  MinimizerOptions,
   NTReplacementFunc,
   StopQueryFunc,
 )
@@ -97,6 +98,8 @@ class Recorder:
     self,
     root: TTNode,
     *,
+
+    # TODO: Improve the factoring w.r.t. mk_min_for_text.
     max_passes: int | None = None,
     alg_kind: MinimizationAlgorithmKind = MinimizationAlgorithmKind.MA1,
     nt: NTReplacementFunc = no_replacement,
@@ -110,15 +113,20 @@ class Recorder:
     as the global make_minimizer.
     """
     self.minimizer = make_minimizer(
-      alg_kind                    = alg_kind,
-      tree_root                   = root,
-      max_passes                  = max_passes,
-      test_acceptance             = self.test,
-      get_non_trivial_replacement = nt,
-      should_stop                 = should_stop,
-      report_test_starting        = self.starts.append,
-      report_test_finished        = self.finish,
-      ma2_brace_group_func        = ma2_brace_group_func,
+      tree_root                     = root,
+      opt = MinimizerOptions(
+        # Pass along most of the options.
+        alg_kind                    = alg_kind,
+        max_passes                  = max_passes,
+        get_non_trivial_replacement = nt,
+        should_stop                 = should_stop,
+        ma2_brace_group_func        = ma2_brace_group_func,
+
+        # Specify the acceptance test functions.
+        test_acceptance             = self.test,
+        report_test_starting        = self.starts.append,
+        report_test_finished        = self.finish,
+      ),
     )
     return self.minimizer
 
@@ -126,7 +134,6 @@ class Recorder:
     self,
     src: bytes,
     *,
-    # TODO: Factor these as a new MinimizerOptions class.
     max_passes: int | None = None,
     alg_kind: MinimizationAlgorithmKind = MinimizationAlgorithmKind.MA1,
     nt: NTReplacementFunc = no_replacement,
@@ -137,15 +144,17 @@ class Recorder:
     Return `mk_minimizer(build_tree(tokenize_cpp(src)), <args>)`.
     """
     tree: TTNode = build_tree(tokenize_cpp(src))
-
-    return self.mk_minimizer(
-      tree,
-      max_passes           = max_passes,
-      alg_kind             = alg_kind,
-      nt                   = nt,
-      should_stop          = should_stop,
-      ma2_brace_group_func = ma2_brace_group_func,
-    )
+    self.minimizer = make_minimizer(tree, MinimizerOptions(
+      alg_kind                    = alg_kind,
+      max_passes                  = max_passes,
+      test_acceptance             = self.test,
+      get_non_trivial_replacement = nt,
+      should_stop                 = should_stop,
+      report_test_starting        = self.starts.append,
+      report_test_finished        = self.finish,
+      ma2_brace_group_func        = ma2_brace_group_func,
+    ))
+    return self.minimizer
 
   def finish(self, result: AcceptanceTestResult, memoized: bool) -> None:
     self.finishes.append((result, memoized))

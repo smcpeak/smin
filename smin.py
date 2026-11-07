@@ -53,7 +53,7 @@ from build_tree import build_tree
 from check_accept import CheckAccept
 from ma_kind import MinimizationAlgorithmKind
 from ma_factory import make_minimizer
-from minimizer import Minimizer
+from minimizer import Minimizer, MinimizerOptions
 from start_report import TestStartReport
 from lang_cpp import CPPLanguage
 from language import Language
@@ -376,17 +376,19 @@ def main(argv: list[str]) -> int:
       else MinimizationAlgorithmKind.MA1)
 
     minimizer = make_minimizer(
-      alg_kind                    = alg_kind,
-      tree_root                   = tree,
-      max_passes                  = args.max_passes,
-      test_acceptance             = checker.run_acceptance_test,
-      get_non_trivial_replacement = language.get_non_trivial_replacement_func(),
-      report_test_starting        = console.report_test_starting,
-      report_test_finished        = console.report_test_finished,
-      should_stop                 = time_limit_reached,
-      ma2_brace_group_func        = (
-        language.get_brace_group_func() if args.ma2_brace_groups
-        else None),
+      tree_root                     = tree,
+      opt = MinimizerOptions(
+        alg_kind                    = alg_kind,
+        max_passes                  = args.max_passes,
+        test_acceptance             = checker.run_acceptance_test,
+        get_non_trivial_replacement = language.get_non_trivial_replacement_func(),
+        report_test_starting        = console.report_test_starting,
+        report_test_finished        = console.report_test_finished,
+        should_stop                 = time_limit_reached,
+        ma2_brace_group_func        = (
+          language.get_brace_group_func() if args.ma2_brace_groups
+          else None),
+      ),
     )
     result = minimizer.run_minimizer()
 

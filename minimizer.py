@@ -16,6 +16,7 @@ from typing import Optional
 from abstract_range import AbstractRange
 from acceptance_test_result import AcceptanceTestResult
 from byte_range import ByteRange
+from ma_kind import MinimizationAlgorithmKind
 from smin_token import SMToken
 from start_report import TestStartReport
 from token_tree import TTNode
@@ -101,6 +102,52 @@ class _AffectedByteRange:
   # the affected tokens, since the whitespace that precedes the next
   # live token depends on the preceding gap.)
   abr_stop: Optional[int]
+
+
+@dataclass(frozen=True, kw_only=True)
+class MinimizerOptions:
+  """
+  Various options that control which minimizer algorithm to use, and the
+  details of how that minimizer operates.
+  """
+
+  # Which algorithm to use.
+  alg_kind: MinimizationAlgorithmKind
+
+  # Optional limit on the number of "passes", i.e., iterations of the
+  # outer loop of the minimizer.
+  max_passes: Optional[int]
+
+  # Candidate tester.
+  #
+  # TODO: Combine this with `report_test_*`.
+  test_acceptance: AcceptanceTestFunc
+
+  # Language-dependent optional non-trivial (non-empty) node replacement.
+  #
+  # TODO: Combine with `ma2_brace_group_func`.
+  get_non_trivial_replacement: NTReplacementFunc
+
+  # Optional additional stop condition.
+  should_stop: Optional[StopQueryFunc]
+
+  # Function to call just before testing a candidate.
+  report_test_starting: TestStartReportFunc
+
+  # Function to call after a candidate test finishes.
+  report_test_finished: TestFinishedReportFunc
+
+  # Optional language-specific test for whether a node is a "brace
+  # group", which is something that MA2 can use.
+  #
+  # If this is not None, then `alg_kind` must be MA2.
+  ma2_brace_group_func: Optional[BraceGroupFunc]
+
+
+  def __post_init__(self) -> None:
+    if self.alg_kind != MinimizationAlgorithmKind.MA2:
+      assert self.ma2_brace_group_func is None, (
+        "Brace groups option requires MA2.")
 
 
 class Minimizer(ABC):
