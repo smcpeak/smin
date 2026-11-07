@@ -150,15 +150,12 @@ class Recorder(AcceptanceTester):
     self.minimizer = make_minimizer(
       tree_root                     = root,
       opt = MinimizerOptions(
-        # Pass along most of the options.
         alg_kind                    = alg_kind,
         max_passes                  = max_passes,
+        acceptance                  = self,
         language                    = language,
         should_stop                 = should_stop,
         ma2_brace_groups            = ma2_brace_groups,
-
-        # Specify the acceptance test functions.
-        acceptance                  = self,
       ),
     )
     return self.minimizer
