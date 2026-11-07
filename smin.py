@@ -51,11 +51,11 @@ from typing import Optional
 from acceptance_test_result import AcceptanceTestResult
 from acceptance_tester import AcceptanceTester
 from build_tree import build_tree
-from check_accept import CheckAccept
 from ma_kind import MinimizationAlgorithmKind
 from ma_factory import make_minimizer
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
+from run_accept_program import RunAcceptProgram
 from start_report import TestStartReport
 from lang_cpp import CPPLanguage
 from language import Language
@@ -133,7 +133,7 @@ class _Tester(AcceptanceTester):
   the progress reports with `console`.
   """
 
-  def __init__(self, checker: CheckAccept, console: _Console) -> None:
+  def __init__(self, checker: RunAcceptProgram, console: _Console) -> None:
     self.checker = checker
     self.console = console
 
@@ -338,7 +338,7 @@ def main(argv: list[str]) -> int:
           f"{fname!r} does not reproduce its contents", file=sys.stderr)
     return 4
 
-  checker = CheckAccept(fname, test_command)
+  checker = RunAcceptProgram(fname, test_command)
 
   # Once created, this holds the most recently accepted input.
   minimizer: Optional[Minimizer] = None

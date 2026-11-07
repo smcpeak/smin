@@ -1,13 +1,13 @@
-# check_accept_test.py
+# run_accept_program_test.py
 """
-Unit tests for check_accept.
+Unit tests for run_accept_program.
 
 If the envvar MANUAL_TEST_PROG is set, then instead of running the unit
 tests, running this module directly runs that program as an acceptance
-test, using `CheckAccept`, and prints the result.  That is useful for
+test, using `RunAcceptProgram`, and prints the result.  That is useful for
 manually testing the response to Ctrl-C:
 
-  $ MANUAL_TEST_PROG=./some-script python3 check_accept_test.py
+  $ MANUAL_TEST_PROG=./some-script python3 run_accept_program_test.py
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from unittest import mock
 
 from acceptance_test_result import AcceptanceTestResult
 from byte_range import ByteRange
-from check_accept import CheckAccept
+from run_accept_program import RunAcceptProgram
 from start_report import TestStartReport
 
 
@@ -42,7 +42,7 @@ def python_command(code: str) -> list[str]:
   return [sys.executable, "-c", code]
 
 
-class CheckAcceptTest(unittest.TestCase):
+class RunAcceptProgramTest(unittest.TestCase):
   def setUp(self) -> None:
     self.temp_dir = tempfile.TemporaryDirectory()
     self.dir = Path(self.temp_dir.name)
@@ -58,7 +58,7 @@ class CheckAcceptTest(unittest.TestCase):
     report: Optional[TestStartReport] = None,
   ) -> AcceptanceTestResult:
     """Run Python `code` as the acceptance test."""
-    checker = CheckAccept(self.input_file_name, python_command(code))
+    checker = RunAcceptProgram(self.input_file_name, python_command(code))
     return checker.run_acceptance_test(contents, report)
 
   def test_accept(self) -> None:
@@ -135,7 +135,7 @@ class CheckAcceptTest(unittest.TestCase):
       "import os, sys\n"
       "sys.exit(0 if b'keep' in open(os.environ['INPUT'], 'rb').read() "
       "else 1)\n")
-    checker = CheckAccept(self.input_file_name, python_command(code))
+    checker = RunAcceptProgram(self.input_file_name, python_command(code))
 
     self.assertEqual(checker.run_acceptance_test(b"keep 1\n", None), ACCEPT)
     self.assertEqual(best.read_bytes(), b"keep 1\n")
@@ -153,7 +153,7 @@ class CheckAcceptTest(unittest.TestCase):
   def test_write_best(self) -> None:
     best = Path(self.input_file_name + ".best")
     best.write_bytes(b"old contents, longer\n")
-    checker = CheckAccept(self.input_file_name, ["unused"])
+    checker = RunAcceptProgram(self.input_file_name, ["unused"])
     self.assertEqual(checker.best_file_name, str(best))
     checker.write_best(b"new\n")
     self.assertEqual(best.read_bytes(), b"new\n")
@@ -178,7 +178,7 @@ class CheckAcceptTest(unittest.TestCase):
     self.assertEqual(self.run_code(code), ACCEPT)
 
   def test_program_not_found(self) -> None:
-    checker = CheckAccept(self.input_file_name,
+    checker = RunAcceptProgram(self.input_file_name,
                           [str(self.dir / "no-such-program")])
     with self.assertRaises(FileNotFoundError):
       checker.run_acceptance_test(b"", None)
@@ -287,7 +287,7 @@ def manual_test(program: str) -> None:
   """Run `program` as an acceptance test and print the result."""
   with tempfile.TemporaryDirectory() as temp_dir:
     input_file_name = str(Path(temp_dir) / "input.txt")
-    checker = CheckAccept(input_file_name, [program])
+    checker = RunAcceptProgram(input_file_name, [program])
     print(f"Running {program!r} with INPUT={input_file_name!r} ...",
           flush=True)
     result = checker.run_acceptance_test(b"manual test input\n", None)

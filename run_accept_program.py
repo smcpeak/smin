@@ -1,6 +1,6 @@
-# check_accept.py
+# run_accept_program.py
 """
-CheckAccept class.
+RunAcceptProgram class.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from start_report import TestStartReport
 
 
 @dataclass
-class CheckAccept:
+class RunAcceptProgram:
   """
   Manage the invocation of the the acceptance program for the minimizer.
   """

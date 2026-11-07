@@ -2,7 +2,7 @@
 # Sleep for 4 seconds, possibly ignoring SIGINT.
 
 # This is meant to be used as the MANUAL_TEST_PROG for a test of the
-# check_accept module, especially to test Ctrl-C behavior.
+# run_accept_program module, especially to test Ctrl-C behavior.
 
 import signal
 import time
