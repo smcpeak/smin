@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from ma_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
 from token_tree import TTNode

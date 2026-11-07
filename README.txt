@@ -29,6 +29,25 @@ novelies here are:
 See doc/related-work.txt (work in progress) for more comparison details.
 
 
+Module Naming Conventions
+-------------------------
+
+There are quite a few modules that pertain to concepts related to
+minimization, and hence have similar names.  To clarify their purpose,
+they are named according to this scheme:
+
+* minimizer*.py: The core minimizer.
+
+* min_alg*.py: Infrastructure for selecting and instantiating a specific
+  algorithm.
+
+* ma_*.py: The individual minimization algorithms.
+
+For a module foo.py, its associated tests are in foo_test.py.
+(Rationale: That keeps the module and its tests next to each other in an
+alphabetical file listing.)
+
+
 AI Disclosure
 -------------
 

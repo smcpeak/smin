@@ -1,4 +1,4 @@
-# ma_kind.py
+# min_alg_kind.py
 """
 MinimizationAlgorithmKind enumeration.
 """

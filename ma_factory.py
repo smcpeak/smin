@@ -6,7 +6,7 @@ Factory function to create a Minimizer subclass instance.
 from __future__ import annotations
 
 from ma_hdd import HDDMinimizer
-from ma_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizationAlgorithmKind
 from ma_ma1 import MA1Minimizer
 from ma_ma2 import MA2Minimizer
 from minimizer import Minimizer

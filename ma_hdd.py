@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 
-from ma_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
 from token_tree import TTNode
 

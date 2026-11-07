@@ -13,7 +13,7 @@ from build_tree import build_tree
 from lang_cpp import CPPLanguage
 from language import Language
 from ma_ma2 import MA2Minimizer
-from ma_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
 from minimizer_test import (
   ACCEPT,

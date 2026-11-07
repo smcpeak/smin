@@ -11,7 +11,7 @@ from typing import Optional
 
 from acceptance_tester import AcceptanceTester
 from language import Language
-from ma_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizationAlgorithmKind
 
 
 # Signature of a function called after each candidate is tested (and,
