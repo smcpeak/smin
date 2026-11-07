@@ -15,6 +15,8 @@ from ma_kind import MinimizationAlgorithmKind
 from start_report import TestStartReport
 
 
+# REFACTOR: Remove the next three types, as they should become unused.
+
 # Signature of a function that checks a candidate input for acceptance
 # as "interesting" for minimization purposes.  The second argument is
 # the progress report for the candidate.  In normal operation, this
@@ -54,9 +56,10 @@ class MinimizerOptions:
   # outer loop of the minimizer.
   max_passes: Optional[int]
 
+  # REFACTOR: Replace `test_acceptance`, `report_test_starting`, and
+  # `report_test_finished` with `acceptance: AcceptanceTester`.
+
   # Candidate tester.
-  #
-  # TODO: Combine this with `report_test_*`.
   test_acceptance: AcceptanceTestFunc
 
   # Language-specific knowledge, such as non-trivial (non-empty) node

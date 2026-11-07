@@ -95,6 +95,9 @@ class Minimizer(ABC):
   max_passes: Optional[int]
 
   # ---- Primary input and output callback ----
+  # REFACTOR: Replace `test_acceptance`, `report_test_starting`, and
+  # `report_test_finished` with `acceptance: AcceptanceTester`.
+
   # Check if a given candidate is accepted.  In normal operation, this
   # will spawn and wait for a child process.
   #

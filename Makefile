@@ -30,6 +30,7 @@ RUFF = ruff
 PYTHON_SRCS :=
 PYTHON_SRCS += abstract_range.py
 PYTHON_SRCS += acceptance_test_result.py
+PYTHON_SRCS += acceptance_tester.py
 PYTHON_SRCS += bm/run_bm.py
 PYTHON_SRCS += build_tree.py
 PYTHON_SRCS += build_tree_util.py
