@@ -38,8 +38,8 @@ class AcceptanceTester(ABC):
     """
     This is called when a candidate is ready for testing, before
     `test_acceptance` (although that might be skipped if the candidate
-    has a memoized result).  In normal # operation, the callee prints
-    this data to the console.
+    has a memoized result).  In normal operation, the callee prints this
+    data to the console.
 
     The default does nothing.
     """
