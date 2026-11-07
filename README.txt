@@ -73,6 +73,16 @@ Any prose that includes AI-generated text is disclosed as such at the
 top of the file (in addition to provenance in git commit messages).
 Currently, that only applies to doc/related-work.txt.
 
+The earliest versions of the structure deduction and minimization
+algorithms were informed in part by drafts created by Claude Code.
+Claude's original minimization proposal is in doc/claude-min-alg.txt.
+Unfortunately, I didn't keep a copy of its proposal for structure
+deduction, though my recollection is it focused on delimiter balancing
+and indentation (aimed at Python).
+
+During development, I have frequently used Claude Code to get feedback
+on design increments.
+
 
 LICENSE
 -------
