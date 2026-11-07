@@ -411,7 +411,7 @@ def main(argv: list[str]) -> int:
 
     minimizer = make_minimizer(
       tree_root                     = tree,
-      opt = MinimizerOptions(
+      options = MinimizerOptions(
         alg_kind                    = alg_kind,
         max_passes                  = args.max_passes,
         acceptance                  = _Tester(run_accept, console),

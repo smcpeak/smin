@@ -16,36 +16,25 @@ from token_tree import TTNode
 
 def make_minimizer(
   tree_root: TTNode,
-  opt: MinimizerOptions,
+  options: MinimizerOptions,
 ) -> Minimizer:
   """
-  Create a Minimizer object.  Uses `opt` to decide which class.
+  Create a Minimizer object.  Uses `options` to decide which class.
   """
 
-  # Get the arguments to relay to the Minimizer constructor.
-  #
-  # TODO: This is ugly.
-  all_args = vars(opt).copy()
-  del all_args["alg_kind"]
-  del all_args["ma2_brace_groups"]
-
-  if opt.alg_kind == MinimizationAlgorithmKind.MA2:
-    return MA2Minimizer(
-      tree_root        = tree_root,
-      **all_args,
-      ma2_brace_groups = opt.ma2_brace_groups)
-
   # Choose which class to create.
-  cls: type[MA1Minimizer | HDDMinimizer]
-  if opt.alg_kind == MinimizationAlgorithmKind.MA1:
+  cls: type[MA1Minimizer | MA2Minimizer | HDDMinimizer]
+  if options.alg_kind == MinimizationAlgorithmKind.MA1:
     cls = MA1Minimizer
-  elif opt.alg_kind == MinimizationAlgorithmKind.HDD:
+  elif options.alg_kind == MinimizationAlgorithmKind.MA2:
+    cls = MA2Minimizer
+  elif options.alg_kind == MinimizationAlgorithmKind.HDD:
     cls = HDDMinimizer
   else:
-    assert False, f"Bad alg_kind: {opt.alg_kind}"
+    assert False, f"Bad alg_kind: {options.alg_kind}"
 
   # Forward the arguments to that constructor.
-  return cls(tree_root=tree_root, **all_args)
+  return cls(tree_root, options)
 
 
 # EOF

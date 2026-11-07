@@ -13,11 +13,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 from abstract_range import AbstractRange
-from acceptance_tester import AcceptanceTester
 from acceptance_test_result import AcceptanceTestResult
 from byte_range import ByteRange
-from language import Language
-from minimizer_options import StopQueryFunc
+from minimizer_options import MinimizerOptions
 from smin_token import SMToken
 from start_report import TestStartReport
 from token_tree import TTNode
@@ -86,26 +84,9 @@ class Minimizer(ABC):
   # The root of the token tree representing the original input.
   tree_root: TTNode
 
-  # Optional user-provided limit on the number of passes.  The precise
-  # meaning of "pass" depends on the algorithm being used.
-  max_passes: Optional[int]
-
-  # ---- Input and output callbacks ----
-  # Checks whether a given candidate is accepted, and receives progress
-  # reports before and after each check.  In normal operation, the
-  # check will spawn and wait for a child process.
-  #
-  # The data passed to `acceptance.test_acceptance` is the minimizer's
-  # primary output, and the return values from it are its primary input
-  # (in addition to `tree_root`).
-  acceptance: AcceptanceTester
-
-  # Language-specific queries, such as for non-trivial replacement text
-  # for a node.
-  language: Language
-
-  # If not None, called after each candidate to ask whether to stop.
-  should_stop: Optional[StopQueryFunc]
+  # Minimizer control options, the most important of which is the
+  # acceptance test function.
+  options: MinimizerOptions
 
   # ---- Fixed data derived from the input ----
   # The tokens of the original input, in order.  Tokens are identified
@@ -175,19 +156,15 @@ class Minimizer(ABC):
   ma2_granularity: int
 
   # ---- Output data ----
-  # True if minimization stopped early because `should_stop` returned
-  # True.
+  # True if minimization stopped early because `options.should_stop`
+  # returned True.
   stop_requested: bool
 
 
   def __init__(
     self,
-    *,
     tree_root: TTNode,
-    max_passes: Optional[int] = None,
-    acceptance: AcceptanceTester,
-    language: Language,
-    should_stop: Optional[StopQueryFunc] = None,
+    options: MinimizerOptions,
   ) -> None:
     """
     Prepare to minimize the input represented by `tree_root`.
@@ -196,10 +173,7 @@ class Minimizer(ABC):
     """
 
     self.tree_root = tree_root
-    self.max_passes = max_passes
-    self.acceptance = acceptance
-    self.language = language
-    self.should_stop = should_stop
+    self.options = options
 
     self.tokens = list(tree_root.tokens())
     self.node_span = {}
@@ -243,8 +217,8 @@ class Minimizer(ABC):
     Requires that `run_minimizer` has not been invoked previously.
 
     It returns ACCEPT if we reached the end of the algorithm normally,
-    or stopped early because `should_stop` returned True (in which case
-    `stop_requested` is set), and INTERRUPTED otherwise.
+    or stopped early because `options.should_stop` returned True (in
+    which case `stop_requested` is set), and INTERRUPTED otherwise.
     """
 
     assert not self.minimizer_invoked
@@ -441,14 +415,14 @@ class Minimizer(ABC):
 
     self.sequence_num += 1
     report = self._make_report(nodes, changed)
-    self.acceptance.report_test_starting(report)
+    self.options.acceptance.report_test_starting(report)
 
     result: Optional[AcceptanceTestResult] = self.memoized_accept.get(digest)
     if result is not None:
-      self.acceptance.report_test_finished(result, True)
+      self.options.acceptance.report_test_finished(result, True)
     else:
-      result = self.acceptance.test_acceptance(text, report)
-      self.acceptance.report_test_finished(result, False)
+      result = self.options.acceptance.test_acceptance(text, report)
+      self.options.acceptance.report_test_finished(result, False)
       if result == AcceptanceTestResult.INTERRUPTED:
         raise _StopMinimization(result)
       self.memoized_accept[digest] = result
@@ -460,7 +434,8 @@ class Minimizer(ABC):
 
     # This is checked after committing so that, if we stop, the most
     # recently accepted input includes this candidate when accepted.
-    if self.should_stop is not None and self.should_stop():
+    if (self.options.should_stop is not None and
+        self.options.should_stop()):
       self.stop_requested = True
       raise _StopMinimization(AcceptanceTestResult.ACCEPT)
 

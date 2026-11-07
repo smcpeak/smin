@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 
+from ma_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
 from token_tree import TTNode
 
@@ -62,14 +63,18 @@ class HDDMinimizer(Minimizer):
   hdd_max_candidates: int = 0
 
 
+  def __post_init(self) -> None:
+    assert self.options.alg_kind == MinimizationAlgorithmKind.HDD
+
+
   def _total_num_passes(self) -> int:
 
     # This is MAX_DEPTH, since there is one pass per level of the tree,
     # not counting the root.
     ret: int = self.tree_root.depth()
 
-    if self.max_passes is not None:
-      ret = min(ret, self.max_passes)
+    if self.options.max_passes is not None:
+      ret = min(ret, self.options.max_passes)
 
     return ret
 
@@ -149,7 +154,7 @@ class HDDMinimizer(Minimizer):
 
         if g == 1:
           n: TTNode = run[0]
-          replacement = self.language.non_trivial_replacement(n)
+          replacement = self.options.language.non_trivial_replacement(n)
           if replacement:
             self.hdd_candidate_number += 0.5
             self._try_candidate({id(n): replacement}, [n])

@@ -149,7 +149,7 @@ class Recorder(AcceptanceTester):
     """
     self.minimizer = make_minimizer(
       tree_root                     = root,
-      opt = MinimizerOptions(
+      options = MinimizerOptions(
         alg_kind                    = alg_kind,
         max_passes                  = max_passes,
         acceptance                  = self,

@@ -47,6 +47,7 @@ class MinimizerOptions:
 
   # If True, MA2 only considers the children of the root and of "brace
   # groups" (as identified by `language`) as candidates for removal.
+  # See minimization-algorithm.txt, "MA2 --ma2-brace-groups".
   #
   # If this is True, then `alg_kind` must be MA2.
   ma2_brace_groups: bool

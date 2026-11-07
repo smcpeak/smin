@@ -5,6 +5,7 @@ Minimization algorithm 1 (MA1).
 
 from __future__ import annotations
 
+from ma_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
 from token_tree import TTNode
 
@@ -20,13 +21,18 @@ class MA1Minimizer(Minimizer):
   """
 
 
+  def __post_init(self) -> None:
+    assert self.options.alg_kind == MinimizationAlgorithmKind.MA1
+
+
   def _total_num_passes(self) -> int:
 
     # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
     ret: int = len(self.tokens).bit_length()
 
-    if self.max_passes is not None:
-      ret = min(ret, self.max_passes)
+    # TODO: Application of this option should be done in Minimizer.
+    if self.options.max_passes is not None:
+      ret = min(ret, self.options.max_passes)
 
     return ret
 
@@ -128,7 +134,7 @@ class MA1Minimizer(Minimizer):
     if self._try_candidate({id(node): b""}, [node]):
       return True
 
-    replacement = self.language.non_trivial_replacement(node)
+    replacement = self.options.language.non_trivial_replacement(node)
     if replacement:
       return self._try_candidate({id(node): replacement}, [node])
 
