@@ -6,7 +6,7 @@ Factory function to create a Minimizer subclass instance.
 from __future__ import annotations
 
 from ma_hdd import HDDMinimizer
-from min_alg_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizerAlgorithmKind
 from ma_ma1 import MA1Minimizer
 from ma_ma2 import MA2Minimizer
 from minimizer import Minimizer
@@ -24,11 +24,11 @@ def make_minimizer(
 
   # Choose which class to create.
   cls: type[MA1Minimizer | MA2Minimizer | HDDMinimizer]
-  if options.alg_kind == MinimizationAlgorithmKind.MA1:
+  if options.alg_kind == MinimizerAlgorithmKind.MA1:
     cls = MA1Minimizer
-  elif options.alg_kind == MinimizationAlgorithmKind.MA2:
+  elif options.alg_kind == MinimizerAlgorithmKind.MA2:
     cls = MA2Minimizer
-  elif options.alg_kind == MinimizationAlgorithmKind.HDD:
+  elif options.alg_kind == MinimizerAlgorithmKind.HDD:
     cls = HDDMinimizer
   else:
     assert False, f"Bad alg_kind: {options.alg_kind}"

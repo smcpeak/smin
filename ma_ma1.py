@@ -5,7 +5,7 @@ Minimization algorithm 1 (MA1).
 
 from __future__ import annotations
 
-from min_alg_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizerAlgorithmKind
 from minimizer import Minimizer
 from token_tree import TTNode
 
@@ -22,7 +22,7 @@ class MA1Minimizer(Minimizer):
 
 
   def __post_init(self) -> None:
-    assert self.options.alg_kind == MinimizationAlgorithmKind.MA1
+    assert self.options.alg_kind == MinimizerAlgorithmKind.MA1
 
 
   def _total_num_passes(self) -> int:

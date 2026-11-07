@@ -12,7 +12,7 @@ from build_tree import build_tree
 from lang_cpp import CPPLanguage
 from language import Language
 from ma_hdd import HDDMinimizer, compute_candidate_numbers
-from min_alg_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizerAlgorithmKind
 from minimizer import Minimizer
 from minimizer_test import (
   ACCEPT,
@@ -67,7 +67,7 @@ class HDDTest(ReportCheckingTestCase):
     return rec.mk_min_for_text(src, rec.min_opts(
       language=language,
       max_passes=max_passes,
-      alg_kind=MinimizationAlgorithmKind.HDD))
+      alg_kind=MinimizerAlgorithmKind.HDD))
 
   def run_hdd(
     self,
@@ -182,7 +182,7 @@ class HDDTest(ReportCheckingTestCase):
     root = build_tree(tokenize_cpp(src))
     rec = Recorder(lambda d: True)
     m = rec.mk_minimizer(root, rec.min_opts(
-      alg_kind=MinimizationAlgorithmKind.HDD))
+      alg_kind=MinimizerAlgorithmKind.HDD))
     assert isinstance(m, HDDMinimizer)
 
     def level_text(level: int) -> list[bytes]:

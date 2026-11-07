@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 
-from min_alg_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizerAlgorithmKind
 from minimizer import Minimizer
 from token_tree import TTNode
 
@@ -64,7 +64,7 @@ class HDDMinimizer(Minimizer):
 
 
   def __post_init(self) -> None:
-    assert self.options.alg_kind == MinimizationAlgorithmKind.HDD
+    assert self.options.alg_kind == MinimizerAlgorithmKind.HDD
 
 
   def _total_num_passes(self) -> int:

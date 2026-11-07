@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from min_alg_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizerAlgorithmKind
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
 from token_tree import TTNode
@@ -35,7 +35,7 @@ class MA2Minimizer(Minimizer):
     tree_root: TTNode,
     options: MinimizerOptions,
   ) -> None:
-    assert options.alg_kind == MinimizationAlgorithmKind.MA2
+    assert options.alg_kind == MinimizerAlgorithmKind.MA2
     super().__init__(tree_root, options)
 
     # MA2 makes one pass per level of the tree, or, with

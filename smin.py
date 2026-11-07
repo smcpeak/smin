@@ -51,7 +51,7 @@ from typing import Optional
 from acceptance_test_result import AcceptanceTestResult
 from acceptance_tester import AcceptanceTester
 from build_tree import build_tree
-from min_alg_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizerAlgorithmKind
 from ma_factory import make_minimizer
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
@@ -405,9 +405,9 @@ def main(argv: list[str]) -> int:
       return deadline is not None and time.monotonic() >= deadline
 
     alg_kind = (
-      MinimizationAlgorithmKind.MA2 if args.ma2
-      else MinimizationAlgorithmKind.HDD if args.hdd
-      else MinimizationAlgorithmKind.MA1)
+      MinimizerAlgorithmKind.MA2 if args.ma2
+      else MinimizerAlgorithmKind.HDD if args.hdd
+      else MinimizerAlgorithmKind.MA1)
 
     minimizer = make_minimizer(
       tree_root                     = tree,

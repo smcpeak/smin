@@ -11,7 +11,7 @@ from typing import Optional
 
 from acceptance_tester import AcceptanceTester
 from language import Language
-from min_alg_kind import MinimizationAlgorithmKind
+from min_alg_kind import MinimizerAlgorithmKind
 
 
 # Signature of a function called after each candidate is tested (and,
@@ -29,7 +29,7 @@ class MinimizerOptions:
   """
 
   # Which algorithm to use.
-  alg_kind: MinimizationAlgorithmKind
+  alg_kind: MinimizerAlgorithmKind
 
   # Optional limit on the number of "passes", i.e., iterations of the
   # outer loop of the minimizer.
@@ -56,7 +56,7 @@ class MinimizerOptions:
 
 
   def __post_init__(self) -> None:
-    if self.alg_kind != MinimizationAlgorithmKind.MA2:
+    if self.alg_kind != MinimizerAlgorithmKind.MA2:
       assert not self.ma2_brace_groups, (
         "Brace groups option requires MA2.")
 

@@ -1,12 +1,12 @@
 # min_alg_kind.py
 """
-MinimizationAlgorithmKind enumeration.
+MinimizerAlgorithmKind enumeration.
 """
 
 from enum import Enum
 
 
-class MinimizationAlgorithmKind(Enum):
+class MinimizerAlgorithmKind(Enum):
   """Defined minimization algorithms."""
   MA1 = 1
   MA2 = 2
