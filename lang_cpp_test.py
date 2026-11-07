@@ -22,7 +22,7 @@ class CPPLanguageTest(unittest.TestCase):
   def test_non_trivial_replacement(self) -> None:
     lang: Language = CPPLanguage()
     tokenizer = lang.make_tokenizer()
-    nt = lang.get_non_trivial_replacement_func()
+    nt = lang.non_trivial_replacement
 
     # Only the brace group has a replacement, not the parentheses.
     tree = build_tree(tokenizer.tokenize(b"int f(int x) { return x; }\n"))
@@ -34,7 +34,7 @@ class CPPLanguageTest(unittest.TestCase):
   def test_brace_group(self) -> None:
     lang: Language = CPPLanguage()
     tokenizer = lang.make_tokenizer()
-    is_bg = lang.get_brace_group_func()
+    is_bg = lang.is_brace_group
 
     # Only the brace groups, not the parentheses or brackets, nor the
     # tokens or other groups.

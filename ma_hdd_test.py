@@ -9,17 +9,19 @@ import unittest
 from collections.abc import Callable
 
 from build_tree import build_tree
+from lang_cpp import CPPLanguage
+from language import Language
 from ma_hdd import HDDMinimizer, compute_candidate_numbers
 from ma_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
-from minimizer_options import NTReplacementFunc
 from minimizer_test import (
   ACCEPT,
+  TEST_LANGUAGE,
   INTERRUPTED,
   Recorder,
   ReportCheckingTestCase,
+  FuncLanguage,
   find_node,
-  no_replacement,
 )
 from start_report import TestStartReport
 from token_tree import TTNode
@@ -27,13 +29,6 @@ from tokenize_cpp import tokenize_cpp
 
 
 KEEP_SRC = b"int a;\nint keep;\nint b;\n"
-
-
-def brace_to_semicolon(node: TTNode) -> bytes | None:
-  """Non-trivial replacement function: replace a brace group with ";"."""
-  if node.is_delim_group() and node.first_token().text.strip() == b"{":
-    return b";"
-  return None
 
 
 class ComputeCandidateNumbersTest(unittest.TestCase):
@@ -65,12 +60,12 @@ class HDDTest(ReportCheckingTestCase):
     self,
     rec: Recorder,
     src: bytes,
-    nt: NTReplacementFunc = no_replacement,
+    language: Language = TEST_LANGUAGE,
     max_passes: int | None = None,
   ) -> Minimizer:
     """Make an HDD minimizer for `src` that reports to `rec`."""
     return rec.mk_min_for_text(src,
-      nt=nt,
+      language=language,
       max_passes=max_passes,
       alg_kind=MinimizationAlgorithmKind.HDD)
 
@@ -78,7 +73,7 @@ class HDDTest(ReportCheckingTestCase):
     self,
     src: bytes,
     accept: Callable[[bytes], bool],
-    nt: NTReplacementFunc = no_replacement,
+    language: Language = TEST_LANGUAGE,
     max_passes: int | None = None,
   ) -> tuple[Recorder, Minimizer]:
     """
@@ -86,7 +81,7 @@ class HDDTest(ReportCheckingTestCase):
     reports, and return the recorder and minimizer.
     """
     rec = Recorder(accept)
-    m = self.make_hdd(rec, src, nt, max_passes)
+    m = self.make_hdd(rec, src, language, max_passes)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertTrue(accept(m.get_minimized_test_input()))
     self.check_reports(rec, m)
@@ -240,7 +235,7 @@ class HDDTest(ReportCheckingTestCase):
     # is accepted.
     rec, m = self.run_hdd(b"void f() { x; }\nint keep;\n",
                           lambda d: b"keep" in d and b"f();" in d,
-                          brace_to_semicolon)
+                          CPPLanguage())
     self.assertEqual(m.get_minimized_test_input(), b" f();\nint keep;\n")
 
     # The replacement is tried right after removal is rejected.
@@ -268,9 +263,9 @@ class HDDTest(ReportCheckingTestCase):
 
     def nt(node: TTNode) -> bytes | None:
       tried.append(int(rec.starts[-1].granularity))
-      return brace_to_semicolon(node)
+      return CPPLanguage().non_trivial_replacement(node)
 
-    m = self.make_hdd(rec, src, nt)
+    m = self.make_hdd(rec, src, FuncLanguage(nt))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.check_reports(rec, m)
     self.assertEqual(rec.starts[0].granularity, 2)

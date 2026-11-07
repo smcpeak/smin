@@ -11,16 +11,16 @@ from unittest import mock
 
 from build_tree import build_tree
 from lang_cpp import CPPLanguage
+from language import Language
 from ma_ma2 import MA2Minimizer
 from ma_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
-from minimizer_options import NTReplacementFunc
 from minimizer_test import (
   ACCEPT,
   INTERRUPTED,
   Recorder,
   ReportCheckingTestCase,
-  no_replacement,
+  TEST_LANGUAGE,
 )
 from start_report import TestStartReport
 from test_util import all_nodes
@@ -40,7 +40,7 @@ class MA2Test(ReportCheckingTestCase):
     self,
     src: bytes,
     accept: Callable[[bytes], bool],
-    nt: NTReplacementFunc = no_replacement,
+    language: Language = TEST_LANGUAGE,
     max_passes: int | None = None,
   ) -> tuple[Recorder, Minimizer]:
     """
@@ -49,7 +49,7 @@ class MA2Test(ReportCheckingTestCase):
     """
     rec = Recorder(accept)
     m = rec.mk_min_for_text(src,
-      nt=nt,
+      language=language,
       max_passes=max_passes,
       alg_kind=MinimizationAlgorithmKind.MA2)
     self.assertEqual(m.run_minimizer(), ACCEPT)
@@ -155,13 +155,9 @@ class MA2Test(ReportCheckingTestCase):
   def test_non_trivial_replacement(self) -> None:
     # Removing the function body is rejected, but replacing it with ";"
     # is accepted.
-    def nt(node: TTNode) -> bytes | None:
-      if node.is_delim_group() and node.first_token().text.strip() == b"{":
-        return b";"
-      return None
-
     rec, m = self.run_ma2(b"void f() { x; }\nint keep;\n",
-                          lambda d: b"keep" in d and b"f();" in d, nt)
+                          lambda d: b"keep" in d and b"f();" in d,
+                          CPPLanguage())
     self.assertEqual(m.get_minimized_test_input(), b" f();\nkeep\n")
 
     # The replacement is tried right after removal is rejected, and the
@@ -217,7 +213,7 @@ int main()
     self.assertLess(len(m.get_minimized_test_input()), len(src) // 4)
 
 
-is_brace_group = CPPLanguage.is_brace_group
+is_brace_group = CPPLanguage().is_brace_group
 
 
 class MA2BraceGroupsTest(ReportCheckingTestCase):
@@ -238,7 +234,7 @@ class MA2BraceGroupsTest(ReportCheckingTestCase):
     m = rec.mk_min_for_text(src,
       max_passes=max_passes,
       alg_kind=MinimizationAlgorithmKind.MA2,
-      ma2_brace_group_func=is_brace_group)
+      ma2_brace_groups=True)
     assert isinstance(m, MA2Minimizer)
     return m
 
@@ -375,7 +371,7 @@ int f(int a)
         Recorder(lambda d: True).mk_min_for_text(
           b"a;\n",
           alg_kind=kind,
-          ma2_brace_group_func=is_brace_group)
+          ma2_brace_groups=True)
 
 
 if __name__ == "__main__":

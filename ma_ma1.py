@@ -128,7 +128,7 @@ class MA1Minimizer(Minimizer):
     if self._try_candidate({id(node): b""}, [node]):
       return True
 
-    replacement = self.get_non_trivial_replacement(node)
+    replacement = self.language.non_trivial_replacement(node)
     if replacement:
       return self._try_candidate({id(node): replacement}, [node])
 

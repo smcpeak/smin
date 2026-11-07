@@ -382,13 +382,11 @@ def main(argv: list[str]) -> int:
         alg_kind                    = alg_kind,
         max_passes                  = args.max_passes,
         test_acceptance             = checker.run_acceptance_test,
-        get_non_trivial_replacement = language.get_non_trivial_replacement_func(),
+        language                    = language,
         report_test_starting        = console.report_test_starting,
         report_test_finished        = console.report_test_finished,
         should_stop                 = time_limit_reached,
-        ma2_brace_group_func        = (
-          language.get_brace_group_func() if args.ma2_brace_groups
-          else None),
+        ma2_brace_groups            = args.ma2_brace_groups,
       ),
     )
     result = minimizer.run_minimizer()

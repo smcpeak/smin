@@ -10,19 +10,20 @@ from collections.abc import Callable
 
 from acceptance_test_result import AcceptanceTestResult
 from build_tree import build_tree
+from lang_cpp import CPPLanguage
+from language import Language
 from ma_factory import make_minimizer
 from ma_kind import MinimizationAlgorithmKind
 from minimizer import Minimizer
 from minimizer_options import (
-  BraceGroupFunc,
   MinimizerOptions,
-  NTReplacementFunc,
   StopQueryFunc,
 )
 from start_report import TestStartReport
 from test_util import all_nodes
 from token_tree import TTNode
 from tokenize_cpp import tokenize_cpp
+from tokenizer import Tokenizer
 
 
 ACCEPT = AcceptanceTestResult.ACCEPT
@@ -33,6 +34,35 @@ INTERRUPTED = AcceptanceTestResult.INTERRUPTED
 def no_replacement(node: TTNode) -> bytes | None:
   """Non-trivial replacement function that never provides one."""
   return None
+
+
+class FuncLanguage:
+  """
+  A `Language` for tests that is like C++, except that its non-trivial
+  replacement query is delegated to a function, which by default never
+  provides a replacement.
+  """
+
+  def __init__(
+    self,
+    nt: Callable[[TTNode], bytes | None] = no_replacement,
+  ) -> None:
+    self.nt = nt
+    self.cpp = CPPLanguage()
+
+  def make_tokenizer(self) -> Tokenizer:
+    return self.cpp.make_tokenizer()
+
+  def non_trivial_replacement(self, node: TTNode) -> bytes | None:
+    return self.nt(node)
+
+  def is_brace_group(self, node: TTNode) -> bool:
+    return self.cpp.is_brace_group(node)
+
+
+# The default language for tests: C++, but with no non-trivial
+# replacements, so tests need only consider removal.
+TEST_LANGUAGE: Language = FuncLanguage()
 
 
 def find_node(root: TTNode, text: bytes) -> TTNode:
@@ -102,9 +132,9 @@ class Recorder:
     # TODO: Improve the factoring w.r.t. mk_min_for_text.
     max_passes: int | None = None,
     alg_kind: MinimizationAlgorithmKind = MinimizationAlgorithmKind.MA1,
-    nt: NTReplacementFunc = no_replacement,
+    language: Language = TEST_LANGUAGE,
     should_stop: StopQueryFunc | None = None,
-    ma2_brace_group_func: BraceGroupFunc | None = None,
+    ma2_brace_groups: bool = False,
   ) -> Minimizer:
     """
     Build a Minimizer object for testing.
@@ -118,9 +148,9 @@ class Recorder:
         # Pass along most of the options.
         alg_kind                    = alg_kind,
         max_passes                  = max_passes,
-        get_non_trivial_replacement = nt,
+        language                    = language,
         should_stop                 = should_stop,
-        ma2_brace_group_func        = ma2_brace_group_func,
+        ma2_brace_groups            = ma2_brace_groups,
 
         # Specify the acceptance test functions.
         test_acceptance             = self.test,
@@ -136,9 +166,9 @@ class Recorder:
     *,
     max_passes: int | None = None,
     alg_kind: MinimizationAlgorithmKind = MinimizationAlgorithmKind.MA1,
-    nt: NTReplacementFunc = no_replacement,
+    language: Language = TEST_LANGUAGE,
     should_stop: StopQueryFunc | None = None,
-    ma2_brace_group_func: BraceGroupFunc | None = None,
+    ma2_brace_groups: bool = False,
   ) -> Minimizer:
     """
     Return `mk_minimizer(build_tree(tokenize_cpp(src)), <args>)`.
@@ -148,11 +178,11 @@ class Recorder:
       alg_kind                    = alg_kind,
       max_passes                  = max_passes,
       test_acceptance             = self.test,
-      get_non_trivial_replacement = nt,
+      language                    = language,
       should_stop                 = should_stop,
       report_test_starting        = self.starts.append,
       report_test_finished        = self.finish,
-      ma2_brace_group_func        = ma2_brace_group_func,
+      ma2_brace_groups            = ma2_brace_groups,
     ))
     return self.minimizer
 

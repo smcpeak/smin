@@ -22,17 +22,15 @@ def make_minimizer(
   Create a Minimizer object.  Uses `opt` to decide which class.
   """
 
-  # Get the arguments except for the algorithm selector and the
-  # algorithm-specific options.
+  # Get the arguments except for the algorithm selector.
   all_args = vars(opt).copy()
   del all_args["alg_kind"]
-  del all_args["ma2_brace_group_func"]
 
   if opt.alg_kind == MinimizationAlgorithmKind.MA2:
-    return MA2Minimizer(
-      tree_root=tree_root,
-      **all_args,
-      is_brace_group = opt.ma2_brace_group_func)
+    return MA2Minimizer(tree_root=tree_root, **all_args)
+
+  # The remaining options are for MA2 only.
+  del all_args["ma2_brace_groups"]
 
   # Choose which class to create.
   cls: type[MA1Minimizer | HDDMinimizer]

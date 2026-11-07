@@ -149,7 +149,7 @@ class HDDMinimizer(Minimizer):
 
         if g == 1:
           n: TTNode = run[0]
-          replacement = self.get_non_trivial_replacement(n)
+          replacement = self.language.non_trivial_replacement(n)
           if replacement:
             self.hdd_candidate_number += 0.5
             self._try_candidate({id(n): replacement}, [n])

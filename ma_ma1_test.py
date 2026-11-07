@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import unittest
 
+from lang_cpp import CPPLanguage
 from minimizer_test import (
   ACCEPT,
   INTERRUPTED,
   Recorder,
   ReportCheckingTestCase,
 )
-from token_tree import TTNode
 
 
 class MA1Test(ReportCheckingTestCase):
@@ -57,16 +57,10 @@ class MA1Test(ReportCheckingTestCase):
   def test_non_trivial_replacement(self) -> None:
     # Removing the function body is rejected, but replacing it with ";"
     # is accepted.
-    def nt(node: TTNode) -> bytes | None:
-      if (node.is_delim_group() and
-          node.first_token().text.strip() == b"{"):
-        return b";"
-      return None
-
     rec = Recorder(lambda d: b"keep" in d and b"f();" in d)
     m = rec.mk_min_for_text(
       b"void f() { x; }\nint keep;\n",
-      nt=nt)
+      language=CPPLanguage())
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b" f();\nkeep\n")
     self.check_reports(rec, m)

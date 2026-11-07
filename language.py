@@ -6,9 +6,9 @@ minimizer.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Optional, Protocol
 
-from minimizer_options import BraceGroupFunc, NTReplacementFunc
+from token_tree import TTNode
 from tokenizer import Tokenizer
 
 
@@ -19,17 +19,21 @@ class Language(Protocol):
     """Return a tokenizer for this language."""
     ...
 
-  def get_non_trivial_replacement_func(self) -> NTReplacementFunc:
+  def non_trivial_replacement(self, node: TTNode) -> Optional[bytes]:
     """
-    Return the function that yields the non-trivial replacement text, if
-    any, for a token tree node.
+    Return the non-trivial replacement text, if any, for `node`.
+
+    If this returns None, then the only replacement is the empty byte
+    sequence.  If it returns non-None, then *in addition* to replacement
+    by the empty sequence, we also consider replacing the node with the
+    returned sequence.
     """
     ...
 
-  def get_brace_group_func(self) -> BraceGroupFunc:
+  def is_brace_group(self, node: TTNode) -> bool:
     """
-    Return the function that says whether a token tree node is a
-    brace-delimited group, for --ma2-brace-groups.
+    Return True if `node` is a brace-delimited group, for
+    --ma2-brace-groups.
     """
     ...
 

@@ -10,22 +10,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 from acceptance_test_result import AcceptanceTestResult
+from language import Language
 from ma_kind import MinimizationAlgorithmKind
 from start_report import TestStartReport
-from token_tree import TTNode
-
-
-# Signature of a function that can specify non-trivial replacement text
-# for a node.  If it returns None, then the only replacement is the
-# empty byte sequence.  If it returns non-None, then *in addition* to
-# replacement by the empty sequence, we also consider replacing the node
-# with the specified sequence.
-NTReplacementFunc = Callable[[TTNode], Optional[bytes]]
-
-
-# Signature of a function that returns True if a token tree node is a
-# brace-delimited group.
-BraceGroupFunc = Callable[[TTNode], bool]
 
 
 # Signature of a function that checks a candidate input for acceptance
@@ -72,10 +59,9 @@ class MinimizerOptions:
   # TODO: Combine this with `report_test_*`.
   test_acceptance: AcceptanceTestFunc
 
-  # Language-dependent optional non-trivial (non-empty) node replacement.
-  #
-  # TODO: Combine with `ma2_brace_group_func`.
-  get_non_trivial_replacement: NTReplacementFunc
+  # Language-specific knowledge, such as non-trivial (non-empty) node
+  # replacements.
+  language: Language
 
   # Optional additional stop condition.
   should_stop: Optional[StopQueryFunc]
@@ -86,16 +72,16 @@ class MinimizerOptions:
   # Function to call after a candidate test finishes.
   report_test_finished: TestFinishedReportFunc
 
-  # Optional language-specific test for whether a node is a "brace
-  # group", which is something that MA2 can use.
+  # If True, MA2 only considers the children of the root and of "brace
+  # groups" (as identified by `language`) as candidates for removal.
   #
-  # If this is not None, then `alg_kind` must be MA2.
-  ma2_brace_group_func: Optional[BraceGroupFunc]
+  # If this is True, then `alg_kind` must be MA2.
+  ma2_brace_groups: bool
 
 
   def __post_init__(self) -> None:
     if self.alg_kind != MinimizationAlgorithmKind.MA2:
-      assert self.ma2_brace_group_func is None, (
+      assert not self.ma2_brace_groups, (
         "Brace groups option requires MA2.")
 
 

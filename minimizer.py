@@ -15,8 +15,8 @@ from typing import Optional
 from abstract_range import AbstractRange
 from acceptance_test_result import AcceptanceTestResult
 from byte_range import ByteRange
+from language import Language
 from minimizer_options import (
-  NTReplacementFunc,
   AcceptanceTestFunc,
   TestStartReportFunc,
   TestFinishedReportFunc,
@@ -104,8 +104,9 @@ class Minimizer(ABC):
   test_acceptance: AcceptanceTestFunc
 
   # ---- Callbacks that affect algorithm behavior ----
-  # Query for non-trivial replacement text for a node.
-  get_non_trivial_replacement: NTReplacementFunc
+  # Language-specific queries, such as for non-trivial replacement text
+  # for a node.
+  language: Language
 
   # If not None, called after each candidate to ask whether to stop.
   should_stop: Optional[StopQueryFunc]
@@ -196,7 +197,7 @@ class Minimizer(ABC):
     tree_root: TTNode,
     max_passes: Optional[int] = None,
     test_acceptance: AcceptanceTestFunc,
-    get_non_trivial_replacement: NTReplacementFunc,
+    language: Language,
     should_stop: Optional[StopQueryFunc] = None,
     report_test_starting: TestStartReportFunc,
     report_test_finished: TestFinishedReportFunc,
@@ -210,7 +211,7 @@ class Minimizer(ABC):
     self.tree_root = tree_root
     self.max_passes = max_passes
     self.test_acceptance = test_acceptance
-    self.get_non_trivial_replacement = get_non_trivial_replacement
+    self.language = language
     self.should_stop = should_stop
     self.report_test_starting = report_test_starting
     self.report_test_finished = report_test_finished
