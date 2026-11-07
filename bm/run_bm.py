@@ -58,11 +58,6 @@ MINIMIZERS: dict[str, MinimizerSpec] = {
   "smin":     MinimizerSpec([_SMIN_PY, TEST_SH, "--", INPUT]),
   "smin-ma2": MinimizerSpec([_SMIN_PY, "--ma2", TEST_SH, "--", INPUT]),
   "smin-hdd": MinimizerSpec([_SMIN_PY, "--hdd", TEST_SH, "--", INPUT]),
-  "delta":    MinimizerSpec(["multimultidelta", TEST_SH, INPUT]),
-
-  # --n 1 causes these to run sequentially.
-  "creduce":  MinimizerSpec(["creduce", "--n", "1", TEST_SH, INPUT]),
-  "cvise":    MinimizerSpec(["cvise", "--n", "1", TEST_SH, INPUT]),
 
   "smin-ma2-bg": MinimizerSpec(
     [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT]),
@@ -70,6 +65,18 @@ MINIMIZERS: dict[str, MinimizerSpec] = {
   "smin-ma2-bg-sp": MinimizerSpec(
     [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT],
     env={"SKIP_PARA": "1"}),
+
+  # This is my own script (in github.com/smcpeak/scripts) that runs
+  # `multidelta -level=N` for N in the sequence [0 1 0 1 2 0 1 2 3 0 1 2
+  # 3 4], thus performing a crude iterative deepening based on the
+  # topformflat call inside multidelta.  That schedule is one I
+  # developed myself via ad-hoc experimentation over the years, and (for
+  # the inputs I've worked with) gets the best delta performance.
+  "delta":    MinimizerSpec(["multimultidelta", TEST_SH, INPUT]),
+
+  # --n 1 causes these to run sequentially.
+  "creduce":  MinimizerSpec(["creduce", "--n", "1", TEST_SH, INPUT]),
+  "cvise":    MinimizerSpec(["cvise", "--n", "1", TEST_SH, INPUT]),
 }
 
 
