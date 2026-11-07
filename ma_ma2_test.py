@@ -12,8 +12,10 @@ from unittest import mock
 from build_tree import build_tree
 from lang_cpp import CPPLanguage
 from language import Language
-from ma_ma2 import MA2Minimizer
-from min_alg_kind import MinimizerAlgorithmKind
+from ma_ma2 import (
+  MA2Minimizer,
+  MA2MinimizerSelector,
+)
 from minimizer import Minimizer
 from minimizer_test import (
   ACCEPT,
@@ -51,7 +53,7 @@ class MA2Test(ReportCheckingTestCase):
     m = rec.mk_min_for_text(src, rec.min_opts(
       language   = language,
       max_passes = max_passes,
-      alg_kind   = MinimizerAlgorithmKind.MA2))
+      selector   = MA2MinimizerSelector()))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertTrue(accept(m.get_minimized_test_input()))
     self.check_reports(rec, m)
@@ -175,7 +177,7 @@ class MA2Test(ReportCheckingTestCase):
     m = rec.mk_min_for_text(
       b"int a;\nint keep;\nint b;\n",
       rec.min_opts(
-        alg_kind=MinimizerAlgorithmKind.MA2
+        selector = MA2MinimizerSelector(),
       ))
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
     self.assertEqual(rec.finishes[-1], (INTERRUPTED, False))
@@ -234,9 +236,9 @@ class MA2BraceGroupsTest(ReportCheckingTestCase):
   ) -> MA2Minimizer:
     """Make an MA2 minimizer for `src`, using brace group mode."""
     m = rec.mk_min_for_text(src, rec.min_opts(
-      max_passes=max_passes,
-      alg_kind=MinimizerAlgorithmKind.MA2,
-      ma2_brace_groups=True))
+      max_passes = max_passes,
+      selector   = MA2MinimizerSelector(use_brace_groups = True),
+    ))
     assert isinstance(m, MA2Minimizer)
     return m
 
@@ -365,18 +367,6 @@ int f(int a)
     self.assertIn(b"{1, 2}",
                   [parent[id(n)].text().strip() for n in candidates])
     self.assertEqual(max(r.pass_num for r in rec.starts), 4)
-
-  def test_requires_ma2(self) -> None:
-    for kind in (MinimizerAlgorithmKind.MA1,
-                 MinimizerAlgorithmKind.HDD):
-      with self.assertRaises(AssertionError):
-        rec = Recorder(lambda d: True)
-        rec.mk_min_for_text(
-          b"a;\n",
-          rec.min_opts(
-            alg_kind=kind,
-            ma2_brace_groups=True,
-          ))
 
 
 if __name__ == "__main__":

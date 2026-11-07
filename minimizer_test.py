@@ -13,8 +13,9 @@ from acceptance_tester import AcceptanceTester
 from build_tree import build_tree
 from lang_cpp import CPPLanguage
 from language import Language
+from ma_ma1 import MA1MinimizerSelector
 from min_alg_factory import make_minimizer
-from min_alg_kind import MinimizerAlgorithmKind
+from min_alg_selector import MinimizerAlgorithmSelector
 from minimizer import Minimizer
 from minimizer_options import (
   MinimizerOptions,
@@ -132,20 +133,20 @@ class Recorder(AcceptanceTester):
   def min_opts(
     self,
     *,
-    alg_kind: MinimizerAlgorithmKind = MinimizerAlgorithmKind.MA1,
+    selector: MinimizerAlgorithmSelector | None = None,
     max_passes: int | None = None,
     language: Language = TEST_LANGUAGE,
     should_stop: StopQueryFunc | None = None,
-    ma2_brace_groups: bool = False,
   ) -> MinimizerOptions:
     """Build minimizer options."""
+    if not selector:
+      selector = MA1MinimizerSelector()
     return MinimizerOptions(
-      alg_kind         = alg_kind,
+      selector         = selector,
       max_passes       = max_passes,
       acceptance       = self,
       language         = language,
       should_stop      = should_stop,
-      ma2_brace_groups = ma2_brace_groups,
     )
 
   def mk_minimizer(

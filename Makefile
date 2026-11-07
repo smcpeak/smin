@@ -50,6 +50,7 @@ PYTHON_SRCS += ma_ma1.py
 PYTHON_SRCS += ma_ma2.py
 PYTHON_SRCS += min_alg_factory.py
 PYTHON_SRCS += min_alg_kind.py
+PYTHON_SRCS += min_alg_selector.py
 PYTHON_SRCS += minimizer.py
 PYTHON_SRCS += minimizer_options.py
 PYTHON_SRCS += run_accept_program.py

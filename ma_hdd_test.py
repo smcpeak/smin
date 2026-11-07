@@ -11,8 +11,11 @@ from collections.abc import Callable
 from build_tree import build_tree
 from lang_cpp import CPPLanguage
 from language import Language
-from ma_hdd import HDDMinimizer, compute_candidate_numbers
-from min_alg_kind import MinimizerAlgorithmKind
+from ma_hdd import (
+  HDDMinimizer,
+  HDDMinimizerSelector,
+  compute_candidate_numbers,
+)
 from minimizer import Minimizer
 from minimizer_test import (
   ACCEPT,
@@ -65,9 +68,10 @@ class HDDTest(ReportCheckingTestCase):
   ) -> Minimizer:
     """Make an HDD minimizer for `src` that reports to `rec`."""
     return rec.mk_min_for_text(src, rec.min_opts(
-      language=language,
-      max_passes=max_passes,
-      alg_kind=MinimizerAlgorithmKind.HDD))
+      language   = language,
+      max_passes = max_passes,
+      selector   = HDDMinimizerSelector()
+    ))
 
   def run_hdd(
     self,
@@ -182,7 +186,7 @@ class HDDTest(ReportCheckingTestCase):
     root = build_tree(tokenize_cpp(src))
     rec = Recorder(lambda d: True)
     m = rec.mk_minimizer(root, rec.min_opts(
-      alg_kind=MinimizerAlgorithmKind.HDD))
+      selector = HDDMinimizerSelector()))
     assert isinstance(m, HDDMinimizer)
 
     def level_text(level: int) -> list[bytes]:

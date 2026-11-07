@@ -6,8 +6,17 @@ Minimization algorithm 1 (MA1).
 from __future__ import annotations
 
 from min_alg_kind import MinimizerAlgorithmKind
+from min_alg_selector import MinimizerAlgorithmSelector
 from minimizer import Minimizer
 from token_tree import TTNode
+
+
+class MA1MinimizerSelector(MinimizerAlgorithmSelector):
+  """
+  Select the MA1 algorithm.
+  """
+  def alg_kind(self) -> MinimizerAlgorithmKind:
+    return MinimizerAlgorithmKind.MA1
 
 
 class MA1Minimizer(Minimizer):
@@ -19,10 +28,6 @@ class MA1Minimizer(Minimizer):
 
   See minimization-algorithm.txt for details.
   """
-
-
-  def __post_init(self) -> None:
-    assert self.options.alg_kind == MinimizerAlgorithmKind.MA1
 
 
   def _total_num_passes(self) -> int:
@@ -38,6 +43,8 @@ class MA1Minimizer(Minimizer):
 
 
   def _run_specific_minimizer(self) -> None:
+    assert self.options.alg_kind() == MinimizerAlgorithmKind.MA1
+
     for k in range(self._total_num_passes()):
       self.pass_index = k
       self._minimize_node(self.tree_root)

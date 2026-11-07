@@ -12,6 +12,7 @@ from typing import Optional
 from acceptance_tester import AcceptanceTester
 from language import Language
 from min_alg_kind import MinimizerAlgorithmKind
+from min_alg_selector import MinimizerAlgorithmSelector
 
 
 # Signature of a function called after each candidate is tested (and,
@@ -28,8 +29,8 @@ class MinimizerOptions:
   details of how that minimizer operates.
   """
 
-  # Which algorithm to use.
-  alg_kind: MinimizerAlgorithmKind
+  # Which algorithm and algorithm-specific options to use.
+  selector: MinimizerAlgorithmSelector
 
   # Optional limit on the number of "passes", i.e., iterations of the
   # outer loop of the minimizer.
@@ -45,20 +46,9 @@ class MinimizerOptions:
   # Optional additional stop condition.
   should_stop: Optional[StopQueryFunc]
 
-  # If True, MA2 only considers the children of the root and of "brace
-  # groups" (as identified by `language`) as candidates for removal.
-  # See minimization-algorithm.txt, "MA2 --ma2-brace-groups".
-  #
-  # If this is True, then `alg_kind` must be MA2.
-  #
-  # TODO: Give this a default value.
-  ma2_brace_groups: bool
 
-
-  def __post_init__(self) -> None:
-    if self.alg_kind != MinimizerAlgorithmKind.MA2:
-      assert not self.ma2_brace_groups, (
-        "Brace groups option requires MA2.")
+  def alg_kind(self) -> MinimizerAlgorithmKind:
+    return self.selector.alg_kind()
 
 
 # EOF

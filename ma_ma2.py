@@ -6,11 +6,30 @@ Minimization algorithm 2 (MA2).
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 from min_alg_kind import MinimizerAlgorithmKind
+from min_alg_selector import MinimizerAlgorithmSelector
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
 from token_tree import TTNode
+
+
+@dataclass(frozen=True, kw_only=True)
+class MA2MinimizerSelector(MinimizerAlgorithmSelector):
+  """
+  Select the MA2 algorithm and control its options.
+  """
+
+  # If True, only consider the children of the root and of "brace
+  # groups" (as identified by the applicable Language object) as
+  # candidates for removal.  See minimization-algorithm.txt, "MA2
+  # --ma2-brace-groups".
+  use_brace_groups: bool = False
+
+
+  def alg_kind(self) -> MinimizerAlgorithmKind:
+    return MinimizerAlgorithmKind.MA2
 
 
 class MA2Minimizer(Minimizer):
@@ -25,6 +44,9 @@ class MA2Minimizer(Minimizer):
   See minimization-algorithm.txt for details.
   """
 
+  # Algorithm-specific options.
+  ma2_selector: MA2MinimizerSelector
+
   # MAX_DEPTH in the spec, before applying `max_passes`.  This depends
   # only on the original tree, so it is computed once.
   max_depth: int
@@ -35,14 +57,21 @@ class MA2Minimizer(Minimizer):
     tree_root: TTNode,
     options: MinimizerOptions,
   ) -> None:
-    assert options.alg_kind == MinimizerAlgorithmKind.MA2
+    assert options.alg_kind() == MinimizerAlgorithmKind.MA2
+    assert isinstance(options.selector, MA2MinimizerSelector)
     super().__init__(tree_root, options)
+
+    self.ma2_selector = options.selector
 
     # MA2 makes one pass per level of the tree, or, with
     # --ma2-brace-groups, per level of brace group nesting.
     self.max_depth = (
-      self.tree_root.depth() if not options.ma2_brace_groups
+      self.tree_root.depth() if not self._use_brace_groups()
       else self._brace_depth(self.tree_root))
+
+
+  def _use_brace_groups(self) -> bool:
+    return self.ma2_selector.use_brace_groups
 
 
   def _total_num_passes(self) -> int:
@@ -138,7 +167,7 @@ class MA2Minimizer(Minimizer):
       # piece near the end could unlock many deletions higher up, so
       # it's worth spending more time here.
       if max_depth > 1:
-        if not self.options.ma2_brace_groups:
+        if not self._use_brace_groups():
           self._ma2_min_node(c, max_depth-1)
         else:
           for bg in self._get_brace_groups(c):
@@ -154,7 +183,7 @@ class MA2Minimizer(Minimizer):
 
     Replaced nodes, and their descendants, are skipped.
     """
-    assert self.options.ma2_brace_groups
+    assert self._use_brace_groups()
 
     if self.options.language.is_brace_group(n):
       yield n
@@ -173,7 +202,7 @@ class MA2Minimizer(Minimizer):
     to a child other than one of its delimiters.  Equivalently, it is
     the number of passes needed to reach every candidate.
     """
-    assert self.options.ma2_brace_groups
+    assert self._use_brace_groups()
 
     children: list[TTNode] = node.children
     is_root: bool = node is self.tree_root

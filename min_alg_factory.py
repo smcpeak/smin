@@ -6,9 +6,9 @@ Factory function to create a Minimizer subclass instance.
 from __future__ import annotations
 
 from ma_hdd import HDDMinimizer
-from min_alg_kind import MinimizerAlgorithmKind
 from ma_ma1 import MA1Minimizer
 from ma_ma2 import MA2Minimizer
+from min_alg_kind import MinimizerAlgorithmKind
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
 from token_tree import TTNode
@@ -24,14 +24,15 @@ def make_minimizer(
 
   # Choose which class to create.
   cls: type[MA1Minimizer | MA2Minimizer | HDDMinimizer]
-  if options.alg_kind == MinimizerAlgorithmKind.MA1:
+  kind: MinimizerAlgorithmKind = options.alg_kind()
+  if kind == MinimizerAlgorithmKind.MA1:
     cls = MA1Minimizer
-  elif options.alg_kind == MinimizerAlgorithmKind.MA2:
+  elif kind == MinimizerAlgorithmKind.MA2:
     cls = MA2Minimizer
-  elif options.alg_kind == MinimizerAlgorithmKind.HDD:
+  elif kind == MinimizerAlgorithmKind.HDD:
     cls = HDDMinimizer
   else:
-    assert False, f"Bad alg_kind: {options.alg_kind}"
+    assert False, f"Unrecognized alg_kind: {kind}"
 
   # Forward the arguments to that constructor.
   return cls(tree_root, options)

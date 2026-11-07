@@ -51,8 +51,11 @@ from typing import Optional
 from acceptance_test_result import AcceptanceTestResult
 from acceptance_tester import AcceptanceTester
 from build_tree import build_tree
-from min_alg_kind import MinimizerAlgorithmKind
+from ma_hdd import HDDMinimizerSelector
+from ma_ma1 import MA1MinimizerSelector
+from ma_ma2 import MA2MinimizerSelector
 from min_alg_factory import make_minimizer
+from min_alg_selector import MinimizerAlgorithmSelector
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
 from run_accept_program import RunAcceptProgram
@@ -404,20 +407,22 @@ def main(argv: list[str]) -> int:
     def time_limit_reached() -> bool:
       return deadline is not None and time.monotonic() >= deadline
 
-    alg_kind = (
-      MinimizerAlgorithmKind.MA2 if args.ma2
-      else MinimizerAlgorithmKind.HDD if args.hdd
-      else MinimizerAlgorithmKind.MA1)
+    selector: MinimizerAlgorithmSelector = (
+      MA2MinimizerSelector(use_brace_groups = args.ma2_brace_groups)
+        if args.ma2
+      else HDDMinimizerSelector()
+        if args.hdd
+      else MA1MinimizerSelector()
+    )
 
     minimizer = make_minimizer(
       tree_root                     = tree,
       options = MinimizerOptions(
-        alg_kind                    = alg_kind,
+        selector                    = selector,
         max_passes                  = args.max_passes,
         acceptance                  = _Tester(run_accept, console),
         language                    = language,
         should_stop                 = time_limit_reached,
-        ma2_brace_groups            = args.ma2_brace_groups,
       ),
     )
     result = minimizer.run_minimizer()

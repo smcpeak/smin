@@ -10,8 +10,17 @@ from __future__ import annotations
 import math
 
 from min_alg_kind import MinimizerAlgorithmKind
+from min_alg_selector import MinimizerAlgorithmSelector
 from minimizer import Minimizer
 from token_tree import TTNode
+
+
+class HDDMinimizerSelector(MinimizerAlgorithmSelector):
+  """
+  Select the HDD algorithm.
+  """
+  def alg_kind(self) -> MinimizerAlgorithmKind:
+    return MinimizerAlgorithmKind.HDD
 
 
 def compute_candidate_numbers(n: int) -> tuple[int, dict[int, int]]:
@@ -63,10 +72,6 @@ class HDDMinimizer(Minimizer):
   hdd_max_candidates: int = 0
 
 
-  def __post_init(self) -> None:
-    assert self.options.alg_kind == MinimizerAlgorithmKind.HDD
-
-
   def _total_num_passes(self) -> int:
 
     # This is MAX_DEPTH, since there is one pass per level of the tree,
@@ -80,6 +85,8 @@ class HDDMinimizer(Minimizer):
 
 
   def _run_specific_minimizer(self) -> None:
+    assert self.options.alg_kind() == MinimizerAlgorithmKind.HDD
+
     # Start with level 1 rather than 0 because 0 would mean attempting
     # to remove the entire input (the sole root node), which is very
     # unlikely to be accepted.
