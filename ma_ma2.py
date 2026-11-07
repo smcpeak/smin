@@ -49,7 +49,7 @@ class MA2Minimizer(Minimizer):
 
   # MAX_DEPTH in the spec, before applying `max_passes`.  This depends
   # only on the original tree, so it is computed once.
-  max_depth: int
+  orig_tree_max_depth: int
 
 
   def __init__(
@@ -65,7 +65,7 @@ class MA2Minimizer(Minimizer):
 
     # MA2 makes one pass per level of the tree, or, with
     # --ma2-brace-groups, per level of brace group nesting.
-    self.max_depth = (
+    self.orig_tree_max_depth = (
       self.tree_root.depth() if not self._use_brace_groups()
       else self._brace_depth(self.tree_root))
 
@@ -76,7 +76,7 @@ class MA2Minimizer(Minimizer):
 
   def _total_num_passes(self) -> int:
 
-    ret: int = self.max_depth
+    ret: int = self.orig_tree_max_depth
 
     if self.options.max_passes is not None:
       ret = min(ret, self.options.max_passes)
