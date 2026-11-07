@@ -49,6 +49,7 @@ import time
 from typing import Optional
 
 from acceptance_test_result import AcceptanceTestResult
+from acceptance_tester import AcceptanceTester
 from build_tree import build_tree
 from check_accept import CheckAccept
 from ma_kind import MinimizationAlgorithmKind
@@ -124,6 +125,34 @@ class _Console:
       verdict = " INTERRUPTED"
 
     self.write(verdict + (" (memo)" if memoized else "") + "\n")
+
+
+class _Tester(AcceptanceTester):
+  """
+  Test candidates by running the test command with `checker`, and print
+  the progress reports with `console`.
+  """
+
+  def __init__(self, checker: CheckAccept, console: _Console) -> None:
+    self.checker = checker
+    self.console = console
+
+  def test_acceptance(
+    self,
+    candidate: bytes,
+    start_report: TestStartReport,
+  ) -> AcceptanceTestResult:
+    return self.checker.run_acceptance_test(candidate, start_report)
+
+  def report_test_starting(self, start_report: TestStartReport) -> None:
+    self.console.report_test_starting(start_report)
+
+  def report_test_finished(
+    self,
+    result: AcceptanceTestResult,
+    memoized: bool,
+  ) -> None:
+    self.console.report_test_finished(result, memoized)
 
 
 def parse_command_line(argv: list[str]) -> argparse.Namespace:
@@ -381,10 +410,8 @@ def main(argv: list[str]) -> int:
       opt = MinimizerOptions(
         alg_kind                    = alg_kind,
         max_passes                  = args.max_passes,
-        test_acceptance             = checker.run_acceptance_test,
+        acceptance                  = _Tester(checker, console),
         language                    = language,
-        report_test_starting        = console.report_test_starting,
-        report_test_finished        = console.report_test_finished,
         should_stop                 = time_limit_reached,
         ma2_brace_groups            = args.ma2_brace_groups,
       ),

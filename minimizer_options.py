@@ -9,31 +9,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Optional
 
-from acceptance_test_result import AcceptanceTestResult
+from acceptance_tester import AcceptanceTester
 from language import Language
 from ma_kind import MinimizationAlgorithmKind
-from start_report import TestStartReport
 
-
-# REFACTOR: Remove the next three types, as they should become unused.
-
-# Signature of a function that checks a candidate input for acceptance
-# as "interesting" for minimization purposes.  The second argument is
-# the progress report for the candidate.  In normal operation, this
-# spawns a new process to run an external program, and waits for it to
-# terminate.
-AcceptanceTestFunc = Callable[[bytes, TestStartReport], AcceptanceTestResult]
-
-
-# Signature of a function that accepts a test start report.  In normal
-# operation, the callee prints this data to the console.
-TestStartReportFunc = Callable[[TestStartReport], None]
-
-# Signature of a function called when a test finishes.  The second
-# argument is True if the result came from the memoization table rather
-# than running the test.  Again, this is normally just printed to the
-# console.
-TestFinishedReportFunc = Callable[[AcceptanceTestResult, bool], None]
 
 # Signature of a function called after each candidate is tested (and,
 # if accepted, made current).  If it returns True, minimization stops.
@@ -56,11 +35,8 @@ class MinimizerOptions:
   # outer loop of the minimizer.
   max_passes: Optional[int]
 
-  # REFACTOR: Replace `test_acceptance`, `report_test_starting`, and
-  # `report_test_finished` with `acceptance: AcceptanceTester`.
-
-  # Candidate tester.
-  test_acceptance: AcceptanceTestFunc
+  # Candidate tester, and recipient of the progress reports.
+  acceptance: AcceptanceTester
 
   # Language-specific knowledge, such as non-trivial (non-empty) node
   # replacements.
@@ -68,12 +44,6 @@ class MinimizerOptions:
 
   # Optional additional stop condition.
   should_stop: Optional[StopQueryFunc]
-
-  # Function to call just before testing a candidate.
-  report_test_starting: TestStartReportFunc
-
-  # Function to call after a candidate test finishes.
-  report_test_finished: TestFinishedReportFunc
 
   # If True, MA2 only considers the children of the root and of "brace
   # groups" (as identified by `language`) as candidates for removal.

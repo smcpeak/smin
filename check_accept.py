@@ -88,8 +88,7 @@ class CheckAccept:
     of death by signal).
 
     The signature of this function is compatible with that of
-    `AcceptanceTestFunc` in the `minimizer` module so it can be used as
-    such.
+    `AcceptanceTester.test_acceptance`, so it can implement that.
 
     Ctrl-C is detected by temporarily replacing the SIGINT handler of
     this process while the program runs, so this must be called from

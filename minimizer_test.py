@@ -9,6 +9,7 @@ import unittest
 from collections.abc import Callable
 
 from acceptance_test_result import AcceptanceTestResult
+from acceptance_tester import AcceptanceTester
 from build_tree import build_tree
 from lang_cpp import CPPLanguage
 from language import Language
@@ -76,7 +77,7 @@ def find_node(root: TTNode, text: bytes) -> TTNode:
   raise AssertionError(f"no node with text {text!r}")
 
 
-class Recorder:
+class Recorder(AcceptanceTester):
   """
   Acceptance test and report callbacks for a Minimizer, which record
   what happened.
@@ -105,7 +106,11 @@ class Recorder:
     # The minimizer made by `mk_minimizer`.
     self.minimizer: Minimizer | None = None
 
-  def test(self, data: bytes, report: TestStartReport) -> AcceptanceTestResult:
+  def test_acceptance(
+    self,
+    data: bytes,
+    report: TestStartReport,
+  ) -> AcceptanceTestResult:
     # The test receives the report issued just before it.
     assert report is self.starts[-1]
 
@@ -153,9 +158,7 @@ class Recorder:
         ma2_brace_groups            = ma2_brace_groups,
 
         # Specify the acceptance test functions.
-        test_acceptance             = self.test,
-        report_test_starting        = self.starts.append,
-        report_test_finished        = self.finish,
+        acceptance                  = self,
       ),
     )
     return self.minimizer
@@ -177,16 +180,21 @@ class Recorder:
     self.minimizer = make_minimizer(tree, MinimizerOptions(
       alg_kind                    = alg_kind,
       max_passes                  = max_passes,
-      test_acceptance             = self.test,
+      acceptance                  = self,
       language                    = language,
       should_stop                 = should_stop,
-      report_test_starting        = self.starts.append,
-      report_test_finished        = self.finish,
       ma2_brace_groups            = ma2_brace_groups,
     ))
     return self.minimizer
 
-  def finish(self, result: AcceptanceTestResult, memoized: bool) -> None:
+  def report_test_starting(self, report: TestStartReport) -> None:
+    self.starts.append(report)
+
+  def report_test_finished(
+    self,
+    result: AcceptanceTestResult,
+    memoized: bool,
+  ) -> None:
     self.finishes.append((result, memoized))
 
 
