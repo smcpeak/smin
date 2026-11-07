@@ -129,12 +129,16 @@ class _Console:
 
 class _Tester(AcceptanceTester):
   """
-  Test candidates by running the test command with `checker`, and print
-  the progress reports with `console`.
+  Test candidates by running the test command with `run_accept`, and
+  print the progress reports with `console`.
   """
 
-  def __init__(self, checker: RunAcceptProgram, console: _Console) -> None:
-    self.checker = checker
+  def __init__(
+    self,
+    run_accept: RunAcceptProgram,
+    console: _Console,
+  ) -> None:
+    self.run_accept = run_accept
     self.console = console
 
   def test_acceptance(
@@ -142,7 +146,7 @@ class _Tester(AcceptanceTester):
     candidate: bytes,
     start_report: TestStartReport,
   ) -> AcceptanceTestResult:
-    return self.checker.run_acceptance_test(candidate, start_report)
+    return self.run_accept.run_acceptance_test(candidate, start_report)
 
   def report_test_starting(self, start_report: TestStartReport) -> None:
     self.console.report_test_starting(start_report)
@@ -338,25 +342,25 @@ def main(argv: list[str]) -> int:
           f"{fname!r} does not reproduce its contents", file=sys.stderr)
     return 4
 
-  checker = RunAcceptProgram(fname, test_command)
+  run_accept = RunAcceptProgram(fname, test_command)
 
   # Once created, this holds the most recently accepted input.
   minimizer: Optional[Minimizer] = None
 
   try:
-    best_existed: bool = os.path.exists(checker.best_file_name)
+    best_existed: bool = os.path.exists(run_accept.best_file_name)
 
     # Remove a left-over .best file since it's unrelated to the current
     # minimization attempt.
     if best_existed:
-      os.remove(checker.best_file_name)
+      os.remove(run_accept.best_file_name)
 
     initial_test_succeeded: bool = False
     try:
       console.write(
         f"Checking {test_command[0]} on initial {fname} ... ")
       try:
-        result = checker.run_acceptance_test(data, None)
+        result = run_accept.run_acceptance_test(data, None)
       except OSError as e:
         console.end_line()
         print(f"smin.py: error: cannot run {test_command[0]!r}: "
@@ -376,10 +380,10 @@ def main(argv: list[str]) -> int:
     finally:
       if best_existed and not initial_test_succeeded:
         # Acknowledge having removing the .best file.
-        console.line(f"Note: I removed {checker.best_file_name}.")
+        console.line(f"Note: I removed {run_accept.best_file_name}.")
 
     console.line(
-      f"Will continuously update {checker.best_file_name}" +
+      f"Will continuously update {run_accept.best_file_name}" +
       (" (which was overwritten)." if best_existed else "."))
 
     backup = fname + ".bak"
@@ -410,7 +414,7 @@ def main(argv: list[str]) -> int:
       opt = MinimizerOptions(
         alg_kind                    = alg_kind,
         max_passes                  = args.max_passes,
-        acceptance                  = _Tester(checker, console),
+        acceptance                  = _Tester(run_accept, console),
         language                    = language,
         should_stop                 = time_limit_reached,
         ma2_brace_groups            = args.ma2_brace_groups,
