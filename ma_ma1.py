@@ -30,16 +30,9 @@ class MA1Minimizer(Minimizer):
   """
 
 
-  def _total_num_passes(self) -> int:
-
+  def _preliminary_num_passes(self) -> int:
     # This is floor(log_2(S))+1 for S > 0, and 0 for S = 0.
-    ret: int = len(self.tokens).bit_length()
-
-    # TODO: Application of this option should be done in Minimizer.
-    if self.options.max_passes is not None:
-      ret = min(ret, self.options.max_passes)
-
-    return ret
+    return len(self.tokens).bit_length()
 
 
   def _run_specific_minimizer(self) -> None:

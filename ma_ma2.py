@@ -74,14 +74,8 @@ class MA2Minimizer(Minimizer):
     return self.ma2_selector.use_brace_groups
 
 
-  def _total_num_passes(self) -> int:
-
-    ret: int = self.orig_tree_max_depth
-
-    if self.options.max_passes is not None:
-      ret = min(ret, self.options.max_passes)
-
-    return ret
+  def _preliminary_num_passes(self) -> int:
+    return self.orig_tree_max_depth
 
 
   def _run_specific_minimizer(self) -> None:

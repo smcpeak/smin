@@ -201,13 +201,28 @@ class Minimizer(ABC):
 
 
   @abstractmethod
-  def _total_num_passes(self) -> int:
+  def _preliminary_num_passes(self) -> int:
     """
-    Return the total number of passes to run.  This is used for the
-    progress reports.  Specific algorithms might also use it to control
-    their outer loop.
+    Return the total number of passes that would run if
+    `self.options.max_passes` was None.
     """
     pass
+
+
+  def _total_num_passes(self) -> int:
+    """
+    Return the total number of passes to run, taking
+    `self.options.max_passes` into account.
+
+    This is used for the progress reports.  Specific algorithms might
+    also use it to control their outer loop.
+    """
+    ret: int = self._preliminary_num_passes()
+
+    if self.options.max_passes is not None:
+      ret = min(ret, self.options.max_passes)
+
+    return ret
 
 
   def run_minimizer(self) -> AcceptanceTestResult:

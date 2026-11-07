@@ -72,16 +72,10 @@ class HDDMinimizer(Minimizer):
   hdd_max_candidates: int = 0
 
 
-  def _total_num_passes(self) -> int:
-
+  def _preliminary_num_passes(self) -> int:
     # This is MAX_DEPTH, since there is one pass per level of the tree,
     # not counting the root.
-    ret: int = self.tree_root.depth()
-
-    if self.options.max_passes is not None:
-      ret = min(ret, self.options.max_passes)
-
-    return ret
+    return self.tree_root.depth()
 
 
   def _run_specific_minimizer(self) -> None:
