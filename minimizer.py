@@ -90,17 +90,16 @@ class Minimizer(ABC):
   # meaning of "pass" depends on the algorithm being used.
   max_passes: Optional[int]
 
-  # ---- Primary input and output callbacks ----
+  # ---- Input and output callbacks ----
   # Checks whether a given candidate is accepted, and receives progress
   # reports before and after each check.  In normal operation, the
   # check will spawn and wait for a child process.
   #
   # The data passed to `acceptance.test_acceptance` is the minimizer's
   # primary output, and the return values from it are its primary input
-  # (aside from `tree_root`).
+  # (in addition to `tree_root`).
   acceptance: AcceptanceTester
 
-  # ---- Callbacks that affect algorithm behavior ----
   # Language-specific queries, such as for non-trivial replacement text
   # for a node.
   language: Language
