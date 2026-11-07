@@ -64,10 +64,10 @@ class HDDTest(ReportCheckingTestCase):
     max_passes: int | None = None,
   ) -> Minimizer:
     """Make an HDD minimizer for `src` that reports to `rec`."""
-    return rec.mk_min_for_text(src,
+    return rec.mk_min_for_text(src, rec.min_opts(
       language=language,
       max_passes=max_passes,
-      alg_kind=MinimizationAlgorithmKind.HDD)
+      alg_kind=MinimizationAlgorithmKind.HDD))
 
   def run_hdd(
     self,
@@ -181,7 +181,8 @@ class HDDTest(ReportCheckingTestCase):
     src = b"void f() { x; }\nint keep;\n"
     root = build_tree(tokenize_cpp(src))
     rec = Recorder(lambda d: True)
-    m = rec.mk_minimizer(root, alg_kind=MinimizationAlgorithmKind.HDD)
+    m = rec.mk_minimizer(root, rec.min_opts(
+      alg_kind=MinimizationAlgorithmKind.HDD))
     assert isinstance(m, HDDMinimizer)
 
     def level_text(level: int) -> list[bytes]:

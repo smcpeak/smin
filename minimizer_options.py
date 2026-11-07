@@ -50,6 +50,8 @@ class MinimizerOptions:
   # See minimization-algorithm.txt, "MA2 --ma2-brace-groups".
   #
   # If this is True, then `alg_kind` must be MA2.
+  #
+  # TODO: Give this a default value.
   ma2_brace_groups: bool
 
 

@@ -129,17 +129,29 @@ class Recorder(AcceptanceTester):
       return INTERRUPTED
     return ACCEPT if self.accept(data) else REJECT
 
-  def mk_minimizer(
+  def min_opts(
     self,
-    root: TTNode,
     *,
-
-    # TODO: Improve the factoring w.r.t. mk_min_for_text.
-    max_passes: int | None = None,
     alg_kind: MinimizationAlgorithmKind = MinimizationAlgorithmKind.MA1,
+    max_passes: int | None = None,
     language: Language = TEST_LANGUAGE,
     should_stop: StopQueryFunc | None = None,
     ma2_brace_groups: bool = False,
+  ) -> MinimizerOptions:
+    """Build minimizer options."""
+    return MinimizerOptions(
+      alg_kind         = alg_kind,
+      max_passes       = max_passes,
+      acceptance       = self,
+      language         = language,
+      should_stop      = should_stop,
+      ma2_brace_groups = ma2_brace_groups,
+    )
+
+  def mk_minimizer(
+    self,
+    root: TTNode,
+    opts: MinimizerOptions | None = None,
   ) -> Minimizer:
     """
     Build a Minimizer object for testing.
@@ -148,41 +160,21 @@ class Recorder(AcceptanceTester):
     as the global make_minimizer.
     """
     self.minimizer = make_minimizer(
-      tree_root                     = root,
-      options = MinimizerOptions(
-        alg_kind                    = alg_kind,
-        max_passes                  = max_passes,
-        acceptance                  = self,
-        language                    = language,
-        should_stop                 = should_stop,
-        ma2_brace_groups            = ma2_brace_groups,
-      ),
+      tree_root = root,
+      options   = opts if opts else self.min_opts(),
     )
     return self.minimizer
 
   def mk_min_for_text(
     self,
     src: bytes,
-    *,
-    max_passes: int | None = None,
-    alg_kind: MinimizationAlgorithmKind = MinimizationAlgorithmKind.MA1,
-    language: Language = TEST_LANGUAGE,
-    should_stop: StopQueryFunc | None = None,
-    ma2_brace_groups: bool = False,
+    opts: MinimizerOptions | None = None,
   ) -> Minimizer:
     """
     Return `mk_minimizer(build_tree(tokenize_cpp(src)), <args>)`.
     """
     tree: TTNode = build_tree(tokenize_cpp(src))
-    self.minimizer = make_minimizer(tree, MinimizerOptions(
-      alg_kind                    = alg_kind,
-      max_passes                  = max_passes,
-      acceptance                  = self,
-      language                    = language,
-      should_stop                 = should_stop,
-      ma2_brace_groups            = ma2_brace_groups,
-    ))
-    return self.minimizer
+    return self.mk_minimizer(tree, opts)
 
   def report_test_starting(self, report: TestStartReport) -> None:
     self.starts.append(report)
@@ -446,8 +438,8 @@ class ShouldStopTest(unittest.TestCase):
     True.
     """
     rec = Recorder(accept)
-    m = rec.mk_min_for_text(src,
-      should_stop = lambda: should_stop(rec),
+    m = rec.mk_min_for_text(src, rec.min_opts(
+      should_stop = lambda: should_stop(rec)),
     )
     return rec, m
 
@@ -511,7 +503,8 @@ class ShouldStopTest(unittest.TestCase):
       calls.append(None)
       return True
 
-    m = rec.mk_min_for_text(self.SRC, should_stop=should_stop)
+    m = rec.mk_min_for_text(self.SRC, rec.min_opts(
+          should_stop=should_stop))
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
     self.assertFalse(m.stop_requested)
     self.assertEqual(calls, [])

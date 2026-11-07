@@ -48,10 +48,10 @@ class MA2Test(ReportCheckingTestCase):
     reports, and return the recorder and minimizer.
     """
     rec = Recorder(accept)
-    m = rec.mk_min_for_text(src,
-      language=language,
-      max_passes=max_passes,
-      alg_kind=MinimizationAlgorithmKind.MA2)
+    m = rec.mk_min_for_text(src, rec.min_opts(
+      language   = language,
+      max_passes = max_passes,
+      alg_kind   = MinimizationAlgorithmKind.MA2))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertTrue(accept(m.get_minimized_test_input()))
     self.check_reports(rec, m)
@@ -174,7 +174,9 @@ class MA2Test(ReportCheckingTestCase):
     rec = Recorder(lambda d: b"keep" in d, interrupt_at=3)
     m = rec.mk_min_for_text(
       b"int a;\nint keep;\nint b;\n",
-      alg_kind=MinimizationAlgorithmKind.MA2)
+      rec.min_opts(
+        alg_kind=MinimizationAlgorithmKind.MA2
+      ))
     self.assertEqual(m.run_minimizer(), INTERRUPTED)
     self.assertEqual(rec.finishes[-1], (INTERRUPTED, False))
 
@@ -231,10 +233,10 @@ class MA2BraceGroupsTest(ReportCheckingTestCase):
     max_passes: int | None = None,
   ) -> MA2Minimizer:
     """Make an MA2 minimizer for `src`, using brace group mode."""
-    m = rec.mk_min_for_text(src,
+    m = rec.mk_min_for_text(src, rec.min_opts(
       max_passes=max_passes,
       alg_kind=MinimizationAlgorithmKind.MA2,
-      ma2_brace_groups=True)
+      ma2_brace_groups=True))
     assert isinstance(m, MA2Minimizer)
     return m
 
@@ -368,10 +370,13 @@ int f(int a)
     for kind in (MinimizationAlgorithmKind.MA1,
                  MinimizationAlgorithmKind.HDD):
       with self.assertRaises(AssertionError):
-        Recorder(lambda d: True).mk_min_for_text(
+        rec = Recorder(lambda d: True)
+        rec.mk_min_for_text(
           b"a;\n",
-          alg_kind=kind,
-          ma2_brace_groups=True)
+          rec.min_opts(
+            alg_kind=kind,
+            ma2_brace_groups=True,
+          ))
 
 
 if __name__ == "__main__":

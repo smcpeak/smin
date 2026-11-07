@@ -42,7 +42,7 @@ class MA1Test(ReportCheckingTestCase):
   def test_max_passes(self) -> None:
     src = b"int a;\nint keep;\nint b;\n"
     rec = Recorder(lambda d: b"keep" in d)
-    m = rec.mk_min_for_text(src, max_passes=2)
+    m = rec.mk_min_for_text(src, rec.min_opts(max_passes=2))
     self.assertEqual(m._total_num_passes(), 2)
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b"\nint keep;\n")
@@ -51,7 +51,7 @@ class MA1Test(ReportCheckingTestCase):
 
     # A limit above the usual number of passes has no effect.
     rec = Recorder(lambda d: b"keep" in d)
-    m = rec.mk_min_for_text(src, max_passes=5)
+    m = rec.mk_min_for_text(src, rec.min_opts(max_passes=5))
     self.assertEqual(m._total_num_passes(), 4)
 
   def test_non_trivial_replacement(self) -> None:
@@ -60,7 +60,7 @@ class MA1Test(ReportCheckingTestCase):
     rec = Recorder(lambda d: b"keep" in d and b"f();" in d)
     m = rec.mk_min_for_text(
       b"void f() { x; }\nint keep;\n",
-      language=CPPLanguage())
+      rec.min_opts(language=CPPLanguage()))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertEqual(m.get_minimized_test_input(), b" f();\nkeep\n")
     self.check_reports(rec, m)
