@@ -1,4 +1,4 @@
-# ma_factory.py
+# min_alg_factory.py
 """
 Factory function to create a Minimizer subclass instance.
 """

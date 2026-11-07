@@ -52,7 +52,7 @@ from acceptance_test_result import AcceptanceTestResult
 from acceptance_tester import AcceptanceTester
 from build_tree import build_tree
 from min_alg_kind import MinimizerAlgorithmKind
-from ma_factory import make_minimizer
+from min_alg_factory import make_minimizer
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
 from run_accept_program import RunAcceptProgram

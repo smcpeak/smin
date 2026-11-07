@@ -13,7 +13,7 @@ from acceptance_tester import AcceptanceTester
 from build_tree import build_tree
 from lang_cpp import CPPLanguage
 from language import Language
-from ma_factory import make_minimizer
+from min_alg_factory import make_minimizer
 from min_alg_kind import MinimizerAlgorithmKind
 from minimizer import Minimizer
 from minimizer_options import (
