@@ -104,6 +104,13 @@ class ParseCommandLineTest(unittest.TestCase):
     self.check_error(
       ["--hdd", "--ma2-brace-groups", "./test.sh", "--", "in.cc"])
 
+  def test_skip_paragraphs(self) -> None:
+    args = parse_command_line(["./test.sh", "--", "in.cc"])
+    self.assertFalse(args.skip_paragraphs)
+    args = parse_command_line(
+      ["--skip-paragraphs", "./test.sh", "--", "in.cc"])
+    self.assertTrue(args.skip_paragraphs)
+
   def test_ma2_and_hdd_conflict(self) -> None:
     self.check_error(["--ma2", "--hdd", "./test.sh", "--", "in.cc"])
 
@@ -291,6 +298,30 @@ class MainTest(unittest.TestCase):
     self.assertEqual(status, 0)
     self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
     self.assertEqual(self.progress_passes(out), ["P=(1/1)"] * 4)
+
+  def test_skip_paragraphs(self) -> None:
+    # Accept an input that contains "keep1" and "keep2".
+    code = (
+      "import os, sys\n"
+      "d = open(os.environ['INPUT'], 'rb').read()\n"
+      "sys.exit(0 if b'keep1' in d and b'keep2' in d else 1)\n")
+
+    # With paragraphs, "a;" is in a paragraph with "int keep1;".  With
+    # two passes, MA1 only tries to remove that paragraph as a whole,
+    # which is rejected.  Without paragraphs, "a;" is a child of the
+    # root, and can be removed by itself.
+    src = b"int keep1;\na;\n\nint keep2, b;\n"
+    for options, expect in [
+      ((), src),
+      (("--skip-paragraphs",), b"int keep1;\n\nint keep2, b;\n"),
+    ]:
+      with self.subTest(options=options):
+        self.input_path.write_bytes(src)
+        status, _, err = self.run_main(
+          code, ("--max-passes", "2", *options))
+        self.assertEqual(status, 0)
+        self.assertEqual(err, "")
+        self.assertEqual(self.input_path.read_bytes(), expect)
 
   def test_max_seconds_reached(self) -> None:
     # With a limit of zero, minimization stops after the first

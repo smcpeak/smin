@@ -34,6 +34,10 @@ Options:
     Use Hierarchical Delta Debugging (HDD) as described in
     doc/hdd-algorithm.txt.  This cannot be combined with --ma2.
 
+  --skip-paragraphs
+
+    During structure deduction, do not group "paragraphs".
+
 See spec in minimization-algorithm.txt.
 """
 
@@ -50,7 +54,7 @@ from typing import Optional
 
 from acceptance_test_result import AcceptanceTestResult
 from acceptance_tester import AcceptanceTester
-from build_tree import build_tree
+from build_tree import BuildTreeOptions, build_tree
 from ma_hdd import HDDMinimizerSelector
 from ma_ma1 import MA1MinimizerSelector
 from ma_ma2 import MA2MinimizerSelector
@@ -225,6 +229,12 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
       groups.
     """)
 
+  parser.add_argument(
+    "--skip-paragraphs", action="store_true",
+    help="""
+      During structure deduction, do not group "paragraphs".
+    """)
+
   # The test command, separator, and input file are all collected into
   # one list, and split below.  (With separate positional arguments,
   # argparse would discard a "--" immediately after `test_program`.)
@@ -333,7 +343,9 @@ def main(argv: list[str]) -> int:
           file=sys.stderr)
     return 2
 
-  tree = build_tree(language.make_tokenizer().tokenize(data))
+  tree = build_tree(
+    language.make_tokenizer().tokenize(data),
+    BuildTreeOptions(use_paragraphs = not args.skip_paragraphs))
   orig_tok_count = sum(1 for _ in tree.tokens())
 
   console.line(
