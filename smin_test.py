@@ -308,16 +308,28 @@ class MainTest(unittest.TestCase):
       sys.exit(0 if b'keep1' in d and b'keep2' in d else 1)
     """)
 
+    # Claude says:
+    #
     # With paragraphs, "a;" is in a paragraph with "int keep1;".  With
     # two passes, MA1 only tries to remove that paragraph as a whole,
     # which is rejected.  Without paragraphs, "a;" is a child of the
     # root, and can be removed by itself.
+    #
+    # smcpeak:
+    #
+    # The reason ", b" is necessary is a bit mysterious, as it is
+    # connected to the odd behavior related to trying to remove the
+    # final newline token from the file.
+    #
+    # Claude came up with this input, but only with some difficulty.
+    #
     src: bytes = dedent_enc("""
       int keep1;
       a;
 
       int keep2, b;
     """)
+
     for options, expect in [
       ((), src),
       (("--skip-paragraphs",), dedent_enc("""
