@@ -761,8 +761,12 @@ Algorithm:
     """
 
     Set max_necessity to 0.
+    Set pass_count to 0.
 
     Do:
+
+      pass_count += 1
+      If --max-passes and pass_count exceeds it, break.
 
       # Expand scope, re-try previously rejected replacements.
       max_necessity += NECESSITY_INCREMENT
