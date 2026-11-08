@@ -639,15 +639,15 @@ grouping disabled and head-body grouping enabled.
 
 MA3 has two fixed integer input parameters:
 
-* NECESSITY_INCREMENT (default 10): Initial max_necessity, and the
-  amount by which to increase it when that happens.
+* NECESSITY_INCREMENT (default 10): The amount by which to increase
+  max_necessity (when that happens is explained below).
 
 * MAX_EXPLORATION_DEPTH (default 4): Maximum value of exploration_depth.
 
 While running, MA3 has two related integer global variables:
 
-* max_necessity: Initially NECESSITY_INCREMENT, this is the maximum
-  number of "necessary" nodes to accumulate within any given BGCT node.
+* max_necessity: The maximum number of "necessary" nodes to accumulate
+  within any given BGCT node.
 
 * exploration_depth: Initially 1, the maximum level of BGCT nodes to
   examine and consider replacing.
