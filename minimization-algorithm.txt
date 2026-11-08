@@ -725,7 +725,7 @@ Algorithm:
 
       Else (REJECT ONE):
 
-        Increase necessary(N) by the one element in CC.
+        Prepend the one element in CC to necessary(N).
 
     Return True if `len(necessary(N)) < len(children(N))`, i.e., we hit
     the necessity limit rather than exhausted the children.
