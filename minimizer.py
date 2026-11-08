@@ -95,6 +95,12 @@ class Minimizer(ABC):
 
   # True if the original input ends with a newline, in which case every
   # rendered candidate does too.
+  #
+  # TODO: This causes weird behavior, where we "remove" the last token
+  # often just a newline, making ostensible progress, but then add it
+  # back and (often) get a memo hit.  I think all trailing whitespace
+  # should simply be collected into a token that is permanently out of
+  # scope for minimization, and not counted in the token counts.
   ends_with_newline: bool
 
   # Map from the id() of each node to the range of the tokens it
