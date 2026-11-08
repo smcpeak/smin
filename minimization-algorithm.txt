@@ -674,7 +674,7 @@ Algorithm:
     # Details omitted; see definition of Brace Group Child Tree (BGCT).
 
 
-  def ma3_min_node(N: BGCT_Node) -> None:
+  def ma3_min_node(N: BGCT_Node) -> bool:
     """
     Non-recursively minimize N.
     """
@@ -712,8 +712,11 @@ Algorithm:
 
         Increase necessary(N) by the one element in C.
 
+    Return True if `len(necessary(N)) < children(N)`, i.e., we hit the
+    necessity limit rather than exhausted the children.
 
-  def ma3_min_subtree(N: BGCT_Node) -> None:
+
+  def ma3_min_subtree(N: BGCT_Node) -> bool:
     """
     Recursively minimize N and its necessary children down to the
     exploration depth.
@@ -721,13 +724,17 @@ Algorithm:
 
     ma3_min_node(N)
 
-    If level(N) == exploration_depth:
+    # The children of `N` are at level `level(N)+1`.  And the recursive
+    # call first tries removing `C`'s children (the grandchildren of
+    # `N`).  So, only recurse if the grandchildren's level is within the
+    # allowed exploration depth.
+    If level(N)+2 <= exploration_depth:
 
-      Return.
+      For C in reverse(necessary(N)):
 
-    For C in reverse(necessary(N)):
+        ma3_min_subtree(C)
 
-      ma3_min_subtree(C)
+    Return True if any `ma3_min_*` call returned True.
 
 
   def ma3_min_tree(root: BGCT_Node) -> None:
@@ -740,7 +747,7 @@ Algorithm:
 
     Set max_necessity to 0.
 
-    While max_necessity < len(children(root)):
+    Do:
 
       # Expand scope, re-try previously rejected replacements.
       max_necessity += NECESSITY_INCREMENT
@@ -753,6 +760,9 @@ Algorithm:
         # Remove what we can, subject to `max_necessity`, down to
         # `exploration_depth`.
         ma3_min_subtree(root)
+
+    # Stop when the necessity limit is not stopping us at any level.
+    While any `ma3_min_subtree` call returned True.
 
 
 Algorithm motivation:
