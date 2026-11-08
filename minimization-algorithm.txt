@@ -598,6 +598,14 @@ nodes for which the number of edges from the root to that node is N.
 Hence, level 0 is just the root node, level 1 is all of the root's
 children, etc.
 
+A BGCT node N may have a "rightmost child's parent brace group", denoted
+RCPBG(N).  This requires that N not be the root node, and that it have
+at least one child.  In that case, the rightmost child must have a
+parent node in the *token tree* that is a brace-delimited group node,
+and that is what RCPBG(N) (of type TTNode) refers to.  In the example
+above, every node that isn't a root or leaf has as its RCPBG the brace
+group that encloses all of its children.
+
 In the context of a minimization algorithm, the BGCT is mutable in the
 sense that the minimizer can "replace" a node with a string (by adding
 an entry to an auxiliary map), which then makes that node "replaced",
@@ -685,35 +693,40 @@ Algorithm:
     While (len(necessary(N)) < len(children(N)) and
            len(necessary(N)) < max_necessity):
 
-      Let C: list[BGCT_Node] be up to G contiguous non-replaced,
+      Let CC: list[BGCT_Node] be up to G contiguous non-replaced,
         non-necessary children of N closest to the end of the file.
 
-      Try to replace all nodes in C:
+      Try to replace all nodes in CC:
 
-        If len(C) > 1 then only attempt the trivial replacement.
+        If len(CC) > 1 then only attempt the trivial replacement.
 
-        If len(C) == 1:
+        If len(CC) == 1:
 
-          Also attempt a non-trivial replacement, if one exists.
+          Let C be the node in CC.
 
-          If the node in C is a head-body group, and its second element
-          has a non-trivial replacement, then try that too.
+          Attempt the trivial replacement of C.
+
+          Also attempt a non-trivial replacement, if one exists for C.
+
+          If RCPBG(C) exists and has a non-trivial replacement, then try
+          that replacement too.  If that succeeds, add C to
+          necessary(N), then proceed to the ACCEPT case.
 
       If ACCEPT (first ACCEPT if there are multiple candidates):
 
         Commit the replacements as permanent.
         Double G if we used a trivial replacement.
 
-      Else (REJECT) if len(C) > 1:
+      Else (REJECT) if len(CC) > 1:
 
-        G = len(C) // 2
+        G = len(CC) // 2
 
       Else (REJECT ONE):
 
-        Increase necessary(N) by the one element in C.
+        Increase necessary(N) by the one element in CC.
 
-    Return True if `len(necessary(N)) < children(N)`, i.e., we hit the
-    necessity limit rather than exhausted the children.
+    Return True if `len(necessary(N)) < len(children(N))`, i.e., we hit
+    the necessity limit rather than exhausted the children.
 
 
   def ma3_min_subtree(N: BGCT_Node) -> bool:
@@ -788,13 +801,14 @@ Algorithm motivation:
   validity in languages like C++, and makes it somewhat easier to reason
   about what a sensible MAX_EXPLORATION_DEPTH ought to be.
 
-  Special treatment of head-body groups is motivated by noticing (credit
-  to Claude) that, without that, non-trivial replacement will virtually
-  never be tried since brace groups are only rarely direct children of
-  brace groups (and when they are, replacement with ";" is usually
-  futile anyway; TODO: decide whether to remove that entirely).  The
-  case where non-trivial replacement is really helpful is exactly when
-  head-body applies.
+  Treatment of RCPBG is motivated by noticing (credit to Claude) that,
+  without that, non-trivial replacement will virtually never be tried
+  since brace groups are only rarely direct children of brace groups
+  (and when they are, replacement with ";" is usually futile anyway;
+  TODO: decide whether to remove that entirely).  The case where
+  non-trivial replacement is really helpful is when the brace group is
+  the last part of a syntactic construct, which is what RCPBG tries to
+  identify.
 
   When a node is found to be "necessary", that (in a Bayesian sense)
   reduces the probability that a future removal attempt will be
