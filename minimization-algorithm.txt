@@ -635,7 +635,7 @@ Minimization Algorithm 3 (MA3)
 ------------------------------
 
 MA3 operates on the brace group child tree (BGCT), with paragraph
-grouping disabled and head-body grouping enabled.
+grouping disabled.
 
 MA3 has two fixed integer input parameters:
 
@@ -895,6 +895,18 @@ From ma3_min_node(N):
 This progress report is admittedly a bit of a mess, as the algorithm's
 behavior resists an easy notion of progress against a prediction.  This
 will probably need to be revised if MA3 turns out to be effective.
+
+
+MA3 Enablement
+--------------
+
+MA3 is enabled by the --ma3 switch to smin.py.  Doing so disables
+paragraph grouping during structure deduction.  The --ma3 switch is
+incompatible with --ma2 and --hdd.
+
+Although not intended to be used together, it is not an error to combine
+--ma3 with --skip-paragraphs (which is redudant), nor with the
+SKIP_HEAD_BODY envvar (which could be a useful experiment).
 
 
 Candidate testing
