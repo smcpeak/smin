@@ -529,17 +529,20 @@ to one of its children, or (2) connect a brace group to a child other
 than its delimiters.
 
 
-Minimization Algorithm 3 (MA3)
-------------------------------
+Brace Child Tree (BCT)
+----------------------
 
-MA3 IS WORK IN PROGRESS; IGNORE FOR NOW
+The "brace child tree" consists of:
 
-MA3 operates on a subset of token tree nodes we call the "brace tree
-nodes".  At level 1, it has all nodes that are the child of the root.
-At level 2, it has all nodes that are the child of a brace-delimited
-group node (BDGN) that is not a descendant of any BDGN, excluding the
-delimiter tokens.  At level N, it has all nodes that are the child of a
-BDGN B for which the path from the root to B goes through N-2 BDGNs.
+* Every node in the token tree that is any of:
+
+  - The root node.
+  - A direct child of the root node.
+  - A direct child of a brace-delimited group node.
+
+* An edge from BCT node P (parent) to BCT node C (child) if, in the
+  token tree, P is an ancestor of C, and the path from P to C in the
+  token tree does not go through any BCT nodes.
 
 For example, if the input is:
 
@@ -561,19 +564,9 @@ For example, if the input is:
     return 1;
   }
 
-then:
+then, if paragraph grouping is disabled, the corresponding BCT is:
 
-* The level 1 nodes are the definitions of "foo" and "bar".
-
-* The level 2 nodes are "return 0;", "while ...", and "return 1;".
-
-* The level 3 nodes are "g();", "h();", and "if ...".
-
-* The level 4 node is "j();".
-
-The nodes of the brace tree are organized into parent-child
-relationships in the obvious way:
-
+- root node
   - "int foo() ..."
     - "return 0;"
   - "int bar() ..."
@@ -584,21 +577,247 @@ relationships in the obvious way:
         - "j();"
     - "return 1;
 
-MA3 begins by attempting to remove the last level 1 node from the input.
-If this is successful, it increases its removal granularity to 2, then
-tries to remove the last 2 level 1 nodes.  Each time removal is
-successful, the granularity of removal attempts doubles.  When a removal
-attempt is unsuccessful, the granularity is halved.
+(The BCT as defined here is intended to define the same set of nodes
+that --ma2-brace-groups operates on, but in a way that is less dependent
+on the specific algorithm in use.)
 
-MA3 works like MA2 except:
+The BCT can be divided into "levels", where "level N" is the set of
+nodes for which the number of edges from the root to that node is N.
+Hence, level 0 is just the root node, level 1 is all of the root's
+children, etc.
 
-* It operates on the brace tree nodes.
 
-* Once a certain number, max_necessary (default: 10) of nodes are found
-  to be necessary, it increases the target_depth by 1.
+Minimization Algorithm 3 (MA3)
+------------------------------
 
-* When target_depth hits its limit, increase max_necessary by its
-  initial value (default 10) and reset target_depth to 1.
+MA3 operates on the brace child tree (BCT), with paragraph grouping
+disabled.
+
+MA3 has two fixed integer input parameters:
+
+* NECESSITY_INCREMENT (default 10): Initial max_necessity, and the
+  amount by which to increase it when that happens.
+
+* MAX_EXPLORATION_DEPTH (default 4): Maximum value of exploration_depth.
+
+While running, MA3 has two related integer global variables:
+
+* max_necessity: Initially NECESSITY_INCREMENT, this is the maximum
+  number of "necessary" nodes to accumulate within any given BCT node.
+
+* exploration_depth: Initially 1, the maximum level of BCT nodes to
+  examine and consider replacing.
+
+Additionally, associated with each BCT node N is a mutable sequence
+necessary(N) that contains the non-replaced children that were, at some
+point, tested for possible replacement, but the resulting candidate(s)
+were rejected.  Initially, necessary(N) is empty for all N.
+
+Invariant: necessary(N) is always a suffix of the non-replaced children
+of N.  (Thus, it can be represented as a "divider" between the necessary
+and possibly-unnecessary non-replaced children.)
+
+
+
+Algorithm:
+
+  BCT_Node is a type denoting a node in the BCT.
+
+
+  def children(N: BCT_Node) -> list[BCT_Node]:
+    """
+    Return all non-replaced children of N in the BCT.
+    """
+    # Details omitted; see definition of Brace Child Tree (BCT).
+
+
+  def level(N: BCT_Node) -> int:
+    """
+    Return the level of N in the BCT.
+    """
+    # Details omitted; see definition of Brace Child Tree (BCT).
+
+
+  def ma3_min_node(N: BCT_Node) -> None:
+    """
+    Non-recursively minimize N.
+    """
+
+    # Granularity, i.e., number of nodes to try removing at once.
+    G: int = 1
+
+    While (len(necessary(N)) < children(N) and
+           len(necessary(N)) < max_necessity):
+
+      Let C: list[BCT_Node] be up to G contiguous non-replaced,
+        non-necessary children of N closest to the end of the file.
+
+      Try to replace all nodes in C.  If len(C) > 1 then only attempt
+        the trivial replacement.  If len(C) == 1 then also attempt a
+        non-trivial replacement, if one exists.
+
+      If ACCEPT:
+
+        Commit the replacements as permanent.
+        Double G.
+
+      Else (REJECT) if len(C) > 1:
+
+        G //= 2
+
+      Else (REJECT ONE):
+
+        Increase necessary(N) by the one element in C.
+
+
+  def ma3_min_subtree(N: BCT_Node) -> None:
+    """
+    Recursively minimize N and its necessary children down to the
+    exploration depth.
+    """
+
+    ma3_min_node(N)
+
+    If level(N) == exploration_depth:
+
+      Return.
+
+    For C in reverse(necessary(N)):
+
+      ma3_min_subtree(C)
+
+
+  def ma3_min_tree(root: BCT_Node) -> None:
+    """
+    Minimize the entire tree, with attention focused on the end of the
+    file, attempting to remove nodes in layers, but with gradually
+    increasing limits on effort spent per node and how far we search
+    from the end.
+    """
+
+    Set max_necessity to 0.
+
+    While max_necessity < len(children(root)):
+
+      # Expand scope, re-try previously rejected replacements.
+      max_necessity += NECESSITY_INCREMENT
+      Reset all necessary(N) to be empty.
+
+      # Iteratively deepen the candidates for replacement, but (in this
+      # loop) do not repeat replacement attempts.
+      For exploration_depth in [1, MAX_EXPLORATION_DEPTH]:
+
+        # Remove what we can, subject to `max_necessity`, down to
+        # `exploration_depth`.
+        ma3_min_subtree(root)
+
+
+Algorithm motivation:
+
+  The primary motivation is the observation that candidates formed by
+  replacements near the end of the file are particularly productive (in
+  expectation) because:
+
+  1. They are much more likely to succeed due to having a minimum of
+     other nodes that depend on them, such that removal violates
+     syntactic or static semantic constraints.
+
+  2. Successful removal then eliminates some constraints on nodes
+     higher up, potentially unlocking their removal, and there are many
+     such nodes when we remove one near the end.
+
+  Therefore, MA3 tries to keep its focus on that end, only moving toward
+  the start of the file as a consequence of removing intervening
+  material, or being forced to expand the scope due to not making
+  progress otherwise.
+
+  Restricting attention to the BCT improves the likelihood of syntactic
+  validity in languages like C++, and makes it somewhat easier to reason
+  about what a sensible MAX_EXPLORATION_DEPTH ought to be.
+
+  When a node is found to be "necessary", that (in a Bayesian sense)
+  reduces the probability that a future removal attempt will be
+  accepted; but each successful removal elsewhere after that increases
+  the probability that the original node might now be unlocked.
+  Resetting necessary(N) where we do is meant to strike a balance
+  between retrying too soon and too late.
+
+  MA3 is deliberately meant as a "coarse minimization" algorithm, which
+  should make a lot of progress quickly, at the expense of minimality of
+  the final result.  It is expected to be optionally followed in
+  practice by a "fine minimization" algorithm that will try harder but
+  can benefit from a much smaller starting input.
+
+
+MA3 Progress Reporting
+----------------------
+
+Progress is reported using, from the outer loop:
+
+* Pm: Maximum number of outer loop iterations:
+
+    ceil(len(children(root)) / NECESSITY_INCREMENT)
+
+  for the initial tree.  This will often be a large over-estimate.
+
+* P: Iteration count for the outer loop, starting at 1:
+
+    max_necessity / NECESSITY_INCREMENT
+
+  Print with as many digits as Pm.
+
+* RNF: Root necessity fraction:
+
+    len(necessary(root)) / len(children(root))
+
+  This will start at 0 with each outer loop, but can go both up and down
+  as it runs.
+
+  Print as a 2-digit percentage (capped 99 if needed).
+
+* ED: exploration_depth
+
+  Print with as many digits as MAX_EXPLORATION_DEPTH has.
+
+From the (0-based) Ith recursive call ma3_min_subtree(N):
+
+* C[I]: 0-based position of C in `reverse(necessary(N))`
+
+  That is, the progress report includes an array C[] that has one
+  element per activation frame.
+
+  Print with as many digits as N[I].
+
+* N[I]: len(necessary(N))
+
+  Another array, N[I] acts as the upper bound for C[I].
+
+  Print with as many digits as max_necessity currently has.
+
+  In the full printout, print each C[I] and N[I] like:
+
+    f"C{I}=({C[I]}/{N[I]}"
+
+  where "{I}" is printed without padding digits, and the others are
+  padded with zeroes as indicated above.
+
+From ma3_min_node(N):
+
+* LVL: level(N)
+
+  Print with as many digits as MAX_EXPLORATION_DEPTH.
+
+* L_NEC: len(necessary(N))
+
+  Print with as many digits as max_necessity currently has.
+
+* G: G
+
+  Print with at least 3 digits.
+
+This progress report is admittedly a bit of a mess, as the algorithm's
+behavior resists an easy notion of progress against a prediction.  This
+will probably need to be revised if MA3 turns out to be effective.
 
 
 Candidate testing
