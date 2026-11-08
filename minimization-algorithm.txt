@@ -682,7 +682,7 @@ Algorithm:
     # Granularity, i.e., number of nodes to try removing at once.
     G: int = 1
 
-    While (len(necessary(N)) < children(N) and
+    While (len(necessary(N)) < len(children(N)) and
            len(necessary(N)) < max_necessity):
 
       Let C: list[BGCT_Node] be up to G contiguous non-replaced,
@@ -755,7 +755,7 @@ Algorithm:
 
       # Iteratively deepen the candidates for replacement, but (in this
       # loop) do not repeat replacement attempts.
-      For exploration_depth in [1, MAX_EXPLORATION_DEPTH]:
+      For exploration_depth in range(1, MAX_EXPLORATION_DEPTH+1):
 
         # Remove what we can, subject to `max_necessity`, down to
         # `exploration_depth`.
