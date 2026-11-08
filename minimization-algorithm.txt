@@ -643,6 +643,8 @@ MA3 has two fixed integer input parameters:
   max_necessity (when that happens is explained below).
 
 * MAX_EXPLORATION_DEPTH (default 4): Maximum value of exploration_depth.
+  BGCT nodes deeper than this are never candidates to be removed on
+  their own.
 
 While running, MA3 has two related integer global variables:
 
