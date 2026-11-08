@@ -704,15 +704,17 @@ Algorithm:
 
           Let C be the node in CC.
 
-          Attempt the trivial replacement of C.
+          Try these candidates in order, stopping on the first ACCEPT:
 
-          Also attempt a non-trivial replacement, if one exists for C.
+            Attempt the trivial replacement of C.
 
-          If RCPBG(C) exists and has a non-trivial replacement, then try
-          that replacement too.  If that succeeds, add C to
-          necessary(N), then proceed to the ACCEPT case.
+            Attempt a non-trivial replacement, if one exists for C.
 
-      If ACCEPT (first ACCEPT if there are multiple candidates):
+            If RCPBG(C) exists and has a non-trivial replacement, then
+            try that replacement too.  If that succeeds, add C to
+            necessary(N), then proceed to the ACCEPT case.
+
+      If ACCEPT:
 
         Commit the replacements as permanent.
         Double G if we used a trivial replacement.
