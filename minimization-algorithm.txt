@@ -532,7 +532,7 @@ than its delimiters.
 Brace Group Child Tree (BGCT)
 -----------------------------
 
-The "brace child tree" consists of:
+The "brace group child tree" consists of:
 
 * Every node in the token tree that is any of:
 
@@ -591,7 +591,7 @@ group together "int foo()" with its body), the corresponding BGCT is:
 
 (The BGCT as defined here is intended to define the same set of nodes
 that --ma2-brace-groups operates on, but in a way that is less dependent
-on the specific algorithm in use.)
+on the specific algorithm in use.  TODO: Combine their descriptions.)
 
 The BGCT can be divided into "levels", where "level N" is the set of
 nodes for which the number of edges from the root to that node is N.
@@ -627,7 +627,7 @@ Minimization Algorithm 3 (MA3)
 ------------------------------
 
 MA3 operates on the brace group child tree (BGCT), with paragraph
-grouping disabled.
+grouping disabled and head-body grouping enabled.
 
 MA3 has two fixed integer input parameters:
 
@@ -654,7 +654,6 @@ of N.  (Thus, it can be represented as a "divider" between the necessary
 and possibly-unnecessary non-replaced children.)
 
 
-
 Algorithm:
 
   BGCT_Node is a type denoting a node in the BGCT.
@@ -662,7 +661,8 @@ Algorithm:
 
   def children(N: BGCT_Node) -> list[BGCT_Node]:
     """
-    Return all non-replaced children of N in the BGCT.
+    Return all non-replaced children of N in the BGCT, in left-to-right
+    order.
     """
     # Details omitted; see definition of Brace Group Child Tree (BGCT).
 
@@ -688,14 +688,21 @@ Algorithm:
       Let C: list[BGCT_Node] be up to G contiguous non-replaced,
         non-necessary children of N closest to the end of the file.
 
-      Try to replace all nodes in C.  If len(C) > 1 then only attempt
-        the trivial replacement.  If len(C) == 1 then also attempt a
-        non-trivial replacement, if one exists.
+      Try to replace all nodes in C:
 
-      If ACCEPT:
+        If len(C) > 1 then only attempt the trivial replacement.
+
+        If len(C) == 1:
+
+          Also attempt a non-trivial replacement, if one exists.
+
+          If the node in C is a head-body group, and its second element
+          has a non-trivial replacement, then try that too.
+
+      If ACCEPT (first ACCEPT if there are multiple candidates):
 
         Commit the replacements as permanent.
-        Double G.
+        Double G if we used a trivial replacement.
 
       Else (REJECT) if len(C) > 1:
 
@@ -752,7 +759,7 @@ Algorithm motivation:
 
   The primary motivation is the observation that candidates formed by
   replacements near the end of the file are particularly productive (in
-  expectation) because:
+  expectation) because (for input that resembles C++):
 
   1. They are much more likely to succeed due to having a minimum of
      other nodes that depend on them, such that removal violates
@@ -770,6 +777,14 @@ Algorithm motivation:
   Restricting attention to the BGCT improves the likelihood of syntactic
   validity in languages like C++, and makes it somewhat easier to reason
   about what a sensible MAX_EXPLORATION_DEPTH ought to be.
+
+  Special treatment of head-body groups is motivated by noticing (credit
+  to Claude) that, without that, non-trivial replacement will virtually
+  never be tried since brace groups are only rarely direct children of
+  brace groups (and when they are, replacement with ";" is usually
+  futile anyway; TODO: decide whether to remove that entirely).  The
+  case where non-trivial replacement is really helpful is exactly when
+  head-body applies.
 
   When a node is found to be "necessary", that (in a Bayesian sense)
   reduces the probability that a future removal attempt will be
