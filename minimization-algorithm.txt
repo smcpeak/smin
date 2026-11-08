@@ -706,7 +706,7 @@ Algorithm:
 
       Else (REJECT) if len(C) > 1:
 
-        G //= 2
+        G = len(C) // 2
 
       Else (REJECT ONE):
 
