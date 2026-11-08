@@ -529,8 +529,8 @@ to one of its children, or (2) connect a brace group to a child other
 than its delimiters.
 
 
-Brace Child Tree (BCT)
-----------------------
+Brace Group Child Tree (BGCT)
+-----------------------------
 
 The "brace child tree" consists of:
 
@@ -538,11 +538,20 @@ The "brace child tree" consists of:
 
   - The root node.
   - A direct child of the root node.
-  - A direct child of a brace-delimited group node.
+  - A direct child of a brace-delimited group node (as recognized by the
+    `Language.is_brace_group` method), excluding the delimiter tokens
+    themselves.
 
-* An edge from BCT node P (parent) to BCT node C (child) if, in the
+* An edge from BGCT node P (parent) to BGCT node C (child) if, in the
   token tree, P is an ancestor of C, and the path from P to C in the
-  token tree does not go through any BCT nodes.
+  token tree does not go through any other BGCT nodes.
+
+  Equivalently (wording suggested by Claude): The BGCT parent of each
+  non-root BGCT node C is the nearest proper ancestor of C (in the token
+  tree) that is also a BGCT node.
+
+The children of a BGCT node are ordered, as in the token tree, left to
+right based on their position in the input file.
 
 For example, if the input is:
 
@@ -564,7 +573,9 @@ For example, if the input is:
     return 1;
   }
 
-then, if paragraph grouping is disabled, the corresponding BCT is:
+then, if paragraph grouping is disabled (preventing, e.g., "g();" and
+"h();" from being grouped), and head-body grouping is enabled (to, e.g.,
+group together "int foo()" with its body), the corresponding BGCT is:
 
 - root node
   - "int foo() ..."
@@ -575,23 +586,48 @@ then, if paragraph grouping is disabled, the corresponding BCT is:
       - "h();"
       - "if ..."
         - "j();"
-    - "return 1;
+    - "return 1;"
+  - the final whitespace-only token
 
-(The BCT as defined here is intended to define the same set of nodes
+(The BGCT as defined here is intended to define the same set of nodes
 that --ma2-brace-groups operates on, but in a way that is less dependent
 on the specific algorithm in use.)
 
-The BCT can be divided into "levels", where "level N" is the set of
+The BGCT can be divided into "levels", where "level N" is the set of
 nodes for which the number of edges from the root to that node is N.
 Hence, level 0 is just the root node, level 1 is all of the root's
 children, etc.
+
+In the context of a minimization algorithm, the BGCT is mutable in the
+sense that the minimizer can "replace" a node with a string (by adding
+an entry to an auxiliary map), which then makes that node "replaced",
+and it and all of its descendants not "live".
+
+Rationale for disabling paragraph grouping: Paragraph grouping was
+originally introduced for MA1, which treats each form of grouping about
+the same, and uses them as a sort of soft guide for where to put run
+boundaries, but would dig inside all of them eventually.  The BGCT is
+meant for use with MA3, which tries to focus on braces, and paragraphs
+within function bodies would intefere with minimality there since MA3
+doesn't have a way to separate them.
+
+Observation: The actual granularity of nodes in the BGCT depends not
+only on where the braces are, but where whitespace is too, because it is
+defined in terms of the token tree, which itself is computed using the
+whitespace-aware structure deduction algorithm (see
+structure-deduction-algorithm.txt).  For example, if the file has no
+newlines, then every brace group will have children that are all either
+single tokens or other brace groups.  The utility of the BGCT thus
+depends, to some degree, on the artifact being minimized having
+whitespace (newlines, especially) that corresponds to good (productive)
+candidate partition boundaries.
 
 
 Minimization Algorithm 3 (MA3)
 ------------------------------
 
-MA3 operates on the brace child tree (BCT), with paragraph grouping
-disabled.
+MA3 operates on the brace group child tree (BGCT), with paragraph
+grouping disabled.
 
 MA3 has two fixed integer input parameters:
 
@@ -603,12 +639,12 @@ MA3 has two fixed integer input parameters:
 While running, MA3 has two related integer global variables:
 
 * max_necessity: Initially NECESSITY_INCREMENT, this is the maximum
-  number of "necessary" nodes to accumulate within any given BCT node.
+  number of "necessary" nodes to accumulate within any given BGCT node.
 
-* exploration_depth: Initially 1, the maximum level of BCT nodes to
+* exploration_depth: Initially 1, the maximum level of BGCT nodes to
   examine and consider replacing.
 
-Additionally, associated with each BCT node N is a mutable sequence
+Additionally, associated with each BGCT node N is a mutable sequence
 necessary(N) that contains the non-replaced children that were, at some
 point, tested for possible replacement, but the resulting candidate(s)
 were rejected.  Initially, necessary(N) is empty for all N.
@@ -621,24 +657,24 @@ and possibly-unnecessary non-replaced children.)
 
 Algorithm:
 
-  BCT_Node is a type denoting a node in the BCT.
+  BGCT_Node is a type denoting a node in the BGCT.
 
 
-  def children(N: BCT_Node) -> list[BCT_Node]:
+  def children(N: BGCT_Node) -> list[BGCT_Node]:
     """
-    Return all non-replaced children of N in the BCT.
+    Return all non-replaced children of N in the BGCT.
     """
-    # Details omitted; see definition of Brace Child Tree (BCT).
+    # Details omitted; see definition of Brace Group Child Tree (BGCT).
 
 
-  def level(N: BCT_Node) -> int:
+  def level(N: BGCT_Node) -> int:
     """
-    Return the level of N in the BCT.
+    Return the level of N in the BGCT.
     """
-    # Details omitted; see definition of Brace Child Tree (BCT).
+    # Details omitted; see definition of Brace Group Child Tree (BGCT).
 
 
-  def ma3_min_node(N: BCT_Node) -> None:
+  def ma3_min_node(N: BGCT_Node) -> None:
     """
     Non-recursively minimize N.
     """
@@ -649,7 +685,7 @@ Algorithm:
     While (len(necessary(N)) < children(N) and
            len(necessary(N)) < max_necessity):
 
-      Let C: list[BCT_Node] be up to G contiguous non-replaced,
+      Let C: list[BGCT_Node] be up to G contiguous non-replaced,
         non-necessary children of N closest to the end of the file.
 
       Try to replace all nodes in C.  If len(C) > 1 then only attempt
@@ -670,7 +706,7 @@ Algorithm:
         Increase necessary(N) by the one element in C.
 
 
-  def ma3_min_subtree(N: BCT_Node) -> None:
+  def ma3_min_subtree(N: BGCT_Node) -> None:
     """
     Recursively minimize N and its necessary children down to the
     exploration depth.
@@ -687,7 +723,7 @@ Algorithm:
       ma3_min_subtree(C)
 
 
-  def ma3_min_tree(root: BCT_Node) -> None:
+  def ma3_min_tree(root: BGCT_Node) -> None:
     """
     Minimize the entire tree, with attention focused on the end of the
     file, attempting to remove nodes in layers, but with gradually
@@ -731,7 +767,7 @@ Algorithm motivation:
   material, or being forced to expand the scope due to not making
   progress otherwise.
 
-  Restricting attention to the BCT improves the likelihood of syntactic
+  Restricting attention to the BGCT improves the likelihood of syntactic
   validity in languages like C++, and makes it somewhat easier to reason
   about what a sensible MAX_EXPLORATION_DEPTH ought to be.
 
