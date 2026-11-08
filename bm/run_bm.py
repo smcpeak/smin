@@ -62,9 +62,12 @@ MINIMIZERS: dict[str, MinimizerSpec] = {
   "smin-ma2-bg": MinimizerSpec(
     [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT]),
 
-  "smin-ma2-bg-sp": MinimizerSpec(
-    [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT],
-    env={"SKIP_PARA": "1"}),
+  "smin-ma2-bg-sp": MinimizerSpec([
+    _SMIN_PY,
+    "--skip-paragraphs",
+    "--ma2", "--ma2-brace-groups",
+    TEST_SH, "--", INPUT
+  ]),
 
   # This is my own script (in github.com/smcpeak/scripts) that runs
   # `multidelta -level=N` for N in the sequence [0 1 0 1 2 0 1 2 3 0 1 2

@@ -402,13 +402,6 @@ class MinimizerEnvTest(TempDirTestCase):
     self.assertEqual((run_dir / "gen.log").read_text(), "gen=a b\n")
     self.assertEqual((run_dir / "min.log").read_text(), "min=a b\n")
 
-  def test_smin_ma2_bg_sp(self) -> None:
-    bg = MINIMIZERS["smin-ma2-bg"]
-    sp = MINIMIZERS["smin-ma2-bg-sp"]
-    self.assertEqual(sp.command, bg.command)
-    self.assertEqual(bg.env, {})
-    self.assertEqual(sp.env, {"SKIP_PARA": "1"})
-
 
 @unittest.skipUnless(os.environ.get("SLOW") == "1", "requires SLOW=1")
 @unittest.skipUnless(shutil.which("clang"), "requires clang")
