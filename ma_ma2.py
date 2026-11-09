@@ -54,12 +54,12 @@ class MA2Minimizer(Minimizer):
 
   def __init__(
     self,
-    tree_root: TTNode,
     options: MinimizerOptions,
+    tree_root: TTNode,
   ) -> None:
     assert options.alg_kind() == MinimizerAlgorithmKind.MA2
     assert isinstance(options.selector, MA2MinimizerSelector)
-    super().__init__(tree_root, options)
+    super().__init__(options, tree_root)
 
     self.ma2_selector = options.selector
 

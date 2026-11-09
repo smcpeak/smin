@@ -81,12 +81,12 @@ class Minimizer(ABC):
   """
 
   # ---- Input ----
-  # The root of the token tree representing the original input.
-  tree_root: TTNode
-
   # Minimizer control options, the most important of which is the
   # acceptance test function.
   options: MinimizerOptions
+
+  # The root of the token tree representing the original input.
+  tree_root: TTNode
 
   # ---- Fixed data derived from the input ----
   # The tokens of the original input, in order.  Tokens are identified
@@ -169,8 +169,8 @@ class Minimizer(ABC):
 
   def __init__(
     self,
-    tree_root: TTNode,
     options: MinimizerOptions,
+    tree_root: TTNode,
   ) -> None:
     """
     Prepare to minimize the input represented by `tree_root`.
@@ -178,8 +178,8 @@ class Minimizer(ABC):
     Requires that the acceptance test has already accepted that input.
     """
 
-    self.tree_root = tree_root
     self.options = options
+    self.tree_root = tree_root
 
     self.tokens = list(tree_root.tokens())
     self.node_span = {}

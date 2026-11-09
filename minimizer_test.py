@@ -161,8 +161,8 @@ class Recorder(AcceptanceTester):
     as the global make_minimizer.
     """
     self.minimizer = make_minimizer(
-      tree_root = root,
       options   = opts if opts else self.min_opts(),
+      tree_root = root,
     )
     return self.minimizer
 

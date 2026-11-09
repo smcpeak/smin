@@ -428,7 +428,6 @@ def main(argv: list[str]) -> int:
     )
 
     minimizer = make_minimizer(
-      tree_root                     = tree,
       options = MinimizerOptions(
         selector                    = selector,
         max_passes                  = args.max_passes,
@@ -436,6 +435,7 @@ def main(argv: list[str]) -> int:
         language                    = language,
         should_stop                 = time_limit_reached,
       ),
+      tree_root                     = tree,
     )
     result = minimizer.run_minimizer()
 

@@ -15,8 +15,8 @@ from token_tree import TTNode
 
 
 def make_minimizer(
-  tree_root: TTNode,
   options: MinimizerOptions,
+  tree_root: TTNode,
 ) -> Minimizer:
   """
   Create a Minimizer object.  Uses `options` to decide which class.
@@ -35,7 +35,7 @@ def make_minimizer(
     assert False, f"Unrecognized alg_kind: {kind}"
 
   # Forward the arguments to that constructor.
-  return cls(tree_root, options)
+  return cls(options, tree_root)
 
 
 # EOF
