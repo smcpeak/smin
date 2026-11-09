@@ -179,6 +179,14 @@ class Minimizer(ABC):
     """
 
     self.options = options
+    self._set_tree_root(tree_root)
+
+
+  def _set_tree_root(self, tree_root: TTNode) -> None:
+    """
+    Set the tree to operate on, calculate the fixed data that depends on
+    it, and reset the minimizer algorithm data.
+    """
     self.tree_root = tree_root
 
     self.tokens = list(tree_root.tokens())
