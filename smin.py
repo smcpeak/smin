@@ -389,25 +389,26 @@ def main(argv: list[str]) -> int:
     _Tester(run_accept, console),
   )
 
-  # ---- File to minimize reading and parsing ----
+  # ---- Input file (to minimize) reading and parsing ----
   try:
     with open(fname, "rb") as f:
-      data = f.read()
+      orig_input_data = f.read()
   except OSError as e:
     print(f"smin.py: error: cannot read {fname!r}: {e.strerror}",
           file=sys.stderr)
     return 2
 
   tree = build_tree(
-    language.make_tokenizer().tokenize(data),
+    language.make_tokenizer().tokenize(orig_input_data),
     BuildTreeOptions(use_paragraphs = not args.skip_paragraphs))
   orig_tok_count = sum(1 for _ in tree.tokens())
 
   console.line(
-    f"Initial {fname} has {orig_tok_count} tokens, {len(data)} bytes, "
+    f"Initial {fname} has {orig_tok_count} tokens, "
+    f"{len(orig_input_data)} bytes, "
     f"and a maximum tree depth of {tree.depth()}.")
 
-  if tree.text() != data:
+  if tree.text() != orig_input_data:
     print(f"smin.py: internal error: rendering the token tree of "
           f"{fname!r} does not reproduce its contents", file=sys.stderr)
     return 4
@@ -429,7 +430,7 @@ def main(argv: list[str]) -> int:
       console.write(
         f"Checking {test_command[0]} on initial {fname} ... ")
       try:
-        result = run_accept.run_acceptance_test(data, None)
+        result = run_accept.run_acceptance_test(orig_input_data, None)
       except OSError as e:
         console.end_line()
         print(f"smin.py: error: cannot run {test_command[0]!r}: "
@@ -474,7 +475,7 @@ def main(argv: list[str]) -> int:
   except BaseException:
     # Leave an accepted input in the file before propagating the error.
     signal.signal(signal.SIGINT, signal.SIG_IGN)
-    _write_file(fname, data if minimizer is None
+    _write_file(fname, orig_input_data if minimizer is None
                        else minimizer.render_candidate({}))
     console.end_line()
     raise
@@ -487,15 +488,15 @@ def main(argv: list[str]) -> int:
   if minimizer is None:
     # Interrupted before minimization started.  The initial test may
     # have rewritten the file, so restore it.
-    final_data, final_tok_count = data, orig_tok_count
+    final_input_data, final_tok_count = orig_input_data, orig_tok_count
   else:
     # This uses `render_candidate` rather than `get_minimized_test_input`
     # since the latter requires that `run_minimizer` has been invoked,
     # which may not be the case after Ctrl-C.
-    final_data = minimizer.render_candidate({})
+    final_input_data = minimizer.render_candidate({})
     final_tok_count = minimizer.current_tok_count()
 
-  _write_file(fname, final_data)
+  _write_file(fname, final_input_data)
 
   interrupted = result == AcceptanceTestResult.INTERRUPTED
   if interrupted:
@@ -519,8 +520,8 @@ def main(argv: list[str]) -> int:
   # unchanged.  For now, I just note the oddity.
   console.line(
     f"Reduced file {fname} from {orig_tok_count} tokens "
-    f"({len(data)} bytes) to {final_tok_count} tokens "
-    f"({len(final_data)} bytes).")
+    f"({len(orig_input_data)} bytes) to {final_tok_count} tokens "
+    f"({len(final_input_data)} bytes).")
 
   console.line(
     f"Elapsed time (D:HH:MM:SS): "
