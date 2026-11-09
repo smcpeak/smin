@@ -345,6 +345,71 @@ def make_minimizer_options(
   )
 
 
+def run_initial_acceptance_test(
+  console: _Console,
+  orig_input_data: bytes,
+  run_accept: RunAcceptProgram,
+) -> int:
+  """
+  Run the initial acceptance test of `orig_input_data` using
+  `run_accept`.  Also back up the input file.
+
+  If that results in an error that should cause the minimizer to stop,
+  return the appropriate exit code.  Otherwise return 0.
+  """
+
+  best_existed: bool = os.path.exists(run_accept.best_file_name)
+
+  # Remove a left-over .best file since it's unrelated to the current
+  # minimization attempt.
+  if best_existed:
+    os.remove(run_accept.best_file_name)
+
+  fname: str = run_accept.input_file_name
+  initial_test_succeeded: bool = False
+  try:
+    console.write(
+      f"Checking {run_accept.prog_name} on initial {fname} ... ")
+
+    try:
+      result = run_accept.run_acceptance_test(orig_input_data, None)
+    except OSError as e:
+      console.end_line()
+      print(f"smin.py: error: cannot run {run_accept.prog_name!r}: "
+            f"{e.strerror}", file=sys.stderr)
+      return 2
+
+    if result == AcceptanceTestResult.INTERRUPTED:
+      console.write("INTERRUPTED\n")
+      raise KeyboardInterrupt()
+
+    if result == AcceptanceTestResult.REJECT:
+      console.write("REJECTED\n")
+      console.line("Stopping because the initial input was rejected.")
+      return 1
+
+    console.write("accepted\n")
+    initial_test_succeeded = True
+
+  finally:
+    if best_existed and not initial_test_succeeded:
+      # Acknowledge having removing the .best file.
+      console.line(f"Note: I removed {run_accept.best_file_name}.")
+
+  console.line(
+    f"Will continuously update {run_accept.best_file_name}" +
+    (" (which was overwritten)." if best_existed else "."))
+
+  backup = fname + ".bak"
+  bak_was_overwritten: bool = os.path.exists(backup)
+  shutil.copyfile(fname, backup)
+  console.line(
+    f"Copied {fname} to {backup}" +
+    (" (which was overwritten)." if bak_was_overwritten else "."))
+
+  return 0
+
+
 def main(argv: list[str]) -> int:
   """
   Run the minimizer with command line arguments `argv` (not including
@@ -416,50 +481,12 @@ def main(argv: list[str]) -> int:
   minimizer: Optional[Minimizer] = None
 
   try:
-    best_existed: bool = os.path.exists(run_accept.best_file_name)
-
-    # Remove a left-over .best file since it's unrelated to the current
-    # minimization attempt.
-    if best_existed:
-      os.remove(run_accept.best_file_name)
-
-    initial_test_succeeded: bool = False
-    try:
-      console.write(
-        f"Checking {test_command[0]} on initial {fname} ... ")
-      try:
-        result = run_accept.run_acceptance_test(orig_input_data, None)
-      except OSError as e:
-        console.end_line()
-        print(f"smin.py: error: cannot run {test_command[0]!r}: "
-              f"{e.strerror}", file=sys.stderr)
-        return 2
-
-      if result == AcceptanceTestResult.INTERRUPTED:
-        console.write("INTERRUPTED\n")
-        raise KeyboardInterrupt()
-      if result == AcceptanceTestResult.REJECT:
-        console.write("REJECTED\n")
-        console.line("Stopping because the initial input was rejected.")
-        return 1
-      console.write("accepted\n")
-      initial_test_succeeded = True
-
-    finally:
-      if best_existed and not initial_test_succeeded:
-        # Acknowledge having removing the .best file.
-        console.line(f"Note: I removed {run_accept.best_file_name}.")
-
-    console.line(
-      f"Will continuously update {run_accept.best_file_name}" +
-      (" (which was overwritten)." if best_existed else "."))
-
-    backup = fname + ".bak"
-    bak_was_overwritten: bool = os.path.exists(backup)
-    shutil.copyfile(fname, backup)
-    console.line(
-      f"Copied {fname} to {backup}" +
-      (" (which was overwritten)." if bak_was_overwritten else "."))
+    initial_exit_code: int = run_initial_acceptance_test(
+      console,
+      orig_input_data,
+      run_accept)
+    if initial_exit_code > 0:
+      return initial_exit_code
 
     minimizer = make_minimizer(
       options   = minimizer_options,

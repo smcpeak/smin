@@ -36,10 +36,21 @@ class RunAcceptProgram:
   acceptance_command: list[str]
 
 
+  def __post_init__(self) -> None:
+    assert len(self.input_file_name) > 0
+    assert len(self.acceptance_command) > 0
+
+
   @property
   def best_file_name(self) -> str:
     """Name of the file that holds the most recently accepted input."""
     return self.input_file_name + ".best"
+
+
+  @property
+  def prog_name(self) -> str:
+    """Name of the program to invoke."""
+    return self.acceptance_command[0]
 
 
   def write_best(self, contents: bytes) -> None:
