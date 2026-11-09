@@ -18,9 +18,8 @@ from byte_range import ByteRange
 from minimizer_options import MinimizerOptions
 from smin_token import SMToken
 from start_report import TestStartReport
-from token_tree import TTNode
+from token_tree import TokenTree, TTNode
 from whitespace import (
-  LF_BYTES,
   contains_newline,
   leading_whitespace,
   trail_indent,
@@ -85,23 +84,16 @@ class Minimizer(ABC):
   # acceptance test function.
   options: MinimizerOptions
 
-  # The root of the token tree representing the original input.
-  tree_root: TTNode
+  # The token tree representing the original input.  The algorithms
+  # operate on `tree.root`.  `tree.eof_ws`, if present, is never
+  # minimized, and only appears when rendering candidates.
+  tree: TokenTree
 
   # ---- Fixed data derived from the input ----
-  # The tokens of the original input, in order.  Tokens are identified
-  # by their index in this list.
+  # The tokens of the original input under `tree.root`, in order.
+  # Tokens are identified by their index in this list.  This excludes
+  # `tree.eof_ws`.
   tokens: list[SMToken]
-
-  # True if the original input ends with a newline, in which case every
-  # rendered candidate does too.
-  #
-  # TODO: This causes weird behavior, where we "remove" the last token
-  # often just a newline, making ostensible progress, but then add it
-  # back and (often) get a memo hit.  I think all trailing whitespace
-  # should simply be collected into a token that is permanently out of
-  # scope for minimization, and not counted in the token counts.
-  ends_with_newline: bool
 
   # Map from the id() of each node to the range of the tokens it
   # contains.
@@ -170,31 +162,29 @@ class Minimizer(ABC):
   def __init__(
     self,
     options: MinimizerOptions,
-    tree_root: TTNode,
+    tree: TokenTree,
   ) -> None:
     """
-    Prepare to minimize the input represented by `tree_root`.
+    Prepare to minimize the input represented by `tree`.
 
     Requires that the acceptance test has already accepted that input.
     """
 
     self.options = options
-    self._set_tree_root(tree_root)
+    self._set_tree(tree)
 
 
-  def _set_tree_root(self, tree_root: TTNode) -> None:
+  def _set_tree(self, tree: TokenTree) -> None:
     """
     Set the tree to operate on, calculate the fixed data that depends on
     it, and reset the minimizer algorithm data.
     """
-    self.tree_root = tree_root
+    self.tree = tree
 
-    self.tokens = list(tree_root.tokens())
+    self.tokens = list(tree.root.tokens())
     self.node_span = {}
-    end = self._compute_spans(tree_root, 0)
+    end = self._compute_spans(tree.root, 0)
     assert end == len(self.tokens)
-    self.ends_with_newline = (
-      len(self.tokens) > 0 and self.tokens[-1].text.endswith(LF_BYTES))
 
     self.cur_replacement = {}
     self.token_live = [True] * len(self.tokens)
@@ -289,7 +279,7 @@ class Minimizer(ABC):
     interrupted the update of `token_live`.
     """
     ctm: list[bytes | None] = [None] * len(self.tokens)
-    self._fill_ctm(self.tree_root, {}, ctm)
+    self._fill_ctm(self.tree.root, {}, ctm)
     return ctm.count(None)
 
 
@@ -297,7 +287,7 @@ class Minimizer(ABC):
     """
     Render the input with the current replacements, plus those in
     `extra`, which maps a node's id() to its candidate replacement.
-    The result ends with a newline if the original input did.
+    The result ends with `tree.eof_ws`, if any.
     """
     return self.render_candidate_with_range(extra)[0]
 
@@ -318,7 +308,7 @@ class Minimizer(ABC):
     # "Candidate rendering".)
     ctm: list[Optional[bytes]] = [None] * len(self.tokens)
     affected_token_range: Optional[_TokenRange] = (
-      self._fill_ctm(self.tree_root, extra, ctm))
+      self._fill_ctm(self.tree.root, extra, ctm))
 
     # Render the candidate using the CTM.
     text: bytes
@@ -328,10 +318,14 @@ class Minimizer(ABC):
                   ctm,
                   affected_token_range))
 
-    # Ensure the candidate ends with a newline (if the original did)
-    # since working with files that do not is annoying.
-    if self.ends_with_newline and not text.endswith(LF_BYTES):
-      text += LF_BYTES
+    # Every candidate ends with the original EOF whitespace, if any, so
+    # if the affected range extends to the end of the tokens, it stops
+    # just before that whitespace.
+    if (affected_byte_range is not None and
+        affected_byte_range.abr_stop is None):
+      affected_byte_range.abr_stop = len(text)
+    if self.tree.eof_ws is not None:
+      text += self.tree.eof_ws.text
 
     if affected_byte_range is None:
       return text, None
@@ -339,9 +333,9 @@ class Minimizer(ABC):
     # The candidate and the last accepted input agree after `abr_stop`,
     # so the end of the modified range is that far from the end of the
     # latter.
+    assert affected_byte_range.abr_stop is not None
     stop: int = (
-      self.accepted_size if affected_byte_range.abr_stop is None
-      else self.accepted_size - (len(text) - affected_byte_range.abr_stop))
+      self.accepted_size - (len(text) - affected_byte_range.abr_stop))
     return text, ByteRange(affected_byte_range.abr_start, stop)
 
 

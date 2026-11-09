@@ -75,16 +75,18 @@ class MA2Test(ReportCheckingTestCase):
     self.assertEqual([r.granularity for r in rec.starts], [1, 2])
 
   def test_keep_one_identifier(self) -> None:
-    # The root's children are the three lines and the final newline.
+    # The root's children are the three lines.  (The final newline is
+    # EOF whitespace, not part of the tree.)
     rec, m = self.run_ma2(b"int a;\nint keep;\nint b;\n",
                           lambda d: b"keep" in d)
     self.assertEqual(m.get_minimized_test_input(), b"\nkeep\n")
     self.assertEqual(m._total_num_passes(), 2)
     self.assertEqual(rec.tested, [
       # Pass 1.  Since the root is not a delimiter group, the first
-      # candidate removes only half of its children.  That is accepted,
-      # so the granularity doubles, but is clamped to the two children
-      # still in scope.
+      # candidate removes only half of its children, rounded down to
+      # one.  That is accepted, so the granularity doubles to two, the
+      # number of children still in scope, but removing both is
+      # rejected.
       b"int a;\nint keep;\n",
       b"\n",
       # The granularity is cut to 1, the "keep" line is found to be
@@ -101,7 +103,7 @@ class MA2Test(ReportCheckingTestCase):
       b"\nkeep\n",
     ])
     self.assertEqual([r.granularity for r in rec.starts],
-                     [2, 2, 1, 1, 1, 1, 2, 1, 1])
+                     [1, 2, 1, 1, 1, 1, 2, 1, 1])
     self.assertEqual([memo for _, memo in rec.finishes],
                      [False] * 4 + [True, False, True, False, False])
 
@@ -267,7 +269,7 @@ class MA2BraceGroupsTest(ReportCheckingTestCase):
     # yield 1 here, and the interior would never be reached.)
     src = b"{\n  x y;\n  keep;\n}\n"
     self.assertEqual(self.num_passes(src), 2)
-    self.assertTrue(is_brace_group(build_tree(tokenize_cpp(src)).children[0]))
+    self.assertTrue(is_brace_group(build_tree(tokenize_cpp(src)).root.children[0]))
 
   def test_num_passes_max_passes(self) -> None:
     src = b"void f() {\n  if (x) {\n    y;\n  }\n}\n"
@@ -276,8 +278,10 @@ class MA2BraceGroupsTest(ReportCheckingTestCase):
 
   def test_get_brace_groups(self) -> None:
     m = self.make(Recorder(lambda d: True),
-                  b"x = f({1}, {2}) { {4} } {3};\n")
-    line = m.tree_root.children[0]
+                  b"x = f({1}, {2}) { {4} } {3};\ny;\n")
+
+    # The second line ensures the first is a line group.
+    line = m.tree.root.children[0]
 
     def texts(n: TTNode) -> list[bytes]:
       return [bg.text() for bg in m._get_brace_groups(n)]
@@ -299,26 +303,30 @@ class MA2BraceGroupsTest(ReportCheckingTestCase):
 
   def test_trace(self) -> None:
     rec = Recorder(lambda d: b"keep" in d and d.count(b"{") == d.count(b"}"))
-    m = self.make(rec, b"int f() { a; keep; }\n")
+    m = self.make(rec, b"int x;\nint f() { a; keep; }\n")
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.check_reports(rec, m)
 
-    # Only the interior of the brace group gets minimized, since nothing
-    # else in the line is a child of the root or of a brace group.
-    self.assertEqual(m.get_minimized_test_input(), b"int f() { keep }\n")
+    # Within the "f" line, only the interior of the brace group gets
+    # minimized, since nothing else in that line is a child of the root
+    # or of a brace group.
+    self.assertEqual(m.get_minimized_test_input(), b"\nint f() { keep }\n")
     self.assertEqual(rec.tested, [
-      # Pass 1: The children of the root: the line, then the newline,
-      # the latter being a memo hit.
-      b"\n",
+      # Pass 1: The children of the root, the two lines, from last to
+      # first.  The "f" line is necessary, while the other is not.
+      b"int x;\n",
+      b"\nint f() { a; keep; }\n",
 
-      # Pass 2: The line is necessary, so recurse into its brace group,
-      # and remove its interior from last to first.
-      b"int f() { }\n",
-      b"int f() { a; }\n",
-      b"int f() { a; keep }\n",
-      b"int f() { a }\n",
-      b"int f() { a keep }\n",
-      b"int f() { keep }\n",
+      # Pass 2: The "f" line, now the only child of the root, is tried
+      # again.  It is necessary, so recurse into its brace group, and
+      # remove its interior from last to first.
+      b"\n",
+      b"\nint f() { }\n",
+      b"\nint f() { a; }\n",
+      b"\nint f() { a; keep }\n",
+      b"\nint f() { a }\n",
+      b"\nint f() { a keep }\n",
+      b"\nint f() { keep }\n",
     ])
     self.assertEqual([r.pass_num for r in rec.starts], [1] * 2 + [2] * 8)
 
@@ -344,7 +352,7 @@ int f(int a)
     m = self.make(rec, src)
     parent = {
       id(c): n
-      for n in all_nodes(m.tree_root)
+      for n in all_nodes(m.tree.root)
       for c in n.children
     }
 
@@ -357,7 +365,7 @@ int f(int a)
     self.assertGreater(len(candidates), 0)
     for n in candidates:
       p = parent[id(n)]
-      if p is not m.tree_root:
+      if p is not m.tree.root:
         self.assertTrue(is_brace_group(p), n.text())
         self.assertIsNot(n, p.children[0])
         self.assertIsNot(n, p.children[-1])

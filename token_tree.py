@@ -14,6 +14,7 @@ from typing import Optional
 
 from smin_token import SMToken
 from string_util import quote_bytes
+from whitespace import only_whitespace
 
 
 class TTNodeKind(Enum):
@@ -166,23 +167,64 @@ class TokenTree:
   eof_ws: Optional[SMToken]
 
 
-  # TODO:
-  #   - tokens(), which includes `eof_ws` if not None
-  #   - text(), again including `eof_ws`
-  #   - depth() = root.depth()
-  #   - self_check()
+  def tokens(self) -> Iterator[SMToken]:
+    """
+    Yield all of the tokens in left-to-right order, including `eof_ws`
+    if it is not None.
+    """
+    yield from self.root.tokens()
+    if self.eof_ws is not None:
+      yield self.eof_ws
 
+  def text(self) -> bytes:
+    """
+    Return the concatenated text of all tokens, including `eof_ws`.
+    This is the original input.
+    """
+    return b"".join(t.text for t in self.tokens())
+
+  def depth(self) -> int:
+    """Return the depth of `root`."""
+    return self.root.depth()
+
+  def self_check(self) -> None:
+    """Assert data structure invariants."""
+    self.root.self_check()
+
+    if self.eof_ws is not None:
+      assert self.eof_ws.text, "eof_ws is empty"
+      assert only_whitespace(self.eof_ws.text), (
+        "eof_ws has non-whitespace")
+
+    # Any final whitespace token must be in `eof_ws`, not the tree.
+    if self.root.children:
+      assert not only_whitespace(self.root.last_token().text), (
+        "tree ends with a whitespace token")
 
   def to_debug_string(self, indent: int = 0) -> str:
-    """
+    r"""
     Render like:
 
       TokenTree{
-        root: <root.to_debug_string()>
+        root: ROOT[
+          ...
+        ]
         eof_ws: "\n"
-      ]
+      }
+
+    where the `root` part is `root.to_debug_string()`, and `eof_ws` is
+    quoted like a token, or is None.
     """
-    return "TODO"
+    pad = " " * indent
+    inner = " " * (indent + 2)
+    root_str = self.root.to_debug_string(indent + 2)[len(inner):]
+    eof_str = ("None" if self.eof_ws is None
+               else quote_bytes(self.eof_ws.text))
+    return (
+      f"{pad}TokenTree{{\n"
+      f"{inner}root: {root_str}"
+      f"{inner}eof_ws: {eof_str}\n"
+      f"{pad}}}\n")
 
 
 # EOF

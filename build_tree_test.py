@@ -11,7 +11,7 @@ import unittest
 
 from build_tree import BuildTreeOptions, build_tree
 from test_util import all_groups, dedent
-from token_tree import TTNode, TTNodeKind
+from token_tree import TokenTree, TTNodeKind
 from tokenize_cpp import tokenize_cpp
 
 
@@ -21,28 +21,31 @@ class BuildTreeTest(unittest.TestCase):
     src: str,
     expect: str,
     options: BuildTreeOptions | None = None,
-  ) -> TTNode:
+    eof_ws: bytes | None = b"\n",
+  ) -> TokenTree:
     """
     Check that building the tree for `src` (dedented), using `options`,
-    yields a tree whose debug string is `expect` (dedented).  Return the
-    tree.
+    yields a tree whose root has debug string `expect` (dedented), and
+    whose EOF whitespace token has text `eof_ws`.  Return the tree.
     """
     data = dedent(src).encode("utf-8")
     tokens = tokenize_cpp(data)
 
     tree = build_tree(tokens, options)
 
-    self.assertEqual(tree.to_debug_string(), dedent(expect))
+    self.assertEqual(tree.root.to_debug_string(), dedent(expect))
+    self.assertEqual(
+      None if tree.eof_ws is None else tree.eof_ws.text, eof_ws)
     self.assertEqual(tree.text(), data)
     tree.self_check()
     for t1, t2 in zip(tokens, tree.tokens(), strict=True):
       self.assertIs(t1, t2)
-    self.assertFalse(tree.is_delim_group())
+    self.assertFalse(tree.root.is_delim_group())
 
     # Phase 6 is unnecessary because no non-root group has a single
     # child.
-    for g in all_groups(tree):
-      if g is not tree:
+    for g in all_groups(tree.root):
+      if g is not tree.root:
         self.assertGreater(len(g.children), 1)
 
     return tree
@@ -51,7 +54,45 @@ class BuildTreeTest(unittest.TestCase):
     self.check("", """
       ROOT[
       ]
-      """)
+      """, eof_ws=None)
+
+  def test_only_whitespace(self) -> None:
+    # The whitespace goes into `eof_ws`, leaving the root empty.  (This
+    # does not use `check` because `dedent` would modify the input.)
+    tree = build_tree(tokenize_cpp(b"\n  \n"))
+    tree.self_check()
+    self.assertEqual(tree.root.children, [])
+    assert tree.eof_ws is not None
+    self.assertEqual(tree.eof_ws.text, b"\n  \n")
+
+  def test_eof_ws_excluded_from_groups(self) -> None:
+    # The EOF whitespace, including the blank line, is separated before
+    # grouping, so it does not join the last paragraph.
+    tree = self.check("a;\nb;\n\nc;\nd;\n\n", r"""
+      ROOT[
+        PARAGRAPH[
+          LINE[
+            "a"
+            ";"
+          ]
+          LINE[
+            "\nb"
+            ";"
+          ]
+        ]
+        PARAGRAPH[
+          LINE[
+            "\n\nc"
+            ";"
+          ]
+          LINE[
+            "\nd"
+            ";"
+          ]
+        ]
+      ]
+      """, eof_ws=b"\n\n")
+    self.assertNotIn(b"\n\n", [t.text for t in tree.root.tokens()])
 
   def test_root_with_one_child(self) -> None:
     # The one place a single-child group can appear is the root, when
@@ -63,7 +104,7 @@ class BuildTreeTest(unittest.TestCase):
           ")"
         ]
       ]
-      """)
+      """, eof_ws=None)
 
   def test_cpp_hello_world(self) -> None:
     # Example input 1 from the spec.  This matches example output 1,
@@ -83,51 +124,48 @@ class BuildTreeTest(unittest.TestCase):
           "#include <iostream>"
           "        // std::cout"
         ]
-        PARAGRAPH[
-          HEAD_BODY[
-            LINE[
-              "\n\nint"
-              " main"
-              DELIMITER[
-                "("
-                "int"
-                " argc"
-                ","
-                " char"
-                " *"
-                "*"
-                "argv"
-                ")"
-              ]
-            ]
+        HEAD_BODY[
+          LINE[
+            "\n\nint"
+            " main"
             DELIMITER[
-              "\n{"
-              PARAGRAPH[
-                LINE[
-                  "\n  std"
-                  "::"
-                  "cout"
-                  " <<"
-                  " \"Hello\\n\""
-                  ";"
-                ]
-                LINE[
-                  "\n  return"
-                  " 0"
-                  ";"
-                ]
-              ]
-              "\n}"
+              "("
+              "int"
+              " argc"
+              ","
+              " char"
+              " *"
+              "*"
+              "argv"
+              ")"
             ]
           ]
-          "\n"
+          DELIMITER[
+            "\n{"
+            PARAGRAPH[
+              LINE[
+                "\n  std"
+                "::"
+                "cout"
+                " <<"
+                " \"Hello\\n\""
+                ";"
+              ]
+              LINE[
+                "\n  return"
+                " 0"
+                ";"
+              ]
+            ]
+            "\n}"
+          ]
         ]
       ]
       """)
 
   def test_cpp_if_statements(self) -> None:
-    # Example input 2 from the spec.  Phase 4.5 groups the head, which
-    # starts with the first token in the file, with its body.
+    # Example input 2 from the spec.  Phase 4.5 does not group the head
+    # with its body, since that group would span the entire root.
     self.check(r"""
       bool GetDepsVisitor::isRefactoringDN(DependencyNode dn) const
       {
@@ -148,110 +186,107 @@ class BuildTreeTest(unittest.TestCase):
       }
       """, r"""
       ROOT[
-        HEAD_BODY[
-          LINE[
-            "bool"
-            " GetDepsVisitor"
-            "::"
-            "isRefactoringDN"
-            DELIMITER[
-              "("
-              "DependencyNode"
-              " dn"
-              ")"
-            ]
-            " const"
-          ]
+        LINE[
+          "bool"
+          " GetDepsVisitor"
+          "::"
+          "isRefactoringDN"
           DELIMITER[
-            "\n{"
-            PARAGRAPH[
-              "\n  // Must be a named declaration."
-              LINE[
-                "\n  if"
+            "("
+            "DependencyNode"
+            " dn"
+            ")"
+          ]
+          " const"
+        ]
+        DELIMITER[
+          "\n{"
+          PARAGRAPH[
+            "\n  // Must be a named declaration."
+            LINE[
+              "\n  if"
+              DELIMITER[
+                " ("
+                "!"
+                "isa"
+                "<"
+                "clang"
+                "::"
+                "NamedDecl"
+                ">"
                 DELIMITER[
-                  " ("
-                  "!"
-                  "isa"
-                  "<"
-                  "clang"
-                  "::"
-                  "NamedDecl"
-                  ">"
-                  DELIMITER[
-                    "("
-                    "dn"
-                    "."
-                    "m_decl"
-                    ")"
-                  ]
+                  "("
+                  "dn"
+                  "."
+                  "m_decl"
                   ")"
                 ]
-                DELIMITER[
-                  " {"
-                  LINE[
-                    "\n    return"
-                    " false"
-                    ";"
-                  ]
-                  "\n  }"
-                ]
+                ")"
               ]
-            ]
-            PARAGRAPH[
-              "\n\n  // What is its syntactic parent?"
-              INDENTATION[
+              DELIMITER[
+                " {"
                 LINE[
-                  "\n  clang"
-                  "::"
-                  "NamedDecl"
-                  " const"
-                  " *"
-                  "parent"
-                  " ="
-                ]
-                LINE[
-                  "\n    getNamedParentDeclOpt_templateAdjustment"
-                  DELIMITER[
-                    "("
-                    "dn"
-                    "."
-                    "m_decl"
-                    ")"
-                  ]
+                  "\n    return"
+                  " false"
                   ";"
                 ]
+                "\n  }"
+              ]
+            ]
+          ]
+          PARAGRAPH[
+            "\n\n  // What is its syntactic parent?"
+            INDENTATION[
+              LINE[
+                "\n  clang"
+                "::"
+                "NamedDecl"
+                " const"
+                " *"
+                "parent"
+                " ="
               ]
               LINE[
-                "\n  if"
+                "\n    getNamedParentDeclOpt_templateAdjustment"
                 DELIMITER[
-                  " ("
-                  "!"
-                  "parent"
+                  "("
+                  "dn"
+                  "."
+                  "m_decl"
                   ")"
                 ]
-                DELIMITER[
-                  " {"
-                  PARAGRAPH[
-                    "\n    // The parent is the TU."
-                    LINE[
-                      "\n    return"
-                      " true"
-                      ";"
-                    ]
-                  ]
-                  "\n  }"
-                ]
+                ";"
               ]
             ]
             LINE[
-              "\n\n  return"
-              " true"
-              ";"
+              "\n  if"
+              DELIMITER[
+                " ("
+                "!"
+                "parent"
+                ")"
+              ]
+              DELIMITER[
+                " {"
+                PARAGRAPH[
+                  "\n    // The parent is the TU."
+                  LINE[
+                    "\n    return"
+                    " true"
+                    ";"
+                  ]
+                ]
+                "\n  }"
+              ]
             ]
-            "\n}"
           ]
+          LINE[
+            "\n\n  return"
+            " true"
+            ";"
+          ]
+          "\n}"
         ]
-        "\n"
       ]
       """)
 
@@ -312,7 +347,6 @@ class BuildTreeTest(unittest.TestCase):
           " d"
           ";"
         ]
-        "\n"
       ]
       """, BuildTreeOptions(use_paragraphs=False))
 
@@ -331,41 +365,38 @@ class BuildTreeTest(unittest.TestCase):
     # But those in a function body are.
     self.check(self.NESTED_PARAGRAPHS, r"""
       ROOT[
-        HEAD_BODY[
-          LINE[
-            "void"
-            " f"
-            DELIMITER[
-              "("
-              ")"
-            ]
-          ]
+        LINE[
+          "void"
+          " f"
           DELIMITER[
-            "\n{"
-            PARAGRAPH[
-              LINE[
-                "\n  a"
-                ";"
-              ]
-              LINE[
-                "\n  b"
-                ";"
-              ]
-            ]
-            PARAGRAPH[
-              LINE[
-                "\n\n  c"
-                ";"
-              ]
-              LINE[
-                "\n  d"
-                ";"
-              ]
-            ]
-            "\n}"
+            "("
+            ")"
           ]
         ]
-        "\n"
+        DELIMITER[
+          "\n{"
+          PARAGRAPH[
+            LINE[
+              "\n  a"
+              ";"
+            ]
+            LINE[
+              "\n  b"
+              ";"
+            ]
+          ]
+          PARAGRAPH[
+            LINE[
+              "\n\n  c"
+              ";"
+            ]
+            LINE[
+              "\n  d"
+              ";"
+            ]
+          ]
+          "\n}"
+        ]
       ]
       """, options)
 
@@ -375,9 +406,12 @@ class BuildTreeTest(unittest.TestCase):
       {
         a;
       }
+      int x;
       """
 
-    # By default, the head and body are grouped.
+    # By default, the head and body are grouped.  (The final line is
+    # there so that group does not span the entire root, in which case
+    # it would not be made.)
     self.assertIn(TTNodeKind.HEAD_BODY,
                   group_kinds(src, BuildTreeOptions()))
 
@@ -401,7 +435,11 @@ class BuildTreeTest(unittest.TestCase):
           ]
           "\n}"
         ]
-        "\n"
+        LINE[
+          "\nint"
+          " x"
+          ";"
+        ]
       ]
       """, BuildTreeOptions(use_head_body=False))
 
@@ -412,7 +450,7 @@ def group_kinds(src: str, options: BuildTreeOptions) -> list[TTNodeKind]:
   (dedented) using `options`, in preorder.
   """
   tree = build_tree(tokenize_cpp(dedent(src).encode("utf-8")), options)
-  return [g.kind for g in all_groups(tree)]
+  return [g.kind for g in all_groups(tree.root)]
 
 
 def print_tree_for_file(fname: str) -> None:

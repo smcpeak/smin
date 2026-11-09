@@ -23,7 +23,7 @@ from minimizer_options import (
 )
 from start_report import TestStartReport
 from test_util import all_nodes
-from token_tree import TTNode
+from token_tree import TokenTree, TTNode
 from tokenize_cpp import tokenize_cpp
 from tokenizer import Tokenizer
 
@@ -151,7 +151,7 @@ class Recorder(AcceptanceTester):
 
   def mk_minimizer(
     self,
-    root: TTNode,
+    tree: TokenTree,
     opts: MinimizerOptions | None = None,
   ) -> Minimizer:
     """
@@ -162,7 +162,7 @@ class Recorder(AcceptanceTester):
     """
     self.minimizer = make_minimizer(
       options   = opts if opts else self.min_opts(),
-      tree_root = root,
+      tree      = tree,
     )
     return self.minimizer
 
@@ -174,7 +174,7 @@ class Recorder(AcceptanceTester):
     """
     Return `mk_minimizer(build_tree(tokenize_cpp(src)), <args>)`.
     """
-    tree: TTNode = build_tree(tokenize_cpp(src))
+    tree: TokenTree = build_tree(tokenize_cpp(src))
     return self.mk_minimizer(tree, opts)
 
   def report_test_starting(self, report: TestStartReport) -> None:
@@ -194,9 +194,9 @@ class RenderCandidateTest(unittest.TestCase):
     Render `src` after replacing, for each key of `replace`, the first
     node with that text by the corresponding value.
     """
-    root = build_tree(tokenize_cpp(src))
-    m = Recorder(lambda d: True).mk_minimizer(root)
-    extra = {id(find_node(root, k)): v for k, v in replace.items()}
+    tree = build_tree(tokenize_cpp(src))
+    m = Recorder(lambda d: True).mk_minimizer(tree)
+    extra = {id(find_node(tree.root, k)): v for k, v in replace.items()}
     return m.render_candidate(extra)
 
   def changed_range(
@@ -208,9 +208,9 @@ class RenderCandidateTest(unittest.TestCase):
     Like `render`, but return the changed byte range as a tuple, or
     None if there is none.
     """
-    root = build_tree(tokenize_cpp(src))
-    m = Recorder(lambda d: True).mk_minimizer(root)
-    extra = {id(find_node(root, k)): v for k, v in replace.items()}
+    tree = build_tree(tokenize_cpp(src))
+    m = Recorder(lambda d: True).mk_minimizer(tree)
+    extra = {id(find_node(tree.root, k)): v for k, v in replace.items()}
     r = m.render_candidate_with_range(extra)[1]
     return None if r is None else (r.start, r.stop)
 
@@ -230,17 +230,24 @@ class RenderCandidateTest(unittest.TestCase):
     self.assertEqual(self.changed_range(b"a+b", {b"+": b""}), (1, 2))
 
   def test_changed_range_non_trivial(self) -> None:
-    # The final newline token is entirely whitespace, so the range
-    # extends to the end.
+    # Nothing live follows the change, so the range extends to the
+    # EOF whitespace, which is never changed.
     self.assertEqual(
       self.changed_range(b"f() {\n  x;\n}\n", {b" {\n  x;\n}": b";"}),
-      (3, 13))
+      (3, 12))
 
   def test_changed_range_at_end(self) -> None:
-    # Nothing live follows the change, so it extends to the end.
+    # Nothing live follows the change, so it extends to the EOF
+    # whitespace.
     self.assertEqual(
-      self.changed_range(b"a;\nb;\n", {b"\nb;": b"", b"\n": b""}),
-      (2, 6))
+      self.changed_range(b"a;\nb;\n", {b"\nb;": b""}),
+      (2, 5))
+
+  def test_changed_range_at_end_without_eof_ws(self) -> None:
+    # Without EOF whitespace, the range extends to the end.
+    self.assertEqual(
+      self.changed_range(b"a;\nb;", {b"\nb;": b""}),
+      (2, 5))
 
   def test_no_replacements(self) -> None:
     src = b"int main()\n{\n  return 0;\n}\n"
@@ -268,10 +275,11 @@ class RenderCandidateTest(unittest.TestCase):
     self.assertEqual(self.render(b"a+b", {b"a": b""}), b"+b")
 
   def test_end_of_file(self) -> None:
-    # The final newline is restored, since the original input had one.
+    # The EOF whitespace, which is not part of the tree, is always
+    # appended.
     self.assertEqual(
-      self.render(b"a;\nb;\n", {b"\nb;": b"", b"\n": b""}),
-      b"a;\n")
+      self.render(b"a;\nb;\n\n", {b"\nb;": b""}),
+      b"a;\n\n")
 
   def test_end_of_file_without_newline(self) -> None:
     # No newline is added if the original input lacked one.
@@ -281,8 +289,7 @@ class RenderCandidateTest(unittest.TestCase):
     self.assertEqual(self.render(b"a;\nb;\n", {b"\nb;": b""}), b"a;\n")
 
   def test_final_newline_when_all_removed(self) -> None:
-    self.assertEqual(self.render(b"a;\n", {b"a;": b"", b"\n": b""}),
-                     b"\n")
+    self.assertEqual(self.render(b"a;\n", {b"a;": b""}), b"\n")
 
   def test_indentation_of_b_not_doubled(self) -> None:
     # B's own horizontal whitespace is dropped in favor of the
@@ -301,7 +308,7 @@ class RenderCandidateTest(unittest.TestCase):
     # nothing live follows it.
     self.assertEqual(
       self.render(b"#define A 1\nint x;\n",
-                  {b"\nint x;": b";", b"\n": b""}),
+                  {b"\nint x;": b";"}),
       b"#define A 1\n;\n")
 
   def test_non_trivial_ignores_newline_inside_token(self) -> None:
@@ -380,10 +387,8 @@ class MinimizerTest(ReportCheckingTestCase):
 
   def test_memo_hits_reported(self) -> None:
     # Nothing can be removed, so later passes repeat candidates that
-    # earlier passes already rejected.  (There is no final newline, since
-    # removing that would be accepted, via a memo hit, because the
-    # rendering restores it.)
-    src = b"a;\nb;\nc;\nd;"
+    # earlier passes already rejected.
+    src = b"a;\nb;\nc;\nd;\n"
     rec = Recorder(lambda d: d == src)
     m = rec.mk_min_for_text(src)
     self.assertEqual(m.run_minimizer(), ACCEPT)
@@ -403,17 +408,18 @@ class MinimizerTest(ReportCheckingTestCase):
 
   def test_current_tok_count(self) -> None:
     rec = Recorder(lambda d: True)
-    root = build_tree(tokenize_cpp(b"int a;\nint b;\n"))
-    m = rec.mk_minimizer(root)
+    tree = build_tree(tokenize_cpp(b"int a;\nint b;\n"))
+    m = rec.mk_minimizer(tree)
 
-    # "int", "a", ";", "\nint", "b", ";", "\n".
-    self.assertEqual(m.current_tok_count(), 7)
+    # "int", "a", ";", "\nint", "b", ";".  The final "\n" is EOF
+    # whitespace, which is not counted.
+    self.assertEqual(m.current_tok_count(), 6)
 
     # Replace a node by modifying `cur_replacement` directly, as if
     # Ctrl-C interrupted `_commit` before it updated `token_live`.
-    m.cur_replacement[id(find_node(root, b"\nint b;"))] = b""
-    self.assertEqual(m.current_tok_count(), 4)
-    self.assertEqual(m.live_tok_count, 7)
+    m.cur_replacement[id(find_node(tree.root, b"\nint b;"))] = b""
+    self.assertEqual(m.current_tok_count(), 3)
+    self.assertEqual(m.live_tok_count, 6)
 
   def test_run_twice_fails(self) -> None:
     rec = Recorder(lambda d: True)
@@ -462,15 +468,13 @@ class ShouldStopTest(unittest.TestCase):
     self.assertEqual(m.get_minimized_test_input(), self.SRC)
 
   def test_stop_keeps_just_accepted(self) -> None:
-    # With MA1, the first candidate that is tested and accepted (rather
-    # than accepted via a memo hit) is the third.  It is kept when
-    # stopping right after it.
+    # With MA1, the first candidate that is tested and accepted is the
+    # second.  It is kept when stopping right after it.
     rec, m = self.make(lambda d: b"keep" in d,
                        lambda r: r.finishes[-1] == (ACCEPT, False))
     self.assertEqual(m.run_minimizer(), ACCEPT)
     self.assertTrue(m.stop_requested)
-    self.assertEqual(rec.finishes,
-                     [(REJECT, False), (ACCEPT, True), (ACCEPT, False)])
+    self.assertEqual(rec.finishes, [(REJECT, False), (ACCEPT, False)])
     self.assertEqual(m.get_minimized_test_input(), b"int a;\nint keep;\n")
     self.assertEqual(m.get_minimized_test_input(), rec.tested[-1])
     self.assertEqual(m.current_tok_count(), m.live_tok_count)

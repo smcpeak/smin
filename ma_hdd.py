@@ -75,7 +75,7 @@ class HDDMinimizer(Minimizer):
   def _preliminary_num_passes(self) -> int:
     # This is MAX_DEPTH, since there is one pass per level of the tree,
     # not counting the root.
-    return self.tree_root.depth()
+    return self.tree.root.depth()
 
 
   def _run_specific_minimizer(self) -> None:
@@ -86,7 +86,7 @@ class HDDMinimizer(Minimizer):
     # unlikely to be accepted.
     level: int = 1
 
-    nodes: list[TTNode] = self._nodes_at_level(self.tree_root, level)
+    nodes: list[TTNode] = self._nodes_at_level(self.tree.root, level)
 
     # Even with no limit on the number of passes, we might stop before
     # reaching the last level, since deep nodes might have been pruned.
@@ -97,7 +97,7 @@ class HDDMinimizer(Minimizer):
       self._ddmin(nodes)
 
       level += 1
-      nodes = self._nodes_at_level(self.tree_root, level)
+      nodes = self._nodes_at_level(self.tree.root, level)
 
 
   def _nodes_at_level(self, node: TTNode, level: int) -> list[TTNode]:

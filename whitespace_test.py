@@ -12,6 +12,7 @@ from whitespace import (
   count_indentation,
   leading_whitespace,
   only_indentation,
+  only_whitespace,
   trail_indent,
 )
 
@@ -44,6 +45,19 @@ class LeadingWhitespaceTest(unittest.TestCase):
     # UTF-8 sequence, are not whitespace.
     self.assertEqual(leading_whitespace(b" \xa0x"), b" ")
     self.assertEqual(leading_whitespace(b" \xc2\xa0x"), b" ")
+
+
+class OnlyWhitespaceTest(unittest.TestCase):
+  def test_empty(self) -> None:
+    self.assertTrue(only_whitespace(b""))
+
+  def test_all_whitespace_bytes(self) -> None:
+    self.assertTrue(only_whitespace(b" \t\r\f\v\n"))
+
+  def test_non_whitespace(self) -> None:
+    self.assertFalse(only_whitespace(b"x"))
+    self.assertFalse(only_whitespace(b"\n x\n"))
+    self.assertFalse(only_whitespace(b" \xa0"))
 
 
 class OnlyIndentationTest(unittest.TestCase):

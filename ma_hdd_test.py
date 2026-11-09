@@ -106,17 +106,15 @@ class HDDTest(ReportCheckingTestCase):
     self.assertEqual([r.granularity for r in rec.starts], [1, 1, 1])
 
   def test_keep_one_identifier(self) -> None:
-    # The root's children are the three lines and the final newline.
+    # The root's children are the three lines.  (The final newline is
+    # EOF whitespace, not part of the tree.)
     rec, m = self.run_hdd(KEEP_SRC, lambda d: b"keep" in d)
     self.assertEqual(m.get_minimized_test_input(), b"\nkeep\n")
     self.assertEqual(m._total_num_passes(), 2)
     self.assertEqual(rec.tested, [
-      # Level 1, G=2: The last two children, then the first two.
+      # Level 1, G=1: The three lines, last first.  Unlike MA2, there is
+      # no recursion into the necessary "keep" line.
       b"int a;\nint keep;\n",
-      b"\n",
-
-      # G=1: Only the first two lines remain, last first.  Unlike MA2,
-      # there is no recursion into the necessary "keep" line.
       b"int a;\n",
       b"\nint keep;\n",
 
@@ -125,13 +123,12 @@ class HDDTest(ReportCheckingTestCase):
       b"\nint\n",
       b"\nkeep\n",
     ])
-    self.assertEqual([r.pass_num for r in rec.starts], [1] * 4 + [2] * 3)
-    self.assertEqual([r.granularity for r in rec.starts],
-                     [2, 2, 1, 1, 1, 1, 1])
+    self.assertEqual([r.pass_num for r in rec.starts], [1] * 3 + [2] * 3)
+    self.assertEqual([r.granularity for r in rec.starts], [1] * 6)
 
-    # Level 1 has Cm=6, with G=1 starting at C=2.  Level 2 has Cm=3.
+    # Both levels have Cm=3.
     self.assertEqual([r.completion_fraction for r in rec.starts],
-                     [0/6, 1/6, 2/6, 3/6, 0/3, 1/3, 2/3])
+                     [0/3, 1/3, 2/3, 0/3, 1/3, 2/3])
 
   def test_report_shortened_iteration(self) -> None:
     # Four tokens get removed at G=2, leaving no candidates for the
@@ -141,11 +138,11 @@ class HDDTest(ReportCheckingTestCase):
       src, lambda d: b"c;" in d and d.count(b"{") == d.count(b"}"))
     self.assertEqual(m.get_minimized_test_input(), b" { c; }\n")
 
-    # Level 3 is the eight tokens between the braces.  Its Cm is
+    # Level 2 is the eight tokens between the braces.  Its Cm is
     # 2 + 4 + 8, and the G=1 iteration starts at C=6.
-    level3 = [r for r in rec.starts if r.pass_num == 3]
-    self.assertEqual([r.granularity for r in level3], [4, 4, 2, 2, 1, 1])
-    self.assertEqual([r.completion_fraction for r in level3],
+    level2 = [r for r in rec.starts if r.pass_num == 2]
+    self.assertEqual([r.granularity for r in level2], [4, 4, 2, 2, 1, 1])
+    self.assertEqual([r.completion_fraction for r in level2],
                      [0/14, 1/14, 2/14, 3/14, 6/14, 7/14])
 
   def test_max_passes(self) -> None:
@@ -162,12 +159,12 @@ class HDDTest(ReportCheckingTestCase):
 
   def test_finishes_before_last_pass(self) -> None:
     # The deepest nodes are in the function body, which is removed at
-    # level 2, so level 3 is empty and never reached.
+    # level 1, so level 2 is empty and never reached.
     src = b"void f() { a; b; }\n"
     rec, m = self.run_hdd(src, lambda d: b"f" in d)
     self.assertEqual(m.get_minimized_test_input(), b" f\n")
-    self.assertEqual(m._total_num_passes(), 3)
-    self.assertEqual(max(r.pass_num for r in rec.starts), 2)
+    self.assertEqual(m._total_num_passes(), 2)
+    self.assertEqual(max(r.pass_num for r in rec.starts), 1)
 
   def test_delimiters_not_removed(self) -> None:
     # No candidate removes a delimiter without its partner, even when
@@ -183,18 +180,20 @@ class HDDTest(ReportCheckingTestCase):
 
   def test_nodes_at_level(self) -> None:
     src = b"void f() { x; }\nint keep;\n"
-    root = build_tree(tokenize_cpp(src))
+    tree = build_tree(tokenize_cpp(src))
+    root = tree.root
     rec = Recorder(lambda d: True)
-    m = rec.mk_minimizer(root, rec.min_opts(
+    m = rec.mk_minimizer(tree, rec.min_opts(
       selector = HDDMinimizerSelector()))
     assert isinstance(m, HDDMinimizer)
 
     def level_text(level: int) -> list[bytes]:
       return [n.text() for n in m._nodes_at_level(root, level)]
 
-    self.assertEqual(level_text(0), [src])
+    # The final newline is EOF whitespace, which is not in the tree.
+    self.assertEqual(level_text(0), [src[:-1]])
     self.assertEqual(level_text(1),
-                     [b"void f() { x; }", b"\nint keep;", b"\n"])
+                     [b"void f() { x; }", b"\nint keep;"])
 
     # Nodes with different parents, in order.
     self.assertEqual(level_text(2), [
@@ -222,7 +221,7 @@ class HDDTest(ReportCheckingTestCase):
     self.assertEqual(level_text(3), [])
 
   def test_non_contiguous_run(self) -> None:
-    # Level 3 is ["a", "b", "c", "d"], so at G=2, the runs have nodes
+    # Level 2 is ["a", "b", "c", "d"], so at G=2, the runs have nodes
     # with different parents, and delimiters in between them.
     src = b"(a)(b)(c)(d)\n"
     rec, m = self.run_hdd(src, lambda d: d.count(b"(") == 4 and b"a" in d)
@@ -230,9 +229,9 @@ class HDDTest(ReportCheckingTestCase):
     # Rendering separates tokens that were not adjacent originally.
     self.assertEqual(m.get_minimized_test_input(), b"(a)( )( )( )\n")
 
-    level3 = [r for r in rec.starts if r.pass_num == 3]
-    self.assertEqual([r.granularity for r in level3], [2, 2, 1, 1])
-    self.assertEqual([r.removed_tok_count for r in level3], [2, 2, 1, 1])
+    level2 = [r for r in rec.starts if r.pass_num == 2]
+    self.assertEqual([r.granularity for r in level2], [2, 2, 1, 1])
+    self.assertEqual([r.removed_tok_count for r in level2], [2, 2, 1, 1])
     self.assertIn(b"(a)(b)( )( )\n", rec.tested)
 
   def test_non_trivial_replacement(self) -> None:

@@ -12,7 +12,7 @@ from min_alg_kind import MinimizerAlgorithmKind
 from min_alg_selector import MinimizerAlgorithmSelector
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
-from token_tree import TTNode
+from token_tree import TokenTree, TTNode
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -55,19 +55,19 @@ class MA2Minimizer(Minimizer):
   def __init__(
     self,
     options: MinimizerOptions,
-    tree_root: TTNode,
+    tree: TokenTree,
   ) -> None:
     assert options.alg_kind() == MinimizerAlgorithmKind.MA2
     assert isinstance(options.selector, MA2MinimizerSelector)
-    super().__init__(options, tree_root)
+    super().__init__(options, tree)
 
     self.ma2_selector = options.selector
 
     # MA2 makes one pass per level of the tree, or, with
     # --ma2-brace-groups, per level of brace group nesting.
     self.orig_tree_max_depth = (
-      self.tree_root.depth() if not self._use_brace_groups()
-      else self._brace_depth(self.tree_root))
+      self.tree.root.depth() if not self._use_brace_groups()
+      else self._brace_depth(self.tree.root))
 
 
   def _use_brace_groups(self) -> bool:
@@ -81,7 +81,7 @@ class MA2Minimizer(Minimizer):
   def _run_specific_minimizer(self) -> None:
     for k in range(self._total_num_passes()):
       self.pass_index = k
-      self._ma2_min_node(self.tree_root, k+1)
+      self._ma2_min_node(self.tree.root, k+1)
 
 
   def _ma2_min_node(self, node: TTNode, max_depth: int) -> None:
@@ -199,7 +199,7 @@ class MA2Minimizer(Minimizer):
     assert self._use_brace_groups()
 
     children: list[TTNode] = node.children
-    is_root: bool = node is self.tree_root
+    is_root: bool = node is self.tree.root
     is_bg: bool = self.options.language.is_brace_group(node)
 
     ret: int = 0

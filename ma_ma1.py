@@ -40,7 +40,7 @@ class MA1Minimizer(Minimizer):
 
     for k in range(self._total_num_passes()):
       self.pass_index = k
-      self._minimize_node(self.tree_root)
+      self._minimize_node(self.tree.root)
 
 
   def _exceeds_half_granularity(self, size: int) -> bool:

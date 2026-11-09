@@ -202,15 +202,15 @@ class MainTest(unittest.TestCase):
     lines = out.splitlines()
     fname = str(self.input_path)
     self.assertEqual(lines[0],
-      f"Initial {fname} has 10 tokens, 24 bytes, "
+      f"Initial {fname} has 9 tokens, 24 bytes, "
       f"and a maximum tree depth of 2.")
     self.assertEqual(lines[1],
       f"Checking {sys.executable} on initial {fname} ... accepted")
     self.assertEqual(lines[2], f"Will continuously update {fname}.best.")
     self.assertEqual(lines[3], f"Copied {fname} to {fname}.bak.")
-    self.assertTrue(lines[4].startswith("N=000001 S=10 "))
+    self.assertTrue(lines[4].startswith("N=000001 S=9 "))
     self.assertEqual(lines[-2],
-      f"Reduced file {fname} from 10 tokens (24 bytes) "
+      f"Reduced file {fname} from 9 tokens (24 bytes) "
       f"to 1 tokens (6 bytes).")
     self.assertRegex(lines[-1], r"^Elapsed time \(D:HH:MM:SS\): 0:00:00:\d\d$")
 
@@ -235,7 +235,7 @@ class MainTest(unittest.TestCase):
     self.assertEqual(status, 0)
     self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
     self.assertEqual(self.progress_passes(out),
-                     ["P=(1/2)"] + ["P=(2/2)"] * 4)
+                     ["P=(1/2)"] + ["P=(2/2)"] * 3)
     self.assertIn("to 3 tokens (11 bytes).", out)
 
   def test_max_passes_more_than_needed(self) -> None:
@@ -261,14 +261,14 @@ class MainTest(unittest.TestCase):
     self.assertIn("to 1 tokens (6 bytes).", out)
 
   def test_ma2_brace_groups(self) -> None:
-    # Only the root's children and the brace group's interior are
-    # candidates, so "int f()" stays.
-    self.input_path.write_bytes(b"int f() { a; keep; }\n")
+    # Only the root's children (the two lines) and the brace group's
+    # interior are candidates, so "int f()" stays.
+    self.input_path.write_bytes(b"int x;\nint f() { a; keep; }\n")
     status, out, err = self.run_main(self.KEEP_CODE,
                                      ("--ma2", "--ma2-brace-groups"))
     self.assertEqual(status, 0)
     self.assertEqual(err, "")
-    self.assertEqual(self.input_path.read_bytes(), b"int f() { keep }\n")
+    self.assertEqual(self.input_path.read_bytes(), b"\nint f() { keep }\n")
     self.assertEqual(self.progress_passes(out),
                      ["P=(1/2)"] * 2 + ["P=(2/2)"] * 8)
 
@@ -289,7 +289,7 @@ class MainTest(unittest.TestCase):
     self.assertEqual(self.input_path.read_bytes(), b"\nkeep\n")
     self.assertEqual(self.best_path.read_bytes(), b"\nkeep\n")
     self.assertEqual(self.progress_passes(out),
-                     ["P=(1/2)"] * 4 + ["P=(2/2)"] * 3)
+                     ["P=(1/2)"] * 3 + ["P=(2/2)"] * 3)
     self.assertIn("to 1 tokens (6 bytes).", out)
 
   def test_hdd_max_passes(self) -> None:
@@ -298,7 +298,7 @@ class MainTest(unittest.TestCase):
                                    ("--hdd", "--max-passes", "1"))
     self.assertEqual(status, 0)
     self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
-    self.assertEqual(self.progress_passes(out), ["P=(1/1)"] * 4)
+    self.assertEqual(self.progress_passes(out), ["P=(1/1)"] * 3)
 
   def test_skip_paragraphs(self) -> None:
     # Accept an input that contains "keep1" and "keep2".
@@ -362,7 +362,7 @@ class MainTest(unittest.TestCase):
     # The message comes last, and shows the limit as written.
     lines = out.splitlines()
     self.assertEqual(lines[-3],
-      f"Reduced file {self.input_path} from 10 tokens (24 bytes) "
+      f"Reduced file {self.input_path} from 9 tokens (24 bytes) "
       f"to 6 tokens (17 bytes).")
     self.assertRegex(lines[-2], r"^Elapsed time ")
     self.assertEqual(lines[-1], "Stopping early due to --max-seconds 0.0.")
@@ -443,21 +443,21 @@ class MainTest(unittest.TestCase):
   @unittest.skipUnless(POSIX, "uses POSIX signals")
   def test_ctrl_c_during_minimization(self) -> None:
     self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
-    # Test N=2, removing the final newline, is a memo hit, since the
-    # newline is restored.  Test N=3 (invocation 3) removes "int b;" and
-    # is accepted.  Test N=4 (invocation 4) is interrupted.
+    # Test N=1 (invocation 2) is rejected.  Test N=2 (invocation 3)
+    # removes "int b;" and is accepted.  Test N=3 (invocation 4) is
+    # interrupted.
     status, out, _ = self.run_main(self.ctrl_c_code(4))
     self.assertEqual(status, EXIT_INTERRUPTED)
     self.assertEqual(self.input_path.read_bytes(), b"int a;\nint keep;\n")
     self.assertEqual(self.best_path.read_bytes(), b"int a;\nint keep;\n")
 
     lines = out.splitlines()
-    self.assertRegex(lines[-6], r"^N=000003 .* ACCEPTED \(removed 3\)$")
-    self.assertRegex(lines[-5], r"^N=000004 .* INTERRUPTED$")
+    self.assertRegex(lines[-6], r"^N=000002 .* ACCEPTED \(removed 3\)$")
+    self.assertRegex(lines[-5], r"^N=000003 .* INTERRUPTED$")
     self.assertEqual(lines[-4], "Stopping early due to Ctrl-C.")
     self.assertEqual(lines[-3], "")
     self.assertEqual(lines[-2],
-      f"Reduced file {self.input_path} from 10 tokens (24 bytes) "
+      f"Reduced file {self.input_path} from 9 tokens (24 bytes) "
       f"to 6 tokens (17 bytes).")
 
   @unittest.skipUnless(POSIX, "uses POSIX signals")
@@ -472,8 +472,8 @@ class MainTest(unittest.TestCase):
       "... INTERRUPTED\n"
       "Stopping early due to Ctrl-C.\n"
       "\n"
-      f"Reduced file {self.input_path} from 4 tokens (10 bytes) "
-      f"to 4 tokens (10 bytes).\n", out)
+      f"Reduced file {self.input_path} from 3 tokens (10 bytes) "
+      f"to 3 tokens (10 bytes).\n", out)
 
 
 if __name__ == "__main__":

@@ -11,12 +11,12 @@ from ma_ma2 import MA2Minimizer
 from min_alg_kind import MinimizerAlgorithmKind
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
-from token_tree import TTNode
+from token_tree import TokenTree
 
 
 def make_minimizer(
   options: MinimizerOptions,
-  tree_root: TTNode,
+  tree: TokenTree,
 ) -> Minimizer:
   """
   Create a Minimizer object.  Uses `options` to decide which class.
@@ -35,7 +35,7 @@ def make_minimizer(
     assert False, f"Unrecognized alg_kind: {kind}"
 
   # Forward the arguments to that constructor.
-  return cls(options, tree_root)
+  return cls(options, tree)
 
 
 # EOF

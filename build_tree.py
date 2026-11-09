@@ -16,7 +16,8 @@ from group_indentation import group_indentation
 from group_lines import group_lines
 from group_paragraphs import group_paragraphs
 from smin_token import SMToken
-from token_tree import TTNode
+from token_tree import TokenTree, TTNode
+from whitespace import only_whitespace
 
 
 @dataclass
@@ -56,10 +57,11 @@ class BuildTreeOptions:
 def build_tree(
   tokens: list[SMToken],
   options: BuildTreeOptions | None = None,
-) -> TTNode:
+) -> TokenTree:
   """
-  Deduce the hierarchical structure of `tokens`, returning the root of
-  a tree whose leaves are those tokens, in order.
+  Deduce the hierarchical structure of `tokens`, returning a tree whose
+  leaves are those tokens, in order, except that if the last token is
+  entirely whitespace, it is instead stored in `eof_ws`.
 
   This performs phases 2 through 5 (including 4.5) of the algorithm.
   Phase 6 is not needed as a separate pass, since the grouping phases
@@ -68,6 +70,13 @@ def build_tree(
 
   if not options:
     options = BuildTreeOptions()
+
+  # Separate the whitespace at EOF, if any, so the grouping phases (and
+  # the minimizer) never see it.
+  eof_ws: SMToken | None = None
+  if tokens and only_whitespace(tokens[-1].text):
+    eof_ws = tokens[-1]
+    tokens = tokens[:-1]
 
   root: TTNode
 
@@ -80,7 +89,7 @@ def build_tree(
   if options.use_paragraphs:
     root = group_paragraphs(root, skip_toplevel = options.skip_top_para)
 
-  return root
+  return TokenTree(root, eof_ws)
 
 
 # EOF

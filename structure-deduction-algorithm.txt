@@ -225,12 +225,12 @@ Input 1: C++ Hello World (test/sda-ex1.txt)
 
 Output 1:
 
-  ROOT[
-    LINE[
-      "#include <iostream>"
-      "        // std::cout"
-    ]
-    PARAGRAPH[
+  TokenTree{
+    root: ROOT[
+      LINE[
+        "#include <iostream>"
+        "        // std::cout"
+      ]
       HEAD_BODY[
         LINE[
           "\n\nint"
@@ -267,9 +267,9 @@ Output 1:
           "\n}"
         ]
       ]
-      "\n"
     ]
-  ]
+    eof_ws: "\n"
+  }
 
 Input 2: C++ function with several `if` statements.  (test/sda-ex2.txt)
 
@@ -293,8 +293,8 @@ Input 2: C++ function with several `if` statements.  (test/sda-ex2.txt)
 
 Output 2:
 
-  ROOT[
-    HEAD_BODY[
+  TokenTree{
+    root: ROOT[
       LINE[
         "bool"
         " GetDepsVisitor"
@@ -397,8 +397,8 @@ Output 2:
         "\n}"
       ]
     ]
-    "\n"
-  ]
+    eof_ws: "\n"
+  }
 
 Input 3: Python function (test/sda-ex3.txt)
 
@@ -416,8 +416,8 @@ Input 3: Python function (test/sda-ex3.txt)
 
 Output 3:
 
-  ROOT[
-    INDENTATION[
+  TokenTree{
+    root: ROOT[
       LINE[
         "def"
         " topo_sort_sccs"
@@ -532,7 +532,7 @@ Output 3:
         ]
       ]
     ]
-    "\n"
-  ]
+    eof_ws: "\n"
+  }
 
 EOF

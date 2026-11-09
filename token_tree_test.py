@@ -8,7 +8,7 @@ from __future__ import annotations
 import unittest
 
 from smin_token import SMToken
-from token_tree import TTNode, TTNodeKind
+from token_tree import TokenTree, TTNode, TTNodeKind
 
 
 def sm_token(text: bytes) -> SMToken:
@@ -197,6 +197,81 @@ class TTNodeTest(unittest.TestCase):
     self.assertEqual(TTNode.make_group(TTNodeKind.ROOT, [])
                        .to_debug_string(2), "  ROOT[\n  ]\n")
 
+
+
+class TokenTreeTest(unittest.TestCase):
+  def test_with_eof_ws(self) -> None:
+    eof = sm_token(b"\n\n")
+    tree = TokenTree(sample_tree(), eof)
+    tree.self_check()
+
+    texts = [t.text for t in tree.tokens()]
+    self.assertEqual(texts[-2:], [b"\nx;", b"\n\n"])
+    self.assertIs(list(tree.tokens())[-1], eof)
+    self.assertEqual(tree.text(), b"f(a, b);\nx;\n\n")
+    self.assertEqual(tree.depth(), 3)
+
+  def test_without_eof_ws(self) -> None:
+    tree = TokenTree(sample_tree(), None)
+    tree.self_check()
+    self.assertEqual(tree.text(), b"f(a, b);\nx;")
+    self.assertEqual(len(list(tree.tokens())), 8)
+
+  def test_only_eof_ws(self) -> None:
+    tree = TokenTree(TTNode.make_group(TTNodeKind.ROOT, []), sm_token(b"\n"))
+    tree.self_check()
+    self.assertEqual(tree.text(), b"\n")
+    self.assertEqual(tree.depth(), 0)
+
+  def test_self_check_eof_ws_not_whitespace(self) -> None:
+    tree = TokenTree(sample_tree(), sm_token(b"\nx"))
+    with self.assertRaisesRegex(AssertionError, "eof_ws has non-whitespace"):
+      tree.self_check()
+
+  def test_self_check_eof_ws_empty(self) -> None:
+    tree = TokenTree(sample_tree(), sm_token(b""))
+    with self.assertRaisesRegex(AssertionError, "eof_ws is empty"):
+      tree.self_check()
+
+  def test_self_check_tree_ends_with_whitespace(self) -> None:
+    root = TTNode.make_group(TTNodeKind.ROOT, [tok(b"a"), tok(b"\n")])
+    tree = TokenTree(root, None)
+    with self.assertRaisesRegex(AssertionError,
+                                "tree ends with a whitespace token"):
+      tree.self_check()
+
+  def test_self_check_recurses(self) -> None:
+    root = TTNode.make_group(TTNodeKind.ROOT, [
+      TTNode.make_group(TTNodeKind.DELIMITER, [tok(b"(")])])
+    with self.assertRaisesRegex(AssertionError, "delim group lacks delimiters"):
+      TokenTree(root, None).self_check()
+
+  def test_to_debug_string(self) -> None:
+    root = TTNode.make_group(TTNodeKind.ROOT, [
+      TTNode.make_group(TTNodeKind.LINE, [tok(b"a"), tok(b";")])])
+    expect = (
+      'TokenTree{\n'
+      '  root: ROOT[\n'
+      '    LINE[\n'
+      '      "a"\n'
+      '      ";"\n'
+      '    ]\n'
+      '  ]\n'
+      '  eof_ws: "\\n"\n'
+      '}\n'
+    )
+    self.assertEqual(TokenTree(root, sm_token(b"\n")).to_debug_string(),
+                     expect)
+
+  def test_to_debug_string_no_eof_ws_indented(self) -> None:
+    root = TTNode.make_group(TTNodeKind.ROOT, [])
+    self.assertEqual(
+      TokenTree(root, None).to_debug_string(2),
+      "  TokenTree{\n"
+      "    root: ROOT[\n"
+      "    ]\n"
+      "    eof_ws: None\n"
+      "  }\n")
 
 if __name__ == "__main__":
   unittest.main()

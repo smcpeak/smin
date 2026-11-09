@@ -466,7 +466,11 @@ def main(argv: list[str]) -> int:
   tree = build_tree(
     language.make_tokenizer().tokenize(orig_input_data),
     BuildTreeOptions(use_paragraphs = not args.skip_paragraphs))
-  orig_tok_count = sum(1 for _ in tree.tokens())
+
+  # This excludes the EOF whitespace, which the minimizer does not
+  # consider part of the input to minimize, for consistency with the
+  # final count and the progress reports.
+  orig_tok_count = sum(1 for _ in tree.root.tokens())
 
   console.line(
     f"Initial {fname} has {orig_tok_count} tokens, "
@@ -489,8 +493,8 @@ def main(argv: list[str]) -> int:
       return initial_exit_code
 
     minimizer = make_minimizer(
-      options   = minimizer_options,
-      tree_root = tree,
+      options = minimizer_options,
+      tree    = tree,
     )
     result = minimizer.run_minimizer()
 

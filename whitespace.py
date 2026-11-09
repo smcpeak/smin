@@ -44,6 +44,14 @@ def leading_whitespace(text: bytes) -> bytes:
   return text
 
 
+def only_whitespace(text: bytes) -> bool:
+  """
+  True if `text` contains only whitespace characters (including if it
+  is empty).
+  """
+  return all(c in WHITESPACE_BYTES_SET for c in text)
+
+
 def only_indentation(text: bytes) -> bool:
   """
   True if `text` contains only characters that count as indentation.

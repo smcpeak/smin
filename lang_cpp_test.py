@@ -26,7 +26,7 @@ class CPPLanguageTest(unittest.TestCase):
 
     # Only the brace group has a replacement, not the parentheses.
     tree = build_tree(tokenizer.tokenize(b"int f(int x) { return x; }\n"))
-    replaced = [(n.text(), r) for n in all_nodes(tree)
+    replaced = [(n.text(), r) for n in all_nodes(tree.root)
                 if (r := nt(n)) is not None]
     self.assertEqual(replaced, [(b" { return x; }", b";")])
 
@@ -40,7 +40,7 @@ class CPPLanguageTest(unittest.TestCase):
     # tokens or other groups.
     tree = build_tree(tokenizer.tokenize(
       b"int f(int x) { return x; }\nint a[2] = {1};\n"))
-    self.assertEqual([n.text() for n in all_nodes(tree) if is_bg(n)],
+    self.assertEqual([n.text() for n in all_nodes(tree.root) if is_bg(n)],
                      [b" { return x; }", b" {1}"])
 
 
