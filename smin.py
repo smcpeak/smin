@@ -301,6 +301,50 @@ def format_elapsed_time(seconds: float) -> str:
   return f"{days}:{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
+def make_minimizer_options(
+  args: argparse.Namespace,
+  start_time: float,
+  language: Language,
+  acceptance: AcceptanceTester,
+) -> MinimizerOptions:
+  """
+  Read `args` to make the MinimizerOptions object.
+
+  `start_time` is the `time.monotonic()` when this program was invoked,
+  for use with --max-seconds.
+
+  `language` provides language-specific tree queries.
+
+  `acceptance` provides the candidate acceptance callbacks.
+  """
+
+  # If --max-seconds, the time (on the `start_time` clock) at which
+  # to stop.
+  deadline: Optional[float] = (
+    None if args.max_seconds is None
+    else start_time + float(args.max_seconds))
+
+  def time_limit_reached() -> bool:
+    return deadline is not None and time.monotonic() >= deadline
+
+  # Choose the algorithm and algorithm-specific options.
+  selector: MinimizerAlgorithmSelector = (
+    MA2MinimizerSelector(use_brace_groups = args.ma2_brace_groups)
+      if args.ma2
+    else HDDMinimizerSelector()
+      if args.hdd
+    else MA1MinimizerSelector()
+  )
+
+  return MinimizerOptions(
+    selector    = selector,
+    max_passes  = args.max_passes,
+    acceptance  = acceptance,
+    language    = language,
+    should_stop = time_limit_reached,
+  )
+
+
 def main(argv: list[str]) -> int:
   """
   Run the minimizer with command line arguments `argv` (not including
@@ -359,6 +403,13 @@ def main(argv: list[str]) -> int:
 
   run_accept = RunAcceptProgram(fname, test_command)
 
+  minimizer_options: MinimizerOptions = make_minimizer_options(
+    args,
+    start_time,
+    language,
+    _Tester(run_accept, console),
+  )
+
   # Once created, this holds the most recently accepted input.
   minimizer: Optional[Minimizer] = None
 
@@ -410,32 +461,9 @@ def main(argv: list[str]) -> int:
 
     # ---- Minimization ----
 
-    # If --max-seconds, the time (on the `start_time` clock) at which
-    # to stop.
-    deadline: Optional[float] = (
-      None if args.max_seconds is None
-      else start_time + float(args.max_seconds))
-
-    def time_limit_reached() -> bool:
-      return deadline is not None and time.monotonic() >= deadline
-
-    selector: MinimizerAlgorithmSelector = (
-      MA2MinimizerSelector(use_brace_groups = args.ma2_brace_groups)
-        if args.ma2
-      else HDDMinimizerSelector()
-        if args.hdd
-      else MA1MinimizerSelector()
-    )
-
     minimizer = make_minimizer(
-      options = MinimizerOptions(
-        selector                    = selector,
-        max_passes                  = args.max_passes,
-        acceptance                  = _Tester(run_accept, console),
-        language                    = language,
-        should_stop                 = time_limit_reached,
-      ),
-      tree_root                     = tree,
+      options   = minimizer_options,
+      tree_root = tree,
     )
     result = minimizer.run_minimizer()
 
