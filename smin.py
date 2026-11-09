@@ -365,20 +365,31 @@ def main(argv: list[str]) -> int:
     130: Minimization was interrupted by SIGINT / Ctrl-C.
   """
 
+  # ---- Preliminaries ----
   # Seconds since an arbitrary epoch.
   start_time: float = time.monotonic()
 
   console = _Console()
 
-  args: argparse.Namespace = parse_command_line(argv)
-  fname: str = args.input_file
-  test_command: list[str] = args.test_command
-
   # All language-specific knowledge comes from this object.  (Later we
   # might add an option to choose the language.)
   language: Language = CPPLanguage()
 
-  # ---- Startup ----
+  # ---- Command line parsing and interpretation ----
+  args: argparse.Namespace = parse_command_line(argv)
+
+  fname: str = args.input_file
+  test_command: list[str] = args.test_command
+  run_accept = RunAcceptProgram(fname, test_command)
+
+  minimizer_options: MinimizerOptions = make_minimizer_options(
+    args,
+    start_time,
+    language,
+    _Tester(run_accept, console),
+  )
+
+  # ---- File to minimize reading and parsing ----
   try:
     with open(fname, "rb") as f:
       data = f.read()
@@ -401,15 +412,7 @@ def main(argv: list[str]) -> int:
           f"{fname!r} does not reproduce its contents", file=sys.stderr)
     return 4
 
-  run_accept = RunAcceptProgram(fname, test_command)
-
-  minimizer_options: MinimizerOptions = make_minimizer_options(
-    args,
-    start_time,
-    language,
-    _Tester(run_accept, console),
-  )
-
+  # ---- Minimization ----
   # Once created, this holds the most recently accepted input.
   minimizer: Optional[Minimizer] = None
 
@@ -459,8 +462,6 @@ def main(argv: list[str]) -> int:
       f"Copied {fname} to {backup}" +
       (" (which was overwritten)." if bak_was_overwritten else "."))
 
-    # ---- Minimization ----
-
     minimizer = make_minimizer(
       options   = minimizer_options,
       tree_root = tree,
@@ -479,7 +480,6 @@ def main(argv: list[str]) -> int:
     raise
 
   # ---- Termination ----
-
   # From here on, Ctrl-C is ignored so that it cannot interrupt writing
   # the final result.
   signal.signal(signal.SIGINT, signal.SIG_IGN)
