@@ -207,12 +207,10 @@ Examples
 
 In these example outputs, the token tree is denoted by enclosing groups
 in brackets and tokens as quoted strings.  Quoted strings use C-style
-escape rules to denote embedded quotes, etc.  To reduce uninteresting
-clutter, some of the quoted strings combine multiple tokens that would
-be separated in the real tree.
+escape rules to denote embedded quotes, etc.
 
 
-Input 1: C++ Hello World
+Input 1: C++ Hello World (test/sda-ex1.txt)
 
   #include <iostream>        // std::cout
 
@@ -224,27 +222,43 @@ Input 1: C++ Hello World
 
 Output 1:
 
-  [
-    [
+  ROOT[
+    LINE[
       "#include <iostream>"
       "        // std::cout"
     ]
-    [
-      [ # head-body group
-        [
-          "\n\nint main"
-          [
-            "(int argc, char **argv)"
+    PARAGRAPH[
+      HEAD_BODY[
+        LINE[
+          "\n\nint"
+          " main"
+          DELIMITER[
+            "("
+            "int"
+            " argc"
+            ","
+            " char"
+            " *"
+            "*"
+            "argv"
+            ")"
           ]
         ]
-        [
+        DELIMITER[
           "\n{"
-          [
-            [
-              "\n  std::cout << \"Hello\\n\";"
+          PARAGRAPH[
+            LINE[
+              "\n  std"
+              "::"
+              "cout"
+              " <<"
+              " \"Hello\\n\""
+              ";"
             ]
-            [
-              "\n  return 0;"
+            LINE[
+              "\n  return"
+              " 0"
+              ";"
             ]
           ]
           "\n}"
@@ -254,8 +268,7 @@ Output 1:
     ]
   ]
 
-
-Input 2: C++ function with several `if` statements.
+Input 2: C++ function with several `if` statements.  (test/sda-ex2.txt)
 
   bool GetDepsVisitor::isRefactoringDN(DependencyNode dn) const
   {
@@ -277,70 +290,106 @@ Input 2: C++ function with several `if` statements.
 
 Output 2:
 
-  [
-    [ # head-body group
-      [
-        "bool GetDepsVisitor::isRefactoringDN"
-        [
-          "(DependencyNode dn)"
+  ROOT[
+    HEAD_BODY[
+      LINE[
+        "bool"
+        " GetDepsVisitor"
+        "::"
+        "isRefactoringDN"
+        DELIMITER[
+          "("
+          "DependencyNode"
+          " dn"
+          ")"
         ]
         " const"
       ]
-      [
+      DELIMITER[
         "\n{"
-        [
+        PARAGRAPH[
           "\n  // Must be a named declaration."
-          [
+          LINE[
             "\n  if"
-            [
-              " (!isa<clang::NamedDecl>"
-              [
-                "(dn.m_decl)"
+            DELIMITER[
+              " ("
+              "!"
+              "isa"
+              "<"
+              "clang"
+              "::"
+              "NamedDecl"
+              ">"
+              DELIMITER[
+                "("
+                "dn"
+                "."
+                "m_decl"
+                ")"
               ]
               ")"
             ]
-            [
+            DELIMITER[
               " {"
-              [
-                "\n    return false;"
+              LINE[
+                "\n    return"
+                " false"
+                ";"
               ]
               "\n  }"
             ]
           ]
         ]
-        [
+        PARAGRAPH[
           "\n\n  // What is its syntactic parent?"
-          [
-            [
-              "\n  clang::NamedDecl const *parent ="
+          INDENTATION[
+            LINE[
+              "\n  clang"
+              "::"
+              "NamedDecl"
+              " const"
+              " *"
+              "parent"
+              " ="
             ]
-            [
+            LINE[
               "\n    getNamedParentDeclOpt_templateAdjustment"
-              [
-                "(dn.m_decl)"
+              DELIMITER[
+                "("
+                "dn"
+                "."
+                "m_decl"
+                ")"
               ]
               ";"
             ]
           ]
-          [
+          LINE[
             "\n  if"
-            [
-              " (!parent)"
+            DELIMITER[
+              " ("
+              "!"
+              "parent"
+              ")"
             ]
-            [
+            DELIMITER[
               " {"
-              [
+              PARAGRAPH[
                 "\n    // The parent is the TU."
-                [
-                  "\n    return true;"
+                LINE[
+                  "\n    return"
+                  " true"
+                  ";"
                 ]
               ]
               "\n  }"
             ]
           ]
         ]
-        [
-          "\n\n  return true;"
+        LINE[
+          "\n\n  return"
+          " true"
+          ";"
         ]
         "\n}"
       ]
@@ -348,8 +397,7 @@ Output 2:
     "\n"
   ]
 
-
-Input 3: Python function
+Input 3: Python function (test/sda-ex3.txt)
 
   def topo_sort_sccs(
     graph: Dict[str, List[str]], sccs: List[List[str]]
@@ -365,77 +413,117 @@ Input 3: Python function
 
 Output 3:
 
-  [
-    [
-      [
-        "def topo_sort_sccs"
-        [
+  ROOT[
+    INDENTATION[
+      LINE[
+        "def"
+        " topo_sort_sccs"
+        DELIMITER[
           "("
-          [
-            "\n  graph: Dict"
-            [
+          LINE[
+            "\n  graph"
+            ":"
+            " Dict"
+            DELIMITER[
               "["
-              "str, List"
-              [
-                "[str]"
+              "str"
+              ","
+              " List"
+              DELIMITER[
+                "["
+                "str"
+                "]"
               ]
               "]"
             ]
-            ", sccs: List"
-            [
+            ","
+            " sccs"
+            ":"
+            " List"
+            DELIMITER[
               "["
               "List"
-              [
-                "[str]"
+              DELIMITER[
+                "["
+                "str"
+                "]"
               ]
               "]"
             ]
           ]
-          ")"
+          "\n)"
         ]
-        " -> List"
-        [
+        " ->"
+        " List"
+        DELIMITER[
           "["
           "List"
-          [
-            "[str]"
+          DELIMITER[
+            "["
+            "str"
+            "]"
           ]
           "]"
         ]
         ":"
       ]
-      "\n  \"\"\"Topologically sort SCCs.\"\"\""
-      [
+      LINE[
+        "\n  \"\""
+        "\"Topologically sort SCCs.\""
+        "\"\""
+      ]
+      PARAGRAPH[
         "\n\n  # Map from a node to the index in `sccs` where that node is found."
         "\n  # Assumes that each node appears in exactly one SCC."
-        [
-          "\n  node_to_scc: Dict"
-          [
-            "[str, int]"
+        LINE[
+          "\n  node_to_scc"
+          ":"
+          " Dict"
+          DELIMITER[
+            "["
+            "str"
+            ","
+            " int"
+            "]"
           ]
-          " = "
-          [
-            "{}"
+          " ="
+          DELIMITER[
+            " {"
+            "}"
           ]
         ]
-        [
-          [
-            "\n  for i, comp in enumerate"
-            [
-              "(sccs)"
+        INDENTATION[
+          LINE[
+            "\n  for"
+            " i"
+            ","
+            " comp"
+            " in"
+            " enumerate"
+            DELIMITER[
+              "("
+              "sccs"
+              ")"
             ]
             ":"
           ]
-          [
-            [
-              "\n    for n in comp:"
+          INDENTATION[
+            LINE[
+              "\n    for"
+              " n"
+              " in"
+              " comp"
+              ":"
             ]
-            [
+            LINE[
               "\n      node_to_scc"
-              [
-                "[n]"
+              DELIMITER[
+                "["
+                "n"
+                "]"
               ]
-              " = i"
+              " ="
+              " i"
             ]
           ]
         ]
@@ -443,6 +531,5 @@ Output 3:
     ]
     "\n"
   ]
-
 
 EOF

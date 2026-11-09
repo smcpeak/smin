@@ -1,0 +1,17 @@
+bool GetDepsVisitor::isRefactoringDN(DependencyNode dn) const
+{
+  // Must be a named declaration.
+  if (!isa<clang::NamedDecl>(dn.m_decl)) {
+    return false;
+  }
+
+  // What is its syntactic parent?
+  clang::NamedDecl const *parent =
+    getNamedParentDeclOpt_templateAdjustment(dn.m_decl);
+  if (!parent) {
+    // The parent is the TU.
+    return true;
+  }
+
+  return true;
+}

@@ -1,0 +1,11 @@
+def topo_sort_sccs(
+  graph: Dict[str, List[str]], sccs: List[List[str]]
+) -> List[List[str]]:
+  """Topologically sort SCCs."""
+
+  # Map from a node to the index in `sccs` where that node is found.
+  # Assumes that each node appears in exactly one SCC.
+  node_to_scc: Dict[str, int] = {}
+  for i, comp in enumerate(sccs):
+    for n in comp:
+      node_to_scc[n] = i
