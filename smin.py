@@ -408,10 +408,8 @@ def main(argv: list[str]) -> int:
     f"{len(orig_input_data)} bytes, "
     f"and a maximum tree depth of {tree.depth()}.")
 
-  if tree.text() != orig_input_data:
-    print(f"smin.py: internal error: rendering the token tree of "
-          f"{fname!r} does not reproduce its contents", file=sys.stderr)
-    return 4
+  assert tree.text() == orig_input_data, (
+    "rendering the token tree not reproduce its contents")
 
   # ---- Minimization ----
   # Once created, this holds the most recently accepted input.
