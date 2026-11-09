@@ -619,7 +619,7 @@ originally introduced for MA1, which treats each form of grouping about
 the same, and uses them as a sort of soft guide for where to put run
 boundaries, but would dig inside all of them eventually.  The BGCT is
 meant for use with MA3, which tries to focus on braces, and paragraphs
-within function bodies would intefere with minimality there since MA3
+within function bodies would interfere with minimality there since MA3
 doesn't have a way to separate them.
 
 Observation: The actual granularity of nodes in the BGCT depends not
@@ -722,7 +722,12 @@ Algorithm:
       If ACCEPT:
 
         Commit the replacements as permanent.
-        Double G if we used a trivial replacement.
+
+        Double G if we used a trivial replacement, but cap it at the
+          remaining number of non-replaced, non-necessary children (so
+          that, among other things, it will reflect the number of
+          replacements attempted on the next iteration when G is
+          included in that attempt's progress report).
 
       Else (REJECT) if len(CC) > 1:
 
@@ -842,30 +847,51 @@ Progress is reported using, from the outer loop:
 
 * Pm: Maximum number of outer loop iterations:
 
-    ceil(len(children(root)) / NECESSITY_INCREMENT)
+  Maximum over BGCT nodes `node` whose level is less than
+  MAX_EXPLORATION_DEPTH of:
+
+    ceil(len(children(node)) / NECESSITY_INCREMENT)
 
   for the initial tree.  This will often be a large over-estimate.
 
-* P: Iteration count for the outer loop, starting at 1:
+  Use a minimum Pm of 1 since the loop in ma3_min_tree is always
+  entered (though, for a tree degenerate enough for this to matter, I
+  think no progress report can ever be issued).
 
-    max_necessity / NECESSITY_INCREMENT
+  As with other algorithms, cap Pm at --max-passes if it is specified.
+
+* P: `pass_count` local variable.
 
   Print with as many digits as Pm.
 
-* RNF: Root necessity fraction:
+* F: Root necessity fraction:
 
     len(necessary(root)) / len(children(root))
+    or 1 if len(children(root)) == 0
 
   This will start at 0 with each outer loop, but can go both up and down
-  as it runs.
+  as it runs.  It also gets "stuck" while minimizing nodes below the
+  root.
 
-  Print as a 2-digit percentage (capped 99 if needed).
+  This F is used as the "completion fraction", even though it is
+  extremely crude and not monotonic.
+
+  Print as a 2-digit percentage (capped 99).
+
+* M_NEC: max_necessity
+
+  Print with at least 3 digits.
 
 * ED: exploration_depth
 
   Print with as many digits as MAX_EXPLORATION_DEPTH has.
 
-From the (0-based) Ith recursive call ma3_min_subtree(N):
+From each active recursive call to ma3_min_subtree(N) that is in its
+"For C in ..." loop:
+
+* I: level(N)
+
+  This numbers the active calls, with outermost at 0.
 
 * C[I]: 0-based position of C in `reverse(necessary(N))`
 
@@ -882,7 +908,7 @@ From the (0-based) Ith recursive call ma3_min_subtree(N):
 
   In the full printout, print each C[I] and N[I] like:
 
-    f"C{I}=({C[I]}/{N[I]}"
+    f"C{I}=({C[I]}/{N[I]})"
 
   where "{I}" is printed without padding digits, and the others are
   padded with zeroes as indicated above.
@@ -901,9 +927,34 @@ From ma3_min_node(N):
 
   Print with at least 3 digits.
 
-This progress report is admittedly a bit of a mess, as the algorithm's
-behavior resists an easy notion of progress against a prediction.  This
-will probably need to be revised if MA3 turns out to be effective.
+* R: The number of replaced tokens for the candidate being tested, as
+  with other algorithms.
+
+  Print with as many digits as the original number of tokens, as with
+  other algorithms.
+
+Render this report as a <status> as:
+
+  P=($P/$Pm) F=$F% M_NEC=$M_NEC ED=$ED <CNI...> LVL=$LVL L_NEC=$L_NEC G=$G R=$R
+
+where <CNI...> is a space-separated sequence of the above-specified
+string containing C[I] and N[i].
+
+As with the other algorithms, this <status> is printed after N and S in
+the console output.
+
+Discussion: This progress report is admittedly a bit of a mess, as the
+algorithm's behavior resists an easy notion of progress against a
+prediction.  It also violates a goal stated elsewhere to keep the
+columns consistent.  `gnuplot_tsv.py --pass-col 6` should still work
+since $P is first, however.  For now I want to gain some experience with
+the algorithm before trying to polish this.
+
+Implementation note: In start_report.py, add a new MA3ReportData class
+to carry the extra data, and add "ma3_data: Optional[MA3ReportData]" as
+a new field to TestStartReport.  However, do not add tests that try to
+validate the extra MA3 data; I want to easily experiment with different
+calculations and even fields.
 
 
 MA3 Enablement
@@ -911,10 +962,10 @@ MA3 Enablement
 
 MA3 is enabled by the --ma3 switch to smin.py.  Doing so disables
 paragraph grouping during structure deduction.  The --ma3 switch is
-incompatible with --ma2 and --hdd.
+incompatible with --ma2, --ma2-brace-groups, and --hdd.
 
 Although not intended to be used together, it is not an error to combine
---ma3 with --skip-paragraphs (which is redudant), nor with the
+--ma3 with --skip-paragraphs (which is redundant), nor with the
 SKIP_HEAD_BODY envvar (which could be a useful experiment).
 
 
