@@ -22,6 +22,9 @@ Output:
     sequence of child nodes.  Left-to-right traversal of the tree yields
     the original sequence of tokens.
 
+    The token tree consists of a root node and an optional `eof_ws`
+    token that captures the trailing whitespace of the file, if any.
+
 
 Phase 1: Tokenization
 ---------------------

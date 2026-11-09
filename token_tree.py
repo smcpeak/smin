@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Optional
 
 from smin_token import SMToken
 from string_util import quote_bytes
@@ -147,6 +148,41 @@ class TTNode:
       parts.append(child.to_debug_string(indent + 2))
     parts.append(pad + "]\n")
     return "".join(parts)
+
+
+@dataclass
+class TokenTree:
+  """
+  The entire tree, wrapped as its own object.
+  """
+
+  # The root node of the tree.
+  root: TTNode
+
+  # If the final token produced by the tokenizer consists only of
+  # characters in `whitespace.WHITESPACE_BYTES_SET`, then it is placed
+  # here, and not part of the tree rooted at `root`.  Otherwise, this is
+  # None.
+  eof_ws: Optional[SMToken]
+
+
+  # TODO:
+  #   - tokens(), which includes `eof_ws` if not None
+  #   - text(), again including `eof_ws`
+  #   - depth() = root.depth()
+  #   - self_check()
+
+
+  def to_debug_string(self, indent: int = 0) -> str:
+    """
+    Render like:
+
+      TokenTree{
+        root: <root.to_debug_string()>
+        eof_ws: "\n"
+      ]
+    """
+    return "TODO"
 
 
 # EOF
