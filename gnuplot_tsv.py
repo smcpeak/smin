@@ -40,7 +40,7 @@ Behavior:
 
     * timestamp: unix time of invocation as a decimal number
     * verdict: TRUE or FALSE
-    * B: candidate size in bytes
+    * B: last accepted candidate size in bytes
 
   A well-formed row must have properly-formatted <timestamp> and <B>
   fields.  Ignore rows that have fewer than 3 fields (more than 3 is
@@ -50,7 +50,19 @@ Behavior:
   "FALSE" verdict can still be used to mark a pass change.
 
   Each <tsvfile> contributes its own data line, with its Y data labeled
-  with the name of its <tsvfile>, omitting path information.
+  with `label(<tsvfile>)`, computed as follows:
+
+    * Split each <tsvfile> name into a list of elements separated by
+      slashes or backslashes (treating them equivalently).
+    * While every list has the same first element and at least two
+      elements, remove the first element from all of them.
+    * While every list has the same last element at at least two
+      elements, remove the last element from all of them.
+    * Let `label(<tsvfile>)` be the remaining elements, joined by
+      forward slashes.
+
+  Note: If there is only one <tsvfile>, then `label(<tsvfile>)` will be
+  its final path component.
 
   The X axis of the plot is "reltime", the difference between the
   timestamp for that row and the first timestamp on a non-ignored row
