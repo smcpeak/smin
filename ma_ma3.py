@@ -109,6 +109,9 @@ class MA3Minimizer(Minimizer):
   bgct_root: BGCTNode
 
   # All BGCT nodes, in preorder.
+  #
+  # The primary use for this is to reset `BGCTNode.num_necessary`.  It
+  # is also used at the start to compute `preliminary_num_passes`.
   bgct_nodes: list[BGCTNode]
 
   # Pm (max pass count) before applying `max_passes`.
@@ -150,6 +153,15 @@ class MA3Minimizer(Minimizer):
     self.bgct_nodes = []
     self.bgct_root = self._build_bgct()
 
+    # The maximum number of outer loop iterations is dictated by the
+    # maximum number of BGCT children in any node, divided by the
+    # necessity increment.
+    #
+    # It is defensively forced to be at least 1 because the outer loop
+    # is always entered, but (I think) if that lower bound ever has any
+    # effect here, then the tree is effectively empty, and no progress
+    # report will be issued, so it ultimately doesn't matter.
+    #
     self.preliminary_num_passes = max(1, max(
       (math.ceil(len(n.all_children) / self._necessity_increment())
        for n in self.bgct_nodes
@@ -188,6 +200,10 @@ class MA3Minimizer(Minimizer):
     `parent.ttnode`) with no BGCT node in between, and add the BGCT
     nodes found to `parent`, recursively building their subtrees.
     """
+    assert ((len(path) == 0 and ttnode == parent.ttnode) or
+            (len(path) != 0 and ttnode != parent.ttnode and
+                                ttnode == path[-1]))
+
     is_root: bool = ttnode is self.tree.root
     is_bg: bool = self.options.language.is_brace_group(ttnode)
     children: list[TTNode] = ttnode.children
