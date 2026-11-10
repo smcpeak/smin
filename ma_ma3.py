@@ -111,14 +111,15 @@ class MA3Minimizer(Minimizer):
   # All BGCT nodes, in preorder.
   bgct_nodes: list[BGCTNode]
 
-  # Pm before applying `max_passes`.
+  # Pm (max pass count) before applying `max_passes`.
   preliminary_num_passes: int
 
   # ---- Algorithm state ----
-  # max_necessity in the spec.
+  # The maximum number of "necessary" nodes to accumulate within any
+  # given BGCT node.
   max_necessity: int = 0
 
-  # exploration_depth in the spec.
+  # The maximum level of BGCT nodes to examine and consider replacing.
   exploration_depth: int = 0
 
   # ---- Progress data ----
