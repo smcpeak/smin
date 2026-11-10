@@ -138,20 +138,18 @@ class Minimizer(ABC):
   # This is incremented in _try_candidate and read in _make_report.
   sequence_num: int
 
-  # Index of the current pass, starting at 0.  With MA1, the
-  # granularity of pass k is `len(tokens) / 2**k`.  With MA2, pass k
-  # considers nodes up to depth k+1.  With HDD, pass k considers nodes
-  # at depth k+1.  With MA3, pass k has max_necessity
-  # (k+1)*NECESSITY_INCREMENT.
-  #
-  # This is maintained by the outer loop, used to compute the
-  # granularity for MA1, and included in progress reports for all.
+  # Index of the current pass, i.e., outer loop iteration, starting at
+  # 0.  Exactly what happens during a "pass" depends on the specific
+  # algorithm in use.  This field's value is included in the progress
+  # reports, and some algorithms use it internally as well.
   pass_index: int
 
   # With MA2, the granularity, in nodes, of the candidate being tested.
   #
   # This is maintained as the algorithm makes granularity adjustments,
   # then included in progress reports.
+  #
+  # TODO: This should not be here.
   ma2_granularity: int
 
   # ---- Output data ----

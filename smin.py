@@ -370,8 +370,10 @@ def make_minimizer_options(
   selector: MinimizerAlgorithmSelector
   if args.ma2:
     selector = MA2MinimizerSelector(use_brace_groups = args.ma2_brace_groups)
+
   elif args.hdd:
     selector = HDDMinimizerSelector()
+
   elif args.ma3:
     # Pass only the parameters that were specified, so the others get
     # the selector's defaults.
@@ -380,8 +382,11 @@ def make_minimizer_options(
       ma3_params["necessity_increment"] = args.ma3_necessity_increment
     if args.ma3_max_exploration_depth is not None:
       ma3_params["max_exploration_depth"] = args.ma3_max_exploration_depth
+
     selector = MA3MinimizerSelector(**ma3_params)
+
   else:
+    # MA1 is the default.
     selector = MA1MinimizerSelector()
 
   return MinimizerOptions(

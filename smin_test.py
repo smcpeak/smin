@@ -391,6 +391,12 @@ class MainTest(unittest.TestCase):
     # connected to the odd behavior related to trying to remove the
     # final newline token from the file.
     #
+    # 2026-11-10: Now that the trailing whitespace is excluded from the
+    # scope of minimization, yet this input still demonstrates the
+    # result of minimization depending on --skip-paragraphs, perhaps
+    # that means my analysis of how it works was wrong.  I don't
+    # particularly care at the moment.
+    #
     # Claude came up with this input, but only with some difficulty.
     #
     src: bytes = dedent_enc("""

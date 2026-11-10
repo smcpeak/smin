@@ -24,6 +24,9 @@ def make_minimizer(
   """
 
   # Choose which class to create.
+  #
+  # TODO: Change this code to create the minimizer in the obvious way
+  # rather than first choosing the class and then later creating it.
   cls: type[MA1Minimizer | MA2Minimizer | HDDMinimizer | MA3Minimizer]
   kind: MinimizerAlgorithmKind = options.alg_kind()
   if kind == MinimizerAlgorithmKind.MA1:

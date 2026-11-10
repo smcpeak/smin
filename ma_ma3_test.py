@@ -1,6 +1,9 @@
 # ma_ma3_test.py
 """
 Unit tests for ma_ma3 (Minimization Algorithm 3).
+
+smcpeak: These tests were written by Claude Code.  I've skimmed them and
+they seem fine, but I have not carefully reviewed them.
 """
 
 from __future__ import annotations
@@ -73,7 +76,8 @@ class MA3Test(ReportCheckingTestCase):
   """Tests of Minimization Algorithm 3."""
 
   # F is the root necessity fraction, which can decrease, and the
-  # number of fields depends on the recursion depth.
+  # number of fields depends on the recursion depth.  Setting these
+  # fields affects how the base test class methods behave.
   CHECK_FRACTION_MONOTONIC = False
   CHECK_FIXED_COLUMNS = False
 
