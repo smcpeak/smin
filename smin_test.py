@@ -334,7 +334,12 @@ class MainTest(unittest.TestCase):
     # MA3 disables paragraph grouping, so the "a" line is a separate
     # child of the root, and can be removed.  (With the paragraph, it
     # could not be, since MA3 does not look inside it.)
-    self.input_path.write_bytes(b"int a;\nint keep;\n\nint b;\n")
+    self.input_path.write_bytes(dedent_enc("""
+      int a;
+      int keep;
+
+      int b;
+    """))
     status, out, err = self.run_main(self.KEEP_CODE, ("--ma3",))
     self.assertEqual(status, 0)
     self.assertEqual(err, "")
@@ -346,7 +351,11 @@ class MainTest(unittest.TestCase):
     # With an increment of 1, the first pass stops once the "keep" line
     # is necessary, so the second pass is needed to remove the first
     # line.
-    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    self.input_path.write_bytes(dedent_enc("""
+      int a;
+      int keep;
+      int b;
+    """))
     status, out, _ = self.run_main(
       self.KEEP_CODE, ("--ma3", "--ma3-necessity-increment", "1"))
     self.assertEqual(status, 0)
@@ -356,7 +365,13 @@ class MainTest(unittest.TestCase):
 
   def test_ma3_max_exploration_depth(self) -> None:
     # With depth 1, the function body's children are not tried.
-    src = b"void f()\n{\n  x;\n  keep;\n}\n"
+    src = dedent_enc("""
+      void f()
+      {
+        x;
+        keep;
+      }
+    """)
     self.input_path.write_bytes(src)
     status, _, _ = self.run_main(
       self.KEEP_CODE, ("--ma3", "--ma3-max-exploration-depth", "1"))
