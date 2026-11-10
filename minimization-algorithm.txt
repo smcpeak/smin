@@ -587,10 +587,6 @@ group together "int foo()" with its body), the corresponding BGCT is:
       - "if ..."
         - "j();"
     - "return 1;"
-  - the final whitespace-only token
-
-The final whitespace-only token is a consequence of an orthogonal design
-defect that I haven't fixed yet.  It can be mostly ignored.
 
 (The BGCT as defined here is intended to define the same set of nodes
 that --ma2-brace-groups operates on, but in a way that is less dependent
