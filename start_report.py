@@ -67,27 +67,30 @@ class MA3ReportData:
   granularity: int
 
 
-  def status_fields(self) -> tuple[list[str], list[str]]:
+  def extra_status_fields(self) -> list[str]:
     """
-    Return the fields to print after F, and those to print before R.
+    Return the extra MA3 status fields.
     """
     ed_width = len(str(self.max_exploration_depth))
     nec_width = len(str(self.max_necessity))
 
-    before = [
+    extra: list[str] = [
       f"M_NEC={self.max_necessity:03d}",
       f"ED={self.exploration_depth:0{ed_width}d}",
     ]
-    before += [
+
+    extra += [
       frame.progress_string(i, nec_width)
       for i, frame in enumerate(self.activation_records)
     ]
-    after = [
+
+    extra += [
       f"LVL={self.level:0{ed_width}d}",
       f"L_NEC={self.len_necessary:0{nec_width}d}",
       f"G={self.granularity:03d}",
     ]
-    return before, after
+
+    return extra
 
 
 @dataclass(frozen=True)
@@ -158,7 +161,7 @@ class TestStartReport:
     # not print as 100.
     f_percent = min(int(self.completion_fraction * 100), 99)
 
-    fields: list[str] = [
+    status_fields: list[str] = [
       f"P=({self.pass_num:0{p_width}d}/{self.total_num_passes})",
       # G is disabled for now.
       #f"G={self.granularity:0{g_width}.1f}",
@@ -166,12 +169,10 @@ class TestStartReport:
     ]
 
     if self.ma3_data is not None:
-      # See "MA3 Progress Reporting".
-      before, after = self.ma3_data.status_fields()
-      fields += before + after
+      status_fields += self.ma3_data.extra_status_fields()
 
-    fields.append(f"R={self.removed_tok_count:0{tok_width}d}")
-    status = " ".join(fields)
+    status_fields.append(f"R={self.removed_tok_count:0{tok_width}d}")
+    status = " ".join(status_fields)
 
     return (
       f"N={self.sequence_num:06d} "
