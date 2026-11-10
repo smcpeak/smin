@@ -54,7 +54,7 @@ def balanced(d: bytes) -> bool:
 
 def label(n: BGCTNode) -> bytes:
   """The first line of the text of `n`, without surrounding whitespace."""
-  return n.tt.text().strip().split(b"\n")[0]
+  return n.ttnode.text().strip().split(b"\n")[0]
 
 
 def outline(n: BGCTNode) -> list[tuple[int, bytes]]:
@@ -142,7 +142,7 @@ class MA3Test(ReportCheckingTestCase):
     # This is the BGCT shown in the spec.
     m = self.make(Recorder(lambda d: True), SPEC_EXAMPLE, CPPLanguage())
     self.assertEqual(m.bgct_root.level, 0)
-    self.assertIs(m.bgct_root.tt, m.tree.root)
+    self.assertIs(m.bgct_root.ttnode, m.tree.root)
     self.assertEqual(outline(m.bgct_root), [
       (1, b"int foo()"),
       (2, b"return 0;"),
@@ -188,7 +188,7 @@ class MA3Test(ReportCheckingTestCase):
     self.assertEqual(m.necessary(root), [c])
 
     # Replaced nodes are not live.
-    m.cur_replacement[id(b.tt)] = b""
+    m.cur_replacement[id(b.ttnode)] = b""
     self.assertEqual(m.children(root), [a, c])
     root.num_necessary = 2
     self.assertEqual(m.necessary(root), [a, c])
@@ -236,7 +236,7 @@ class MA3Test(ReportCheckingTestCase):
     m = self.make(Recorder(lambda d: True), b"{ { x; } }\n", CPPLanguage())
     outer = m.bgct_root.all_children[0]
     inner = outer.all_children[0]
-    self.assertIs(m.rcpbg(inner), inner.tt)
+    self.assertIs(m.rcpbg(inner), inner.ttnode)
 
   # ---- Number of passes ----
   def test_num_passes(self) -> None:

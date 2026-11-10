@@ -51,18 +51,24 @@ class BGCTNode:
   """
   A node in the brace group child tree (BGCT).
 
+  See the spec for more details, but the essential idea of the BGCT is
+  it is a tree formed from the token tree by keeping only the direct
+  children of brace-delimited group nodes (plus the root and its
+  children).  The MA3 algorithm then operates primarily on this reduced
+  structure.
+
   Equality is identity, since each one corresponds to a distinct node
   in the token tree.
   """
 
   # The token tree node this corresponds to.
-  tt: TTNode
+  ttnode: TTNode
 
   # Number of edges from the BGCT root to this node.
   level: int
 
   # The token tree nodes on the path from just below the BGCT parent of
-  # this node, down to and including `tt`.  If any is replaced, then
+  # this node, down to and including `ttnode`.  If any is replaced, then
   # this node is not live.  Empty for the root.
   path: list[TTNode] = field(default_factory=list)
 
@@ -155,25 +161,25 @@ class MA3Minimizer(Minimizer):
     """
     root = BGCTNode(self.tree.root, 0)
     self.bgct_nodes.append(root)
-    self._add_bgct_children(root, root.tt, [])
+    self._add_bgct_children(root, root.ttnode, [])
     return root
 
 
   def _add_bgct_children(
     self,
     parent: BGCTNode,
-    tt: TTNode,
+    ttnode: TTNode,
     path: list[TTNode],
   ) -> None:
     """
-    Search the token tree below `tt`, which is either `parent.tt` or a
-    descendant of it (reached via `path`, excluding `parent.tt`) with
-    no BGCT node in between, and add the BGCT nodes found to `parent`,
-    recursively building their subtrees.
+    Search the token tree below `ttnode`, which is either
+    `parent.ttnode` or a descendant of it (reached via `path`, excluding
+    `parent.ttnode`) with no BGCT node in between, and add the BGCT
+    nodes found to `parent`, recursively building their subtrees.
     """
-    is_root: bool = tt is self.tree.root
-    is_bg: bool = self.options.language.is_brace_group(tt)
-    children: list[TTNode] = tt.children
+    is_root: bool = ttnode is self.tree.root
+    is_bg: bool = self.options.language.is_brace_group(ttnode)
+    children: list[TTNode] = ttnode.children
 
     for i, c in enumerate(children):
       c_path = path + [c]
@@ -224,7 +230,7 @@ class MA3Minimizer(Minimizer):
     # element before the child is its token tree parent, unless the
     # path has just one element, in which case the parent is `node`.
     path = live[-1].path
-    tt_parent: TTNode = path[-2] if len(path) >= 2 else node.tt
+    tt_parent: TTNode = path[-2] if len(path) >= 2 else node.ttnode
 
     if self.options.language.is_brace_group(tt_parent):
       return tt_parent
@@ -320,7 +326,7 @@ class MA3Minimizer(Minimizer):
       self.cur_granularity = g
 
       if len(cc) > 1:
-        tt_nodes = [c.tt for c in cc]
+        tt_nodes = [c.ttnode for c in cc]
         if self._try_candidate({id(n): b"" for n in tt_nodes}, tt_nodes):
           g = min(2 * g, remaining)
         else:
@@ -328,14 +334,16 @@ class MA3Minimizer(Minimizer):
         continue
 
       c = cc[0]
-      if self._try_candidate({id(c.tt): b""}, [c.tt]):
+      if self._try_candidate({id(c.ttnode): b""}, [c.ttnode]):
         # Trivial replacement accepted.
         g = min(2 * g, remaining)
         continue
 
-      replacement = self.options.language.non_trivial_replacement(c.tt)
-      if replacement and self._try_candidate({id(c.tt): replacement},
-                                             [c.tt]):
+      replacement = (
+        self.options.language.non_trivial_replacement(c.ttnode))
+      if (replacement and
+          self._try_candidate({id(c.ttnode): replacement},
+                              [c.ttnode])):
         g = min(g, remaining)
         continue
 
@@ -343,7 +351,7 @@ class MA3Minimizer(Minimizer):
       # the children of `c`.  Skip it if that group is `c` itself, as
       # the candidate would be the same as the one just tried.
       bg = self.rcpbg(c)
-      if bg is not None and bg is not c.tt:
+      if bg is not None and bg is not c.ttnode:
         replacement = self.options.language.non_trivial_replacement(bg)
         if replacement and self._try_candidate({id(bg): replacement},
                                                [bg]):
