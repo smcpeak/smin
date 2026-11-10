@@ -52,9 +52,9 @@ class BGCTNode:
   A node in the brace group child tree (BGCT).
 
   See the spec for more details, but the essential idea of the BGCT is
-  it is a tree formed from the token tree by keeping only the direct
-  children of brace-delimited group nodes (plus the root and its
-  children).
+  it is an ordered embedded subtree formed from the token tree by
+  keeping only the direct children of brace-delimited group nodes (plus
+  the root and its children).
 
   The MA3 algorithm then operates primarily on this reduced structure,
   motivated by the observation that it contains, in some sense, the most

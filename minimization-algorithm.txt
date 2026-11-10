@@ -550,6 +550,9 @@ The "brace group child tree" consists of:
   non-root BGCT node C is the nearest proper ancestor of C (in the token
   tree) that is also a BGCT node.
 
+  Yet another alternative definition is to simply say the BGCT is an
+  ordered embedded subtree of the token tree.
+
 The children of a BGCT node are ordered, as in the token tree, left to
 right based on their position in the input file.
 
