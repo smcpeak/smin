@@ -11,6 +11,32 @@ from typing import Optional
 from byte_range import ByteRange
 
 
+@dataclass
+class MA3RecMinAR:
+  """
+  Recursive minimizer activation record.  This is used in progress
+  reports to try to give some sense of where the algorithm is.
+  """
+
+  # The index of the child being explored in the `rev_nec` list.
+  child_index: int
+
+  # Length of `rev_nec`.
+  rev_nec_len: int
+
+
+  def progress_string(self, i: int, nec_width: int) -> str:
+    """
+    Return the string used to show this activation record in the
+    progress report.
+    """
+    c: int = self.child_index
+    n: int = self.rev_nec_len
+    return f"C{i}=({c:0{nec_width}d}/{n:0{nec_width}d})"
+
+
+# TODO: Provide a way to allow algorithm-specific reporting without
+# having all of them known to this module.
 @dataclass(frozen=True, kw_only=True)
 class MA3ReportData:
   """
@@ -27,9 +53,9 @@ class MA3ReportData:
   # MAX_EXPLORATION_DEPTH, which determines the width of ED and LVL.
   max_exploration_depth: int
 
-  # (C[I], N[I]) for each active `ma3_min_subtree` call that is in its
-  # loop over necessary children, outermost first.
-  cni: tuple[tuple[int, int], ...]
+  # Record of each active `ma3_min_subtree` call that is in its loop
+  # over necessary children, outermost first.
+  activation_records: list[MA3RecMinAR]
 
   # LVL: level(N) for the current `ma3_min_node(N)`.
   level: int
@@ -53,8 +79,8 @@ class MA3ReportData:
       f"ED={self.exploration_depth:0{ed_width}d}",
     ]
     before += [
-      f"C{i}=({c:0{nec_width}d}/{n:0{nec_width}d})"
-      for i, (c, n) in enumerate(self.cni)
+      frame.progress_string(i, nec_width)
+      for i, frame in enumerate(self.activation_records)
     ]
     after = [
       f"LVL={self.level:0{ed_width}d}",

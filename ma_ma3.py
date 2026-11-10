@@ -19,7 +19,7 @@ from min_alg_kind import MinimizerAlgorithmKind
 from min_alg_selector import MinimizerAlgorithmSelector
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
-from start_report import MA3ReportData, TestStartReport
+from start_report import MA3RecMinAR, MA3ReportData, TestStartReport
 from token_tree import TokenTree, TTNode
 
 
@@ -130,7 +130,7 @@ class MA3Minimizer(Minimizer):
   # necessary children, outermost first, the [C, N] values: the index of
   # the child being explored within `reverse(necessary(N))`, and the
   # length of that list.
-  cni_stack: list[list[int]]
+  activation_records: list[MA3RecMinAR]
 
   # LVL, L_NEC, and G from the current `_min_node` call.
   cur_level: int = 0
@@ -148,7 +148,7 @@ class MA3Minimizer(Minimizer):
     super().__init__(options, tree)
 
     self.ma3_selector = options.selector
-    self.cni_stack = []
+    self.activation_records = []
 
     self.bgct_nodes = []
     self.bgct_root = self._build_bgct()
@@ -324,6 +324,9 @@ class MA3Minimizer(Minimizer):
     children, recursively, down to the exploration depth.  Return True
     if any node hit the necessity limit.
     """
+
+    # Minimize `node` itself.  `ret` tracks if any call hit the
+    # necessity limit.
     ret: bool = self._min_node(node)
 
     # The children of `node` are at level `node.level+1`.  And the
@@ -335,17 +338,21 @@ class MA3Minimizer(Minimizer):
       # This list (of live, necessary children) does not change during
       # the loop, since the recursive calls only replace nodes within
       # the children's subtrees.
-      nec: list[BGCTNode] = list(reversed(self.necessary(node)))
+      rev_nec: list[BGCTNode] = list(reversed(self.necessary(node)))
 
-      frame = [0, len(nec)]
-      self.cni_stack.append(frame)
+      # Add a record of this recursive call.
+      frame = MA3RecMinAR(0, len(rev_nec))
+      self.activation_records.append(frame)
+
       try:
-        for i, c in enumerate(nec):
-          frame[0] = i
+        # Try to minimize each of the necessary children individually.
+        for i, c in enumerate(rev_nec):
+          frame.child_index = i
           if self._min_subtree(c):
             ret = True
+
       finally:
-        self.cni_stack.pop()
+        self.activation_records.pop()
 
     return ret
 
@@ -444,7 +451,7 @@ class MA3Minimizer(Minimizer):
         max_necessity         = self.max_necessity,
         exploration_depth     = self.exploration_depth,
         max_exploration_depth = self._max_exploration_depth(),
-        cni                   = tuple((c, n) for c, n in self.cni_stack),
+        activation_records    = self.activation_records,
         level                 = self.cur_level,
         level_necessary       = self.cur_level_necessary,
         granularity           = self.cur_granularity,

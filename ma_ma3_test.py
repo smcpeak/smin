@@ -128,7 +128,7 @@ class MA3Test(ReportCheckingTestCase):
       self.assertTrue(r.to_console_string().startswith("N="))
 
     # Every recursive call has finished.
-    self.assertEqual(m.cni_stack, [])
+    self.assertEqual(m.activation_records, [])
     return rec, m
 
   # ---- BGCT ----
