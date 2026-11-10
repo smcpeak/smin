@@ -711,9 +711,10 @@ Algorithm:
 
             Attempt a non-trivial replacement, if one exists for C.
 
-            If RCPBG(C) exists and has a non-trivial replacement, then
-            try that replacement too.  If that succeeds, add C to
-            necessary(N), then proceed to the ACCEPT case.
+            If RCPBG(C) exists, is not C itself, and has a non-trivial
+            replacement, then try that replacement too.  If that
+            succeeds, add C to necessary(N), then proceed to the ACCEPT
+            case.
 
       If ACCEPT:
 
