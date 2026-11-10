@@ -54,8 +54,11 @@ class BGCTNode:
   See the spec for more details, but the essential idea of the BGCT is
   it is a tree formed from the token tree by keeping only the direct
   children of brace-delimited group nodes (plus the root and its
-  children).  The MA3 algorithm then operates primarily on this reduced
-  structure.
+  children).
+
+  The MA3 algorithm then operates primarily on this reduced structure,
+  motivated by the observation that it contains, in some sense, the most
+  important hierarchical structure.
 
   Equality is identity, since each one corresponds to a distinct node
   in the token tree.
@@ -68,8 +71,10 @@ class BGCTNode:
   level: int
 
   # The token tree nodes on the path from just below the BGCT parent of
-  # this node, down to and including `ttnode`.  If any is replaced, then
-  # this node is not live.  Empty for the root.
+  # this node, down to and including `ttnode`.  Empty for the root.
+  #
+  # This is used to check liveness (if any node on the path is replaced,
+  # then this node is not live), and to compute RCPBG.
   path: list[TTNode] = field(default_factory=list)
 
   # All children in the BGCT, including those that have since been
@@ -78,6 +83,11 @@ class BGCTNode:
 
   # Length of necessary(N), which is always a suffix of the live
   # children.
+  #
+  # Nodes beyond this "divider" have been determined to be "necessary"
+  # for a candidate to be accepted, and hence their replacement will not
+  # be re-tried, although that determination is reset at the start of
+  # each outer loop iteration.
   num_necessary: int = 0
 
 
