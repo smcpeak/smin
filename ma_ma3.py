@@ -244,10 +244,17 @@ class MA3Minimizer(Minimizer):
 
   def rcpbg(self, node: BGCTNode) -> Optional[TTNode]:
     """
-    Return RCPBG(N), the token tree parent of the rightmost live child of
-    non-root `node`, if that is a brace group, or None if there is no
-    such group.
+    Return the token tree parent of the rightmost live child of non-root
+    `node`, if that is a brace group, or None if there is no such group.
+
+    The idea here is if `node` is something like a C++ function or class
+    definition, or a control flow statement like `if`, then the RCPBG is
+    the brace-enclosed "body", which might be profitably replaced by a
+    semicolon.  (Other minimization algorithms do this naturally by
+    operating on the token tree, but because MA3 operates the BGCT, it
+    would otherwise miss these replacements.)
     """
+
     if node is self.bgct_root:
       return None
 
@@ -368,43 +375,69 @@ class MA3Minimizer(Minimizer):
     g: int = 1
 
     while True:
-      live = self.children(node)
-      if not (node.num_necessary < len(live) and
-              node.num_necessary < self.max_necessity):
-        break
+      # Stop if all of the children are necessary.
+      live: list[BGCTNode] = self.children(node)
+      assert not (node.num_necessary > len(live))
+      if node.num_necessary == len(live):
+        return False
 
-      # The children that are not necessary, and the last `g` of them.
-      non_nec = live[:len(live) - node.num_necessary]
+      # Also stop if we hit the limit.
+      if node.num_necessary >= self.max_necessity:
+        return True
+
+      # The children that have not been determined to be necessary.
+      non_nec = live[ : len(live) - node.num_necessary]
+
+      # The last `g` of them; we will try to replace them.
       assert 1 <= g <= len(non_nec)
-      cc = non_nec[len(non_nec) - g:]
+      cc = non_nec[len(non_nec) - g : ]
 
       # Number of non-replaced, non-necessary children that will remain
-      # after an accepted candidate.
+      # if we replace all of them in `cc`.
       remaining = len(non_nec) - len(cc)
 
+      # Update the progress report data before running `_try_candidate`.
       self.cur_level = node.level
       self.cur_level_necessary = node.num_necessary
       self.cur_granularity = g
 
       if len(cc) > 1:
-        tt_nodes = [c.ttnode for c in cc]
+        # We are attempting to replace multiple nodes, so only attempt
+        # the trivial replacement.
+        tt_nodes: list[TTNode] = [c.ttnode for c in cc]
+
+        # TODO: Factor the several places that use `_try_candidate` and
+        # supply a dict with trivial replacements.
         if self._try_candidate({id(n): b"" for n in tt_nodes}, tt_nodes):
+          # ACCEPT: Double `g`, up to the number remaining, to
+          # optimistically accelerate further removal.
           g = min(2 * g, remaining)
+
         else:
+          # REJECT: Halve `g`, doing a sort of binary search to zoom in
+          # on the next (going in reverse order) element of `cc` that is
+          # necessary.
           g = len(cc) // 2
+
         continue
 
-      c = cc[0]
+      # We are attempting to remove just one node, `c`.
+      c: BGCTNode = cc[0]
       if self._try_candidate({id(c.ttnode): b""}, [c.ttnode]):
-        # Trivial replacement accepted.
+        # ACCEPT trivial replacement.
         g = min(2 * g, remaining)
         continue
 
-      replacement = (
+      # Non-trivial replacement?
+      replacement: Optional[bytes] = (
         self.options.language.non_trivial_replacement(c.ttnode))
       if (replacement and
           self._try_candidate({id(c.ttnode): replacement},
                               [c.ttnode])):
+        # ACCEPT non-trivial replacement.  Since it was non-trivial, and
+        # thus required attention to the individual node, we
+        # optimistically expect the same to be true of the next node, so
+        # do not increase `g`.
         g = min(g, remaining)
         continue
 
@@ -418,13 +451,15 @@ class MA3Minimizer(Minimizer):
                                                [bg]):
           # `c` itself survives, and is now necessary.
           node.num_necessary += 1
+
+          # ACCEPT non-trivial replacement of a "body".
           g = min(g, remaining)
           continue
 
       # REJECT ONE: `c` is necessary.
       node.num_necessary += 1
 
-    return node.num_necessary < len(self.children(node))
+    # Not reached.
 
 
   # ---- Progress reporting ----
