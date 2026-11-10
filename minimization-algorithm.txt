@@ -964,6 +964,14 @@ Although not intended to be used together, it is not an error to combine
 --ma3 with --skip-paragraphs (which is redundant), nor with the
 SKIP_HEAD_BODY envvar (which could be a useful experiment).
 
+MA3 is configured with these options:
+
+* --ma3-necessity-increment N: Set NECESSITY_INCREMENT.
+
+* --ma3-max-exploration-depth N: Set MAX_EXPLORATION_DEPTH.
+
+Those options require that --ma3 also be specified.
+
 
 Candidate testing
 -----------------
