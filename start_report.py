@@ -61,7 +61,7 @@ class MA3ReportData:
   level: int
 
   # L_NEC: len(necessary(N)) for that N.
-  level_necessary: int
+  len_necessary: int
 
   # G: The number of nodes in the candidate.
   granularity: int
@@ -84,7 +84,7 @@ class MA3ReportData:
     ]
     after = [
       f"LVL={self.level:0{ed_width}d}",
-      f"L_NEC={self.level_necessary:0{nec_width}d}",
+      f"L_NEC={self.len_necessary:0{nec_width}d}",
       f"G={self.granularity:03d}",
     ]
     return before, after

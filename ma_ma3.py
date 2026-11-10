@@ -134,7 +134,7 @@ class MA3Minimizer(Minimizer):
 
   # LVL, L_NEC, and G from the current `_min_node` call.
   cur_level: int = 0
-  cur_level_necessary: int = 0
+  cur_len_necessary: int = 0
   cur_granularity: int = 0
 
 
@@ -398,7 +398,7 @@ class MA3Minimizer(Minimizer):
 
       # Update the progress report data before running `_try_candidate`.
       self.cur_level = node.level
-      self.cur_level_necessary = node.num_necessary
+      self.cur_len_necessary = node.num_necessary
       self.cur_granularity = g
 
       if len(cc) > 1:
@@ -488,7 +488,7 @@ class MA3Minimizer(Minimizer):
         max_exploration_depth = self._max_exploration_depth(),
         activation_records    = self.activation_records,
         level                 = self.cur_level,
-        level_necessary       = self.cur_level_necessary,
+        len_necessary         = self.cur_len_necessary,
         granularity           = self.cur_granularity,
       ))
 
