@@ -17,6 +17,7 @@ from unittest import mock
 from gnuplot_tsv import (
   DataSeries,
   PassChange,
+  compute_labels,
   main,
   make_script,
   parse_tsv,
@@ -284,6 +285,64 @@ def series(tsv_name: str, points: list[tuple[Decimal, int]],
                     pass_changes=pass_changes or [])
 
 
+class ComputeLabelsTest(unittest.TestCase):
+  def check(self, fnames: list[str], expect: list[str]) -> None:
+    self.assertEqual(compute_labels(fnames), expect)
+
+  def test_empty(self) -> None:
+    self.check([], [])
+
+  def test_one_name(self) -> None:
+    # Only the final path component remains.
+    self.check(["a.tsv"], ["a.tsv"])
+    self.check(["out/bm1/smin/bm1-smin.tsv"], ["bm1-smin.tsv"])
+    self.check(["/abs/x.tsv"], ["x.tsv"])
+
+  def test_common_directory(self) -> None:
+    self.check(["out/a.tsv", "out/b.tsv"], ["a.tsv", "b.tsv"])
+
+  def test_common_front_and_back(self) -> None:
+    # The benchmark names differ, while the leading directory and the
+    # minimizer and file names are the same.
+    self.check(
+      ["out/bm1/smin/log.tsv", "out/bm2/smin/log.tsv"],
+      ["bm1", "bm2"])
+
+  def test_differing_middle_elements(self) -> None:
+    self.check(
+      ["out/bm1/smin/log.tsv", "out/bm1/delta/log.tsv",
+       "out/bm2/delta/log.tsv"],
+      ["bm1/smin", "bm1/delta", "bm2/delta"])
+
+  def test_different_lengths(self) -> None:
+    # The first elements differ, so nothing is removed from the front,
+    # and the last elements differ too.
+    self.check(["run_1.tsv", "other/run_2.tsv"],
+               ["run_1.tsv", "other/run_2.tsv"])
+
+  def test_back_stops_at_one_element(self) -> None:
+    # After the common front is removed, one list has a single element,
+    # so the common last element is kept.
+    self.check(["a/x.tsv", "a/b/x.tsv"], ["x.tsv", "b/x.tsv"])
+
+  def test_identical_names(self) -> None:
+    self.check(["d/x.tsv", "d/x.tsv"], ["x.tsv", "x.tsv"])
+
+  def test_backslashes(self) -> None:
+    # Backslashes are separators too, and the result uses forward
+    # slashes.
+    self.check(["out\\bm1\\s\\log.tsv", "out/bm2\\t/log.tsv"],
+               ["bm1/s", "bm2/t"])
+
+  def test_absolute_paths(self) -> None:
+    # The empty element before the leading slash is common.
+    self.check(["/tmp/a.tsv", "/tmp/b.tsv"], ["a.tsv", "b.tsv"])
+
+  def test_common_suffix_not_whole_element(self) -> None:
+    # Only whole elements are removed, not common substrings.
+    self.check(["a-smin.tsv", "b-smin.tsv"], ["a-smin.tsv", "b-smin.tsv"])
+
+
 class MakeScriptTest(unittest.TestCase):
   def test_one_dataset(self) -> None:
     script = make_script([series("log.tsv", [(Decimal(0), 10),
@@ -387,6 +446,12 @@ class MakeScriptTest(unittest.TestCase):
     script = make_script([series(os.path.join("dir", "sub", "a.tsv"), [])])
     self.assertIn(" title 'a.tsv' noenhanced\n", script)
 
+  def test_labels_drop_common_elements(self) -> None:
+    script = make_script([series("out/bm1/smin/log.tsv", []),
+                          series("out/bm2/smin/log.tsv", [])])
+    self.assertIn(" title 'bm1' noenhanced, \\\n", script)
+    self.assertIn(" title 'bm2' noenhanced\n", script)
+
 
 class MainTest(unittest.TestCase):
   def setUp(self) -> None:
@@ -475,7 +540,7 @@ class MainTest(unittest.TestCase):
       f"{other} has 3 rows (a=3, m=0).\n")
 
     # Each file's reltime is measured from its own first timestamp, and
-    # its label has no path information.
+    # its label omits the directory common to both files.
     self.assertEqual(gp.read_text(), dedent("""
       set title 'Accepted Size vs. Time'
       set xlabel 'reltime (s)'
@@ -493,7 +558,7 @@ class MainTest(unittest.TestCase):
       set linetype 1 lw 2
       set linetype 2 lw 2
       plot $data1 using 1:2 with steps title 'run_1.tsv' noenhanced, \\
-           $data2 using 1:2 with steps title 'run_2.tsv' noenhanced
+           $data2 using 1:2 with steps title 'other/run_2.tsv' noenhanced
       pause mouse close
       """))
 

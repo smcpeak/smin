@@ -56,7 +56,7 @@ Behavior:
       slashes or backslashes (treating them equivalently).
     * While every list has the same first element and at least two
       elements, remove the first element from all of them.
-    * While every list has the same last element at at least two
+    * While every list has the same last element and at least two
       elements, remove the last element from all of them.
     * Let `label(<tsvfile>)` be the remaining elements, joined by
       forward slashes.
@@ -94,7 +94,6 @@ Behavior:
 """
 
 import argparse
-import os
 import re
 import subprocess
 import sys
@@ -149,16 +148,6 @@ class DataSeries:
   # a labeled point on each one.  This is empty if --pass-col was not
   # passed.
   pass_changes: list[PassChange] = field(default_factory=list)
-
-
-  def series_label(self) -> str:
-    """
-    Return the label to use for this series in the gnuplot legend,
-    quoted in gnuplot syntax.
-    """
-    # We strip the path info since my current naming convention has all
-    # the info in the basename.
-    return _quote(os.path.basename(self.tsv_name))
 
 
 def main(argv: list[str]) -> int:
@@ -300,10 +289,35 @@ def parse_tsv_text(
   return ds
 
 
+def compute_labels(fnames: list[str]) -> list[str]:
+  """
+  Return the legend label for each of `fnames`, in the same order, as
+  `label(<tsvfile>)` is described in the module docstring: the name
+  elements remaining after removing those at the front and back that
+  are the same for all names.
+  """
+  # Each name as a list of elements, separated by either kind of slash.
+  elts: list[list[str]] = [re.split(r"[/\\]", f) for f in fnames]
+
+  # Remove common leading elements.
+  while (elts and
+         all(len(e) >= 2 for e in elts) and
+         all(e[0] == elts[0][0] for e in elts)):
+    elts = [e[1:] for e in elts]
+
+  # Remove common trailing elements.
+  while (elts and
+         all(len(e) >= 2 for e in elts) and
+         all(e[-1] == elts[0][-1] for e in elts)):
+    elts = [e[:-1] for e in elts]
+
+  return ["/".join(e) for e in elts]
+
+
 def make_script(datasets: list[DataSeries]) -> str:
   """
   Return a gnuplot script that plots each of `datasets` as its own line,
-  labeled in the legend with its file name without path information.
+  labeled in the legend as computed by `compute_labels`.
   Each of its pass changes is drawn as a dot, labeled with the
   pass value, in the color of that line.  The data is embedded in the
   script, and the script waits for the plot window to be closed before
@@ -358,10 +372,11 @@ def make_script(datasets: list[DataSeries]) -> str:
   # is drawn as a step function.  The labels are not "enhanced" so that,
   # e.g., "_" in a file name is not treated as a subscript marker.
   # (gnuplot skips a data block with no points, with a warning.)
+  labels = compute_labels([ds.tsv_name for ds in datasets])
   plot_elements = [
     f"$data{i} using 1:2 with steps "
-    f"title {ds.series_label()} noenhanced"
-    for i, ds in enumerate(datasets, start=1)]
+    f"title {_quote(label)} noenhanced"
+    for i, label in enumerate(labels, start=1)]
 
   # Each pass change is a dot in its dataset's line color, labeled with
   # the new pass value above and to the right.  These come after all of
