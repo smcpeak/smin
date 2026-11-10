@@ -895,7 +895,7 @@ From each active recursive call to ma3_min_subtree(N) that is in its
   That is, the progress report includes an array C[] that has one
   element per activation frame.
 
-  Print with as many digits as N[I].
+  Print with as many digits as max_necessity currently has.
 
 * N[I]: len(necessary(N))
 

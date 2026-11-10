@@ -53,7 +53,7 @@ class MA3ReportData:
       f"ED={self.exploration_depth:0{ed_width}d}",
     ]
     before += [
-      f"C{i}=({c:0{len(str(n))}d}/{n:0{nec_width}d})"
+      f"C{i}=({c:0{nec_width}d}/{n:0{nec_width}d})"
       for i, (c, n) in enumerate(self.cni)
     ]
     after = [
