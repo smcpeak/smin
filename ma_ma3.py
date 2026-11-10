@@ -278,11 +278,20 @@ class MA3Minimizer(Minimizer):
 
 
   def _run_specific_minimizer(self) -> None:
-    """`ma3_min_tree` in the spec."""
+    """
+    Minimize the entire tree, with attention focused on the end of the
+    file, attempting to remove nodes in layers, but with gradually
+    increasing limits on effort spent per node and how far we search
+    from the end.
+
+    Implements spec function `ma3_min_tree`.
+    """
+
     self.max_necessity = 0
     pass_count: int = 0
 
     while True:
+      # Bump the pass count, and stop if --max-passes says to.
       pass_count += 1
       if (self.options.max_passes is not None and
           pass_count > self.options.max_passes):
@@ -298,6 +307,9 @@ class MA3Minimizer(Minimizer):
       hit_limit: bool = False
       for ed in range(1, self._max_exploration_depth() + 1):
         self.exploration_depth = ed
+
+        # Remove what we can, subject to `max_necessity`, down to
+        # `exploration_depth`.
         if self._min_subtree(self.bgct_root):
           hit_limit = True
 
@@ -314,10 +326,17 @@ class MA3Minimizer(Minimizer):
     """
     ret: bool = self._min_node(node)
 
+    # The children of `node` are at level `node.level+1`.  And the
+    # recursive call first tries removing `c`'s children (the
+    # grandchildren of `node`).  So, only recurse if the grandchildren's
+    # level is within the allowed exploration depth.
     if node.level + 2 <= self.exploration_depth:
-      # This list does not change during the loop, since the recursive
-      # calls only replace nodes within the children's subtrees.
-      nec = list(reversed(self.necessary(node)))
+
+      # This list (of live, necessary children) does not change during
+      # the loop, since the recursive calls only replace nodes within
+      # the children's subtrees.
+      nec: list[BGCTNode] = list(reversed(self.necessary(node)))
+
       frame = [0, len(nec)]
       self.cni_stack.append(frame)
       try:
