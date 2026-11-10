@@ -211,7 +211,9 @@ class MA3Minimizer(Minimizer):
     for i, c in enumerate(children):
       c_path = path + [c]
       if is_root or (is_bg and 0 < i < len(children)-1):
-        # `c` is a BGCT child of `parent`.
+        # `c` is a BGCT child of `parent`, either because it is a child
+        # of the root, or it is a child of a brace group, but not either
+        # of the delimiter tokens.
         node = BGCTNode(c, parent.level + 1, c_path)
         parent.all_children.append(node)
         self.bgct_nodes.append(node)
@@ -237,7 +239,7 @@ class MA3Minimizer(Minimizer):
   def necessary(self, node: BGCTNode) -> list[BGCTNode]:
     """necessary(N) in the spec, in left-to-right order."""
     live = self.children(node)
-    return live[len(live) - node.num_necessary:]
+    return live[len(live) - node.num_necessary : ]
 
 
   def rcpbg(self, node: BGCTNode) -> Optional[TTNode]:
@@ -253,10 +255,16 @@ class MA3Minimizer(Minimizer):
     if not live:
       return None
 
+    rightmost_child: BGCTNode = live[-1]
+
+    # Path in the token tree from `node` to its rightmost child in the
+    # BGCT.
+    path: list[TTNode] = rightmost_child.path
+    assert path[-1] == rightmost_child.ttnode
+
     # The path of a child begins just below its BGCT parent, so the
     # element before the child is its token tree parent, unless the
     # path has just one element, in which case the parent is `node`.
-    path = live[-1].path
     tt_parent: TTNode = path[-2] if len(path) >= 2 else node.ttnode
 
     if self.options.language.is_brace_group(tt_parent):
