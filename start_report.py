@@ -6,8 +6,62 @@ TestStartReport class.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from byte_range import ByteRange
+
+
+@dataclass(frozen=True, kw_only=True)
+class MA3ReportData:
+  """
+  Additional progress data reported by MA3.  See
+  minimization-algorithm.txt, "MA3 Progress Reporting".
+  """
+
+  # M_NEC: max_necessity.
+  max_necessity: int
+
+  # ED: exploration_depth.
+  exploration_depth: int
+
+  # MAX_EXPLORATION_DEPTH, which determines the width of ED and LVL.
+  max_exploration_depth: int
+
+  # (C[I], N[I]) for each active `ma3_min_subtree` call that is in its
+  # loop over necessary children, outermost first.
+  cni: tuple[tuple[int, int], ...]
+
+  # LVL: level(N) for the current `ma3_min_node(N)`.
+  level: int
+
+  # L_NEC: len(necessary(N)) for that N.
+  level_necessary: int
+
+  # G: The number of nodes in the candidate.
+  granularity: int
+
+
+  def status_fields(self) -> tuple[list[str], list[str]]:
+    """
+    Return the fields to print after F, and those to print before R.
+    """
+    ed_width = len(str(self.max_exploration_depth))
+    nec_width = len(str(self.max_necessity))
+
+    before = [
+      f"M_NEC={self.max_necessity:03d}",
+      f"ED={self.exploration_depth:0{ed_width}d}",
+    ]
+    before += [
+      f"C{i}=({c:0{len(str(n))}d}/{n:0{nec_width}d})"
+      for i, (c, n) in enumerate(self.cni)
+    ]
+    after = [
+      f"LVL={self.level:0{ed_width}d}",
+      f"L_NEC={self.level_necessary:0{nec_width}d}",
+      f"G={self.granularity:03d}",
+    ]
+    return before, after
 
 
 @dataclass(frozen=True)
@@ -55,6 +109,9 @@ class TestStartReport:
   # program in the CHANGED_BYTE_RANGE envvar.
   changed_byte_range: ByteRange
 
+  # Additional data when the algorithm is MA3.
+  ma3_data: Optional[MA3ReportData] = None
+
 
   def to_progress_string(self) -> str:
     """
@@ -75,12 +132,20 @@ class TestStartReport:
     # not print as 100.
     f_percent = min(int(self.completion_fraction * 100), 99)
 
-    status = (
-      f"P=({self.pass_num:0{p_width}d}/{self.total_num_passes}) "
+    fields: list[str] = [
+      f"P=({self.pass_num:0{p_width}d}/{self.total_num_passes})",
       # G is disabled for now.
-      #f"G={self.granularity:0{g_width}.1f} "
-      f"F={f_percent:02d}% "
-      f"R={self.removed_tok_count:0{tok_width}d}")
+      #f"G={self.granularity:0{g_width}.1f}",
+      f"F={f_percent:02d}%",
+    ]
+
+    if self.ma3_data is not None:
+      # See "MA3 Progress Reporting".
+      before, after = self.ma3_data.status_fields()
+      fields += before + after
+
+    fields.append(f"R={self.removed_tok_count:0{tok_width}d}")
+    status = " ".join(fields)
 
     return (
       f"N={self.sequence_num:06d} "

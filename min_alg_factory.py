@@ -8,6 +8,7 @@ from __future__ import annotations
 from ma_hdd import HDDMinimizer
 from ma_ma1 import MA1Minimizer
 from ma_ma2 import MA2Minimizer
+from ma_ma3 import MA3Minimizer
 from min_alg_kind import MinimizerAlgorithmKind
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
@@ -23,7 +24,7 @@ def make_minimizer(
   """
 
   # Choose which class to create.
-  cls: type[MA1Minimizer | MA2Minimizer | HDDMinimizer]
+  cls: type[MA1Minimizer | MA2Minimizer | HDDMinimizer | MA3Minimizer]
   kind: MinimizerAlgorithmKind = options.alg_kind()
   if kind == MinimizerAlgorithmKind.MA1:
     cls = MA1Minimizer
@@ -31,6 +32,8 @@ def make_minimizer(
     cls = MA2Minimizer
   elif kind == MinimizerAlgorithmKind.HDD:
     cls = HDDMinimizer
+  elif kind == MinimizerAlgorithmKind.MA3:
+    cls = MA3Minimizer
   else:
     assert False, f"Unrecognized alg_kind: {kind}"
 

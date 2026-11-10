@@ -34,6 +34,20 @@ Options:
     Use Hierarchical Delta Debugging (HDD) as described in
     doc/hdd-algorithm.txt.  This cannot be combined with --ma2.
 
+  --ma3
+
+    Use Minimization Algorithm 3 (MA3) as described in the spec.  This
+    disables paragraph grouping, and cannot be combined with --ma2,
+    --ma2-brace-groups, or --hdd.
+
+  --ma3-necessity-increment N
+
+    With --ma3, set NECESSITY_INCREMENT to N (default 10).
+
+  --ma3-max-exploration-depth N
+
+    With --ma3, set MAX_EXPLORATION_DEPTH to N (default 4).
+
   --skip-paragraphs
 
     During structure deduction, do not group "paragraphs".
@@ -58,6 +72,7 @@ from build_tree import BuildTreeOptions, build_tree
 from ma_hdd import HDDMinimizerSelector
 from ma_ma1 import MA1MinimizerSelector
 from ma_ma2 import MA2MinimizerSelector
+from ma_ma3 import MA3MinimizerSelector
 from min_alg_factory import make_minimizer
 from min_alg_selector import MinimizerAlgorithmSelector
 from minimizer import Minimizer
@@ -222,11 +237,30 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
       MA1.
     """)
 
+  algorithm_group.add_argument(
+    "--ma3", action="store_true",
+    help="""
+      Use Minimization Algorithm 3 (MA3) rather than the default, MA1.
+      This disables paragraph grouping.
+    """)
+
   parser.add_argument(
     "--ma2-brace-groups", action="store_true",
     help="""
       With --ma2, only try to remove children of the root and of brace
       groups.
+    """)
+
+  parser.add_argument(
+    "--ma3-necessity-increment", type=_positive_int, metavar="N",
+    help="""
+      With --ma3, set NECESSITY_INCREMENT to N (default 10).
+    """)
+
+  parser.add_argument(
+    "--ma3-max-exploration-depth", type=_positive_int, metavar="N",
+    help="""
+      With --ma3, set MAX_EXPLORATION_DEPTH to N (default 4).
     """)
 
   parser.add_argument(
@@ -251,6 +285,11 @@ def parse_command_line(argv: list[str]) -> argparse.Namespace:
 
   if args.ma2_brace_groups and not args.ma2:
     parser.error("--ma2-brace-groups requires --ma2")
+  if args.ma3_necessity_increment is not None and not args.ma3:
+    parser.error("--ma3-necessity-increment requires --ma3")
+  if args.ma3_max_exploration_depth is not None and not args.ma3:
+    parser.error("--ma3-max-exploration-depth requires --ma3")
+
   cmd_and_input: list[str] = args.cmd_and_input
 
   if cmd_and_input.count("--") != 1:
@@ -328,13 +367,22 @@ def make_minimizer_options(
     return deadline is not None and time.monotonic() >= deadline
 
   # Choose the algorithm and algorithm-specific options.
-  selector: MinimizerAlgorithmSelector = (
-    MA2MinimizerSelector(use_brace_groups = args.ma2_brace_groups)
-      if args.ma2
-    else HDDMinimizerSelector()
-      if args.hdd
-    else MA1MinimizerSelector()
-  )
+  selector: MinimizerAlgorithmSelector
+  if args.ma2:
+    selector = MA2MinimizerSelector(use_brace_groups = args.ma2_brace_groups)
+  elif args.hdd:
+    selector = HDDMinimizerSelector()
+  elif args.ma3:
+    # Pass only the parameters that were specified, so the others get
+    # the selector's defaults.
+    ma3_params: dict[str, int] = {}
+    if args.ma3_necessity_increment is not None:
+      ma3_params["necessity_increment"] = args.ma3_necessity_increment
+    if args.ma3_max_exploration_depth is not None:
+      ma3_params["max_exploration_depth"] = args.ma3_max_exploration_depth
+    selector = MA3MinimizerSelector(**ma3_params)
+  else:
+    selector = MA1MinimizerSelector()
 
   return MinimizerOptions(
     selector    = selector,
@@ -465,7 +513,9 @@ def main(argv: list[str]) -> int:
 
   tree = build_tree(
     language.make_tokenizer().tokenize(orig_input_data),
-    BuildTreeOptions(use_paragraphs = not args.skip_paragraphs))
+    BuildTreeOptions(
+      # MA3 requires that paragraph grouping be disabled.
+      use_paragraphs = not (args.skip_paragraphs or args.ma3)))
 
   # This excludes the EOF whitespace, which the minimizer does not
   # consider part of the input to minimize, for consistency with the

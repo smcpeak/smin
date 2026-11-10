@@ -58,6 +58,7 @@ MINIMIZERS: dict[str, MinimizerSpec] = {
   "smin":     MinimizerSpec([_SMIN_PY, TEST_SH, "--", INPUT]),
   "smin-ma2": MinimizerSpec([_SMIN_PY, "--ma2", TEST_SH, "--", INPUT]),
   "smin-hdd": MinimizerSpec([_SMIN_PY, "--hdd", TEST_SH, "--", INPUT]),
+  "smin-ma3": MinimizerSpec([_SMIN_PY, "--ma3", TEST_SH, "--", INPUT]),
 
   "smin-ma2-bg": MinimizerSpec(
     [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT]),

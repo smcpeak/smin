@@ -141,7 +141,8 @@ class Minimizer(ABC):
   # Index of the current pass, starting at 0.  With MA1, the
   # granularity of pass k is `len(tokens) / 2**k`.  With MA2, pass k
   # considers nodes up to depth k+1.  With HDD, pass k considers nodes
-  # at depth k+1.
+  # at depth k+1.  With MA3, pass k has max_necessity
+  # (k+1)*NECESSITY_INCREMENT.
   #
   # This is maintained by the outer loop, used to compute the
   # granularity for MA1, and included in progress reports for all.

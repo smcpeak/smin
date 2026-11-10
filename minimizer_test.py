@@ -329,6 +329,14 @@ class RenderCandidateTest(unittest.TestCase):
 class ReportCheckingTestCase(unittest.TestCase):
   """Base class for tests that check the progress reports."""
 
+  # True to check that, within a pass, the completion fraction never
+  # decreases.
+  CHECK_FRACTION_MONOTONIC: bool = True
+
+  # True to check that every progress report has the same length, so
+  # its fields stay in consistent columns.
+  CHECK_FIXED_COLUMNS: bool = True
+
   def check_granularity(self, r: TestStartReport, m: Minimizer) -> None:
     """
     Check that `r.granularity` is consistent with the algorithm used by
@@ -362,13 +370,14 @@ class ReportCheckingTestCase(unittest.TestCase):
         self.assertGreaterEqual(r.pass_num, prev.pass_num)
         self.assertLessEqual(r.last_accepted_tok_count,
                              prev.last_accepted_tok_count)
-        if r.pass_num == prev.pass_num:
+        if self.CHECK_FRACTION_MONOTONIC and r.pass_num == prev.pass_num:
           self.assertGreaterEqual(r.completion_fraction,
                                   prev.completion_fraction)
 
         # The fields stay in consistent columns.
-        self.assertEqual(len(r.to_console_string()),
-                         len(prev.to_console_string()))
+        if self.CHECK_FIXED_COLUMNS:
+          self.assertEqual(len(r.to_console_string()),
+                           len(prev.to_console_string()))
       prev = r
 
 

@@ -115,6 +115,36 @@ class ParseCommandLineTest(unittest.TestCase):
   def test_ma2_and_hdd_conflict(self) -> None:
     self.check_error(["--ma2", "--hdd", "./test.sh", "--", "in.cc"])
 
+  def test_ma3(self) -> None:
+    args = parse_command_line(["./test.sh", "--", "in.cc"])
+    self.assertFalse(args.ma3)
+    self.assertIsNone(args.ma3_necessity_increment)
+    self.assertIsNone(args.ma3_max_exploration_depth)
+    args = parse_command_line(
+      ["--ma3", "--ma3-necessity-increment", "3",
+       "--ma3-max-exploration-depth", "2", "./test.sh", "--", "in.cc"])
+    self.assertTrue(args.ma3)
+    self.assertEqual(args.ma3_necessity_increment, 3)
+    self.assertEqual(args.ma3_max_exploration_depth, 2)
+
+    # Redundant, but allowed.
+    args = parse_command_line(
+      ["--ma3", "--skip-paragraphs", "./test.sh", "--", "in.cc"])
+    self.assertTrue(args.ma3)
+
+  def test_ma3_conflicts(self) -> None:
+    for other in ["--ma2", "--hdd", "--ma2-brace-groups"]:
+      with self.subTest(other=other):
+        self.check_error(["--ma3", other, "./test.sh", "--", "in.cc"])
+
+  def test_ma3_options_require_ma3(self) -> None:
+    for option in ["--ma3-necessity-increment",
+                   "--ma3-max-exploration-depth"]:
+      with self.subTest(option=option):
+        self.check_error([option, "2", "./test.sh", "--", "in.cc"])
+        self.check_error(["--ma2", option, "2", "./test.sh", "--", "in.cc"])
+        self.check_error(["--ma3", option, "0", "./test.sh", "--", "in.cc"])
+
   def test_help(self) -> None:
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
@@ -299,6 +329,46 @@ class MainTest(unittest.TestCase):
     self.assertEqual(status, 0)
     self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
     self.assertEqual(self.progress_passes(out), ["P=(1/1)"] * 3)
+
+  def test_ma3(self) -> None:
+    # MA3 disables paragraph grouping, so the "a" line is a separate
+    # child of the root, and can be removed.  (With the paragraph, it
+    # could not be, since MA3 does not look inside it.)
+    self.input_path.write_bytes(b"int a;\nint keep;\n\nint b;\n")
+    status, out, err = self.run_main(self.KEEP_CODE, ("--ma3",))
+    self.assertEqual(status, 0)
+    self.assertEqual(err, "")
+    self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
+    self.assertEqual(self.best_path.read_bytes(), b"\nint keep;\n")
+    self.assertEqual(self.progress_passes(out), ["P=(1/1)"] * 4)
+
+  def test_ma3_necessity_increment(self) -> None:
+    # With an increment of 1, the first pass stops once the "keep" line
+    # is necessary, so the second pass is needed to remove the first
+    # line.
+    self.input_path.write_bytes(b"int a;\nint keep;\nint b;\n")
+    status, out, _ = self.run_main(
+      self.KEEP_CODE, ("--ma3", "--ma3-necessity-increment", "1"))
+    self.assertEqual(status, 0)
+    self.assertEqual(self.input_path.read_bytes(), b"\nint keep;\n")
+    self.assertEqual(self.progress_passes(out),
+                     ["P=(1/3)"] * 3 + ["P=(2/3)"] * 2)
+
+  def test_ma3_max_exploration_depth(self) -> None:
+    # With depth 1, the function body's children are not tried.
+    src = b"void f()\n{\n  x;\n  keep;\n}\n"
+    self.input_path.write_bytes(src)
+    status, _, _ = self.run_main(
+      self.KEEP_CODE, ("--ma3", "--ma3-max-exploration-depth", "1"))
+    self.assertEqual(status, 0)
+    self.assertEqual(self.input_path.read_bytes(),
+                     b"\n{\n  x;\n  keep;\n}\n")
+
+    # By default, they are.
+    self.input_path.write_bytes(src)
+    status, _, _ = self.run_main(self.KEEP_CODE, ("--ma3",))
+    self.assertEqual(status, 0)
+    self.assertEqual(self.input_path.read_bytes(), b"\n{\n  keep;\n}\n")
 
   def test_skip_paragraphs(self) -> None:
     # Accept an input that contains "keep1" and "keep2".

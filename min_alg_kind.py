@@ -11,6 +11,7 @@ class MinimizerAlgorithmKind(Enum):
   MA1 = 1
   MA2 = 2
   HDD = 3
+  MA3 = 4
 
 
 # EOF
