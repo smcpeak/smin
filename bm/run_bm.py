@@ -5,10 +5,18 @@ Run a minimizer on one of the benchmarks.
 
 Usage:
 
-  ./run_bm.py <benchmarkdir> <minimizer>
+  ./run_bm.py <benchmarkdir> <minimizer> [<variant> [<min-options>]]
 
-The results go into out/<benchmark>/<minimizer>, relative to the current
-directory, replacing any prior run there.
+The results go into out/<benchmark>/<minimizer>[-<variant>], relative to
+the current directory, replacing any prior run there.
+
+If <variant> is provided, that string is simply appended (after a
+hyphen) to <minimizer> to form the name of the results directory.
+
+Anything that follows <variant> on the command line is treated as a
+sequence of options to be passed to the minimizer.  When options are
+present, the <variant> string should summarize them so that runs with
+different options don't collide (but this script does not enforce that).
 
 The exit status is that of the minimizer if it ran, or 2 for any error
 that prevented that, or 128+N if a child was killed by signal N.
@@ -49,8 +57,6 @@ class MinimizerSpec:
 
   # The second part of the command.  Between the two are inserted
   # additional options specified on the `run_bm.py` command line.
-  #
-  # TODO: Design and implement an interface for providing those options.
   command_suffix: list[str]
 
   # Additional environment variables to set while running the benchmark,
@@ -58,6 +64,7 @@ class MinimizerSpec:
   env: dict[str, str] = field(default_factory=dict)
 
 
+  # TODO: Modify this method so it inserts <min-options>.
   def get_command(self) -> list[str]:
     return self.command_prefix + self.command_suffix
 
@@ -69,6 +76,9 @@ MINIMIZERS: dict[str, MinimizerSpec] = {
     [_SMIN_PY],
     [TEST_SH, "--", INPUT]),
 
+  # This minimizer is equivalent to "smin ma2 --ma2", i.e., using "ma2"
+  # as the <variant> and "--ma2" as <min-options>.  For now, these
+  # aliases are retained for convenience.
   "smin-ma2": MinimizerSpec(
     [_SMIN_PY, "--ma2"],
     [TEST_SH, "--", INPUT]),
