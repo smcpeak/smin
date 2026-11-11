@@ -9,7 +9,6 @@ Reporting".
 
 from __future__ import annotations
 
-import dataclasses
 import math
 from dataclasses import dataclass, field
 from typing import Optional
@@ -19,7 +18,7 @@ from min_alg_kind import MinimizerAlgorithmKind
 from min_alg_selector import MinimizerAlgorithmSelector
 from minimizer import Minimizer
 from minimizer_options import MinimizerOptions
-from start_report import MA3RecMinAR, MA3ReportData, TestStartReport
+from start_report import TestStartReport
 from token_tree import TokenTree, TTNode
 
 
@@ -44,6 +43,86 @@ class MA3MinimizerSelector(MinimizerAlgorithmSelector):
 
   def alg_kind(self) -> MinimizerAlgorithmKind:
     return MinimizerAlgorithmKind.MA3
+
+
+@dataclass
+class MA3RecMinAR:
+  """
+  Recursive minimizer activation record.  This is used in progress
+  reports to try to give some sense of where the algorithm is.
+  """
+
+  # The index of the child being explored in the `rev_nec` list.
+  child_index: int
+
+  # Length of `rev_nec`.
+  rev_nec_len: int
+
+
+  def progress_string(self, i: int, nec_width: int) -> str:
+    """
+    Return the string used to show this activation record in the
+    progress report.
+    """
+    c: int = self.child_index
+    n: int = self.rev_nec_len
+    return f"C{i}=({c:0{nec_width}d}/{n:0{nec_width}d})"
+
+
+@dataclass(frozen=True, kw_only=True)
+class MA3StartReport(TestStartReport):
+  """
+  Progress data reported by MA3.  See minimization-algorithm.txt, "MA3
+  Progress Reporting".
+  """
+
+  # M_NEC: max_necessity.
+  max_necessity: int
+
+  # ED: exploration_depth.
+  exploration_depth: int
+
+  # MAX_EXPLORATION_DEPTH, which determines the width of ED and LVL.
+  max_exploration_depth: int
+
+  # Record of each active `ma3_min_subtree` call that is in its loop
+  # over necessary children, outermost first.
+  activation_records: list[MA3RecMinAR]
+
+  # LVL: level(N) for the current `ma3_min_node(N)`.
+  level: int
+
+  # L_NEC: len(necessary(N)) for that N.
+  len_necessary: int
+
+  # G: The number of nodes in the candidate.
+  node_granularity: int
+
+
+  def extra_status_fields(self) -> list[str]:
+    """
+    Return the extra MA3 status fields.
+    """
+    ed_width = len(str(self.max_exploration_depth))
+    nec_width = len(str(self.max_necessity))
+
+    extra: list[str] = [
+      f"M_NEC={self.max_necessity:03d}",
+      f"ED={self.exploration_depth:0{ed_width}d}",
+    ]
+
+    extra += [
+      frame.progress_string(i, nec_width)
+      for i, frame in enumerate(self.activation_records)
+    ]
+
+    extra += [
+      f"LVL={self.level:0{ed_width}d}",
+      f"L_NEC={self.len_necessary:0{nec_width}d}",
+      f"G={self.node_granularity:03d}",
+    ]
+
+    return extra
 
 
 @dataclass(eq=False)
@@ -135,7 +214,7 @@ class MA3Minimizer(Minimizer):
   # LVL, L_NEC, and G from the current `_min_node` call.
   cur_level: int = 0
   cur_len_necessary: int = 0
-  cur_granularity: int = 0
+  cur_node_granularity: int = 0
 
 
   def __init__(
@@ -399,7 +478,7 @@ class MA3Minimizer(Minimizer):
       # Update the progress report data before running `_try_candidate`.
       self.cur_level = node.level
       self.cur_len_necessary = node.num_necessary
-      self.cur_granularity = g
+      self.cur_node_granularity = g
 
       if len(cc) > 1:
         # We are attempting to replace multiple nodes, so only attempt
@@ -456,7 +535,7 @@ class MA3Minimizer(Minimizer):
 
   # ---- Progress reporting ----
   def _get_cur_granularity(self) -> float:
-    return float(self.cur_granularity)
+    return float(self.cur_node_granularity)
 
 
   def _get_cur_completion_fraction(self, nodes: list[TTNode]) -> float:
@@ -472,17 +551,18 @@ class MA3Minimizer(Minimizer):
     nodes: list[TTNode],
     changed: ByteRange,
   ) -> TestStartReport:
-    return dataclasses.replace(
-      super()._make_report(nodes, changed),
-      ma3_data = MA3ReportData(
-        max_necessity         = self.max_necessity,
-        exploration_depth     = self.exploration_depth,
-        max_exploration_depth = self._max_exploration_depth(),
-        activation_records    = self.activation_records,
-        level                 = self.cur_level,
-        len_necessary         = self.cur_len_necessary,
-        granularity           = self.cur_granularity,
-      ))
+    base_report: TestStartReport = super()._make_report(nodes, changed)
+
+    return MA3StartReport(
+      **vars(base_report),
+      max_necessity         = self.max_necessity,
+      exploration_depth     = self.exploration_depth,
+      max_exploration_depth = self._max_exploration_depth(),
+      activation_records    = self.activation_records,
+      level                 = self.cur_level,
+      len_necessary         = self.cur_len_necessary,
+      node_granularity      = self.cur_node_granularity,
+    )
 
 
 # EOF

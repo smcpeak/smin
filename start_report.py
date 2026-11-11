@@ -6,91 +6,8 @@ TestStartReport class.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from byte_range import ByteRange
-
-
-@dataclass
-class MA3RecMinAR:
-  """
-  Recursive minimizer activation record.  This is used in progress
-  reports to try to give some sense of where the algorithm is.
-  """
-
-  # The index of the child being explored in the `rev_nec` list.
-  child_index: int
-
-  # Length of `rev_nec`.
-  rev_nec_len: int
-
-
-  def progress_string(self, i: int, nec_width: int) -> str:
-    """
-    Return the string used to show this activation record in the
-    progress report.
-    """
-    c: int = self.child_index
-    n: int = self.rev_nec_len
-    return f"C{i}=({c:0{nec_width}d}/{n:0{nec_width}d})"
-
-
-# TODO: Provide a way to allow algorithm-specific reporting without
-# having all of them known to this module.
-@dataclass(frozen=True, kw_only=True)
-class MA3ReportData:
-  """
-  Additional progress data reported by MA3.  See
-  minimization-algorithm.txt, "MA3 Progress Reporting".
-  """
-
-  # M_NEC: max_necessity.
-  max_necessity: int
-
-  # ED: exploration_depth.
-  exploration_depth: int
-
-  # MAX_EXPLORATION_DEPTH, which determines the width of ED and LVL.
-  max_exploration_depth: int
-
-  # Record of each active `ma3_min_subtree` call that is in its loop
-  # over necessary children, outermost first.
-  activation_records: list[MA3RecMinAR]
-
-  # LVL: level(N) for the current `ma3_min_node(N)`.
-  level: int
-
-  # L_NEC: len(necessary(N)) for that N.
-  len_necessary: int
-
-  # G: The number of nodes in the candidate.
-  granularity: int
-
-
-  def extra_status_fields(self) -> list[str]:
-    """
-    Return the extra MA3 status fields.
-    """
-    ed_width = len(str(self.max_exploration_depth))
-    nec_width = len(str(self.max_necessity))
-
-    extra: list[str] = [
-      f"M_NEC={self.max_necessity:03d}",
-      f"ED={self.exploration_depth:0{ed_width}d}",
-    ]
-
-    extra += [
-      frame.progress_string(i, nec_width)
-      for i, frame in enumerate(self.activation_records)
-    ]
-
-    extra += [
-      f"LVL={self.level:0{ed_width}d}",
-      f"L_NEC={self.len_necessary:0{nec_width}d}",
-      f"G={self.granularity:03d}",
-    ]
-
-    return extra
 
 
 @dataclass(frozen=True)
@@ -119,6 +36,8 @@ class TestStartReport:
 
   # G: Current granularity, in tokens.  The algorithm is (mainly) trying
   # to remove nodes of about this size.
+  #
+  # TODO: Rename to "token_granularity".
   granularity: float
 
   # F: Estimate of how far we are through the current pass, in [0,1].
@@ -137,9 +56,6 @@ class TestStartReport:
   # modified to produce the candidate.  This is passed to the test
   # program in the CHANGED_BYTE_RANGE envvar.
   changed_byte_range: ByteRange
-
-  # Additional data when the algorithm is MA3.
-  ma3_data: Optional[MA3ReportData] = None
 
 
   def to_progress_string(self) -> str:
@@ -168,8 +84,7 @@ class TestStartReport:
       f"F={f_percent:02d}%",
     ]
 
-    if self.ma3_data is not None:
-      status_fields += self.ma3_data.extra_status_fields()
+    status_fields += self.extra_status_fields()
 
     status_fields.append(f"R={self.removed_tok_count:0{tok_width}d}")
     status = " ".join(status_fields)
@@ -178,6 +93,16 @@ class TestStartReport:
       f"N={self.sequence_num:06d} "
       f"S={self.last_accepted_tok_count:0{tok_width}d} "
       f"{status}")
+
+
+  def extra_status_fields(self) -> list[str]:
+    """
+    Return any additional, algorithm-specific fields.
+
+    The default returns [].
+    """
+    return []
+
 
   def to_console_string(self) -> str:
     """

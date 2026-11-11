@@ -14,7 +14,12 @@ from collections.abc import Callable
 from build_tree import BuildTreeOptions, build_tree
 from lang_cpp import CPPLanguage
 from language import Language
-from ma_ma3 import BGCTNode, MA3Minimizer, MA3MinimizerSelector
+from ma_ma3 import (
+  BGCTNode,
+  MA3Minimizer,
+  MA3MinimizerSelector,
+  MA3StartReport,
+)
 from min_alg_kind import MinimizerAlgorithmKind
 from minimizer import Minimizer
 from minimizer_test import (
@@ -128,7 +133,7 @@ class MA3Test(ReportCheckingTestCase):
     # The MA3 report contents are deliberately not checked, but
     # rendering them should work.
     for r in rec.starts:
-      self.assertIsNotNone(r.ma3_data)
+      self.assertIsInstance(r, MA3StartReport)
       self.assertTrue(r.to_console_string().startswith("N="))
 
     # Every recursive call has finished.
@@ -353,6 +358,11 @@ class MA3Test(ReportCheckingTestCase):
     self.assertEqual(m.get_minimized_test_input(), b"a;\nb;\nc;\n")
     self.assertEqual(rec.tested, [b"a;\nb;\n"])
 
+  def as_ma3_report(self, r: TestStartReport) -> MA3StartReport:
+    self.assertIsInstance(r, MA3StartReport)
+    assert isinstance(r, MA3StartReport)    # mypy needs this too...
+    return r
+
   def test_max_exploration_depth(self) -> None:
     # The function's body is a child of the root, since the head and
     # body together would span the entire root.
@@ -376,8 +386,9 @@ class MA3Test(ReportCheckingTestCase):
     self.assertEqual(m.get_minimized_test_input(), b"\n{\n  keep;\n}\n")
     self.assertEqual(rec.tested[3:], [b"\n{\n  x;\n}\n",
                                       b"\n{\n  keep;\n}\n"])
-    self.assertEqual([r.ma3_data.exploration_depth
-                      for r in rec.starts[3:] if r.ma3_data], [2, 2])
+    self.assertEqual([self.as_ma3_report(r).exploration_depth
+                      for r in rec.starts[3:]],
+                     [2, 2])
 
   def test_spec_example(self) -> None:
     # Keep the "g" call.  Everything removable at depth 4 or less goes.
