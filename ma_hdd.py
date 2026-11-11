@@ -150,15 +150,13 @@ class HDDMinimizer(Minimizer):
       # Work from the last run to the first.
       for offset, run in enumerate(reversed(runs)):
         self.hdd_candidate_number = c_for_g[g] + offset
-        if self._try_candidate({id(n): b"" for n in run}, run):
+        if self._try_trivial_replacement_candidate(run):
           continue
 
         if g == 1:
           n: TTNode = run[0]
-          replacement = self.options.language.non_trivial_replacement(n)
-          if replacement:
-            self.hdd_candidate_number += 0.5
-            self._try_candidate({id(n): replacement}, [n])
+          self.hdd_candidate_number += 0.5
+          self._try_if_non_trivial_replacement_candidate(n)
 
       g //= 2
 

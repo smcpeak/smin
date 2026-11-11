@@ -406,9 +406,7 @@ class MA3Minimizer(Minimizer):
         # the trivial replacement.
         tt_nodes: list[TTNode] = [c.ttnode for c in cc]
 
-        # TODO: Factor the several places that use `_try_candidate` and
-        # supply a dict with trivial replacements.
-        if self._try_candidate({id(n): b"" for n in tt_nodes}, tt_nodes):
+        if self._try_trivial_replacement_candidate(tt_nodes):
           # ACCEPT: Double `g`, up to the number remaining, to
           # optimistically accelerate further removal.
           g = min(2 * g, remaining)
@@ -423,17 +421,13 @@ class MA3Minimizer(Minimizer):
 
       # We are attempting to remove just one node, `c`.
       c: BGCTNode = cc[0]
-      if self._try_candidate({id(c.ttnode): b""}, [c.ttnode]):
+      if self._try_trivial_replacement_candidate([c.ttnode]):
         # ACCEPT trivial replacement.
         g = min(2 * g, remaining)
         continue
 
       # Non-trivial replacement?
-      replacement: Optional[bytes] = (
-        self.options.language.non_trivial_replacement(c.ttnode))
-      if (replacement and
-          self._try_candidate({id(c.ttnode): replacement},
-                              [c.ttnode])):
+      if self._try_if_non_trivial_replacement_candidate(c.ttnode):
         # ACCEPT non-trivial replacement.  Since it was non-trivial, and
         # thus required attention to the individual node, we
         # optimistically expect the same to be true of the next node, so
@@ -446,9 +440,7 @@ class MA3Minimizer(Minimizer):
       # the candidate would be the same as the one just tried.
       bg = self.rcpbg(c)
       if bg is not None and bg is not c.ttnode:
-        replacement = self.options.language.non_trivial_replacement(bg)
-        if replacement and self._try_candidate({id(bg): replacement},
-                                               [bg]):
+        if self._try_if_non_trivial_replacement_candidate(bg):
           # `c` itself survives, and is now necessary.
           node.num_necessary += 1
 

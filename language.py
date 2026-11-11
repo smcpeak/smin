@@ -27,6 +27,8 @@ class Language(Protocol):
     sequence.  If it returns non-None, then *in addition* to replacement
     by the empty sequence, we also consider replacing the node with the
     returned sequence.
+
+    Ensures that the return value, if not None, is not empty.
     """
     ...
 

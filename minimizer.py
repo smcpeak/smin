@@ -419,29 +419,45 @@ class Minimizer(ABC):
     Test the candidate formed by adding the replacements in `extra`,
     which replace `nodes`, to the current ones.  If it is accepted, make
     them current and return True.
+
+    There is overlap in purpose among `extra` and `nodes`.  The former
+    is what controls what goes into the candidate, while the latter is
+    only used for progress reporting.  This isn't ideal as an interface,
+    but now that `_try_candidate` has dedicated wrappers for trivial and
+    non-trivial replacements, I think the overlap is not a major
+    problem.
     """
+
+    # Render the candidate, getting its text and the changed range.
     text: bytes
     changed: Optional[ByteRange]
     text, changed = self.render_candidate_with_range(extra)
     assert changed is not None
+
+    # Hash the candidate text for memoization.
     digest: bytes = _digest(text)
 
+    # Deliver a progress report for this candidate.
     self.sequence_num += 1
     report = self._make_report(nodes, changed)
     self.options.acceptance.report_test_starting(report)
 
+    # Check the memo table.
     result: Optional[AcceptanceTestResult] = self.memoized_accept.get(digest)
     if result is not None:
       self.options.acceptance.report_test_finished(result, True)
+
     else:
+      # Run the actual acceptance test.
       result = self.options.acceptance.test_acceptance(text, report)
       self.options.acceptance.report_test_finished(result, False)
       if result == AcceptanceTestResult.INTERRUPTED:
         raise _StopMinimization(result)
       self.memoized_accept[digest] = result
 
-    accepted: bool = result == AcceptanceTestResult.ACCEPT
+    accepted: bool = (result == AcceptanceTestResult.ACCEPT)
     if accepted:
+      # Update the tree, making the tested changes permanent.
       self.accepted_size = len(text)
       self._commit(extra)
 
@@ -453,6 +469,52 @@ class Minimizer(ABC):
       raise _StopMinimization(AcceptanceTestResult.ACCEPT)
 
     return accepted
+
+
+  def _try_trivial_replacement_candidate(
+    self,
+    nodes: list[TTNode],
+  ) -> bool:
+    """
+    Try the candidate formed by replacing all of `nodes` trivially,
+    i.e., with the empty string.
+    """
+
+    return self._try_candidate({id(n): b"" for n in nodes}, nodes)
+
+
+  def _try_non_trivial_replacement_candidate(
+    self,
+    node: TTNode,
+    replacement: bytes,
+  ) -> bool:
+    """
+    Try replacing `node` with `replacement`, which is not the empty
+    string.
+    """
+
+    assert replacement != b""
+    return self._try_candidate({id(node): replacement}, [node])
+
+
+  def _try_if_non_trivial_replacement_candidate(
+    self,
+    node: TTNode,
+  ) -> bool:
+    """
+    Try replacing `node` with a non-trivial replacement if it has one.
+
+    Return True if there was such a replacement and it was accepted.
+    """
+
+    replacement: Optional[bytes] = (
+      self.options.language.non_trivial_replacement(node))
+
+    if replacement:
+      return self._try_non_trivial_replacement_candidate(
+               node, replacement)
+    else:
+      return False
 
 
   def _commit(self, extra: dict[int, bytes]) -> None:

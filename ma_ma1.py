@@ -119,7 +119,7 @@ class MA1Minimizer(Minimizer):
       else:
         # When we try removing a run, we only try the trivial
         # replacement of an empty byte sequence.
-        self._try_candidate({id(n): b"" for n in run}, run)
+        self._try_trivial_replacement_candidate(run)
 
       # Continue with the node that stopped the run, if any.
       i = j
@@ -131,14 +131,10 @@ class MA1Minimizer(Minimizer):
     with its non-trivial replacement, if any.  Return True if either
     was accepted.
     """
-    if self._try_candidate({id(node): b""}, [node]):
+    if self._try_trivial_replacement_candidate([node]):
       return True
 
-    replacement = self.options.language.non_trivial_replacement(node)
-    if replacement:
-      return self._try_candidate({id(node): replacement}, [node])
-
-    return False
+    return self._try_if_non_trivial_replacement_candidate(node)
 
 
   def _get_cur_granularity(self) -> float:

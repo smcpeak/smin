@@ -125,7 +125,7 @@ class MA2Minimizer(Minimizer):
       # Try removing the last `granularity` children in scope.
       self.ma2_granularity = granularity
       run: list[TTNode] = children[limit-granularity : limit]
-      if self._try_candidate({id(n): b"" for n in run}, run):
+      if self._try_trivial_replacement_candidate(run):
         # Removing `run` worked.  `_try_candidate` marked the nodes as
         # replaced in the tree, but we need to update our local list.
         del children[limit-granularity : limit]
@@ -149,8 +149,7 @@ class MA2Minimizer(Minimizer):
       c: TTNode = run[0]
 
       # Try a non-trivial replacement.
-      replacement = self.options.language.non_trivial_replacement(c)
-      if replacement and self._try_candidate({id(c): replacement}, [c]):
+      if self._try_if_non_trivial_replacement_candidate(c):
         # Keep `granularity` at 1 since `c` required individualized
         # attention, so its neighbor might too.
         del children[limit-1]
