@@ -8,6 +8,7 @@ exec python3 "$T_ACCEPT_PY" \
     --before-after helper helper \
     --has-string std::cout \
     --tsv-log "$T_ACCEPT_TSV_LOG" \
+    --input-log "$T_ACCEPT_INPUT_LOG" \
     >/dev/null 2>&1
 
 # EOF

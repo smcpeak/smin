@@ -254,6 +254,9 @@ def main(argv: list[str]) -> int:
   # anywhere.  (creduce runs the program in a temporary directory.)
   env["T_ACCEPT_TSV_LOG"] = str(run_dir / f"{benchmark}-{minimizer}.tsv")
 
+  # Similarly, provide a name for --input-log.
+  env["T_ACCEPT_INPUT_LOG"] = str(run_dir / f"input.log")
+
   return run_minimizer(spec.command, run_dir, env)
 
 
