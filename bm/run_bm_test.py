@@ -425,7 +425,7 @@ class EndToEndTest(TempDirTestCase):
     self.assertEqual((run_dir / "input").read_bytes(), expected)
 
     self.assertIn(
-      f"from 68 tokens ({len(original)} bytes) "
+      f"from 67 tokens ({len(original)} bytes) "
       f"to 17 tokens ({len(expected)} bytes).",
       proc.stdout)
     self.assertIn("Minimizer time:", proc.stdout)
