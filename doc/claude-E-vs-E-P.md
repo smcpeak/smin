@@ -2,10 +2,12 @@ This file has Claude's analysis of a minimizer performance issue.
 
 Claude took about 7 minutes to do its analysis and writeup.  I then
 asked it to write that to a file (this file), and I then added the
-prompt and reformatted the answer for easier reading as text.
+prompt and reformatted the answer for easier reading as text.  I also
+added my own summary to the end.
 
-The answer points to a /tmp directory at the end.  I haven't preserved
-its contents.
+Claude's text points to a /tmp directory at the end.  I haven't
+preserved its contents.  (I looked at it briefly.  Nothing jumped out as
+being worth saving.)
 
 
 Prompt
@@ -89,7 +91,7 @@ In E-P, one namespace body ends up with about 62 necessary children.
 With `NECESSITY_INCREMENT=10` it keeps hitting the limit, and that alone
 forces passes 5, 6 and 7. Every pass also resets necessity, so each of
 those passes re-tests every necessary child at every level it explores.
-That is where the extra 2.5 minutes goes. Passes 5–7 in E-P accept
+That is where the extra 2.5 minutes goes. Passes 5--7 in E-P accept
 very little: about 9 kB removed over about 870 tests.
 
 **A second effect inflates the necessary counts.**
@@ -145,3 +147,37 @@ down fully.
 
 I didn't change any code. The analysis scripts are in
 `/tmp/claude-1000/-home-scott-wrk-smin/49bf68d2-5d07-49b8-82c5-80ba709d3a05/scratchpad/`.
+
+
+My summary
+----------
+
+Key points from Claude's analysis:
+
+* Line markers interact with indentation grouping to cause nodes to have
+  fewer children overall.  Evidently, keeping a smaller number of larger
+  children tends to work better, even when that means they have some
+  unnecessary text inside them.
+
+* Larger children also avoids a problem where, without paragraphs, I
+  split multi-line declarations badly and waste a lot of time trying to
+  take them apart in syntactically inappropriate ways.
+
+* With E-P, the necessity limit is too small, so we waste time retrying
+  a bunch of nodes and expanding that limit.  In fact, Claude basically
+  ascribes the entire extra 2.5 minutes to retries while expanding
+  necessity.
+
+* Meanwhile, indentation causes E-P to sometimes very coarsely divide
+  classes due to "public:", etc., whereas the line markers cause
+  divisions to appear.
+
+Summarizing my summary, indentation grouping with line markers produces
+groups that have surprisingly useful structure.
+
+Consequently, if I want the algorithms to perform well without line
+markers (and of course I do), then I need ways to recover at least as
+much structure as the line markers were (accidentally!) providing.
+
+
+EOF
