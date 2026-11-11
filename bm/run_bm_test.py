@@ -220,7 +220,7 @@ class ScriptTest(TempDirTestCase):
 
     # Make sure the variables we check come from the script.
     self.env.pop("T_ACCEPT_PY", None)
-    self.env.pop("T_ACCEPT_LOG_TSV", None)
+    self.env.pop("T_ACCEPT_TSV_LOG", None)
 
   def fake_delta(self, body: str) -> None:
     """Install a stand-in for the "delta" minimizer's program."""
@@ -241,12 +241,12 @@ class ScriptTest(TempDirTestCase):
   def test_environment_and_arguments(self) -> None:
     bench = self.make_benchmark(gen_body=(
       'echo "gen_py=$T_ACCEPT_PY" > gen.log\n'
-      'echo "gen_tsv=$T_ACCEPT_LOG_TSV" >> gen.log\n'
+      'echo "gen_tsv=$T_ACCEPT_TSV_LOG" >> gen.log\n'
       'pwd >> gen.log\n'
       ': > input'))
     self.fake_delta(
       'echo "py=$T_ACCEPT_PY" > delta.log\n'
-      'echo "tsv=$T_ACCEPT_LOG_TSV" >> delta.log\n'
+      'echo "tsv=$T_ACCEPT_TSV_LOG" >> delta.log\n'
       'echo "args=$*" >> delta.log\n'
       'pwd >> delta.log\n'
       'test -e input && echo "have input" >> delta.log')

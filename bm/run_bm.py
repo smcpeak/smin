@@ -252,7 +252,7 @@ def main(argv: list[str]) -> int:
 
   # Export the name of the log file so test.sh can log to it from
   # anywhere.  (creduce runs the program in a temporary directory.)
-  env["T_ACCEPT_LOG_TSV"] = str(run_dir / f"{benchmark}-{minimizer}.tsv")
+  env["T_ACCEPT_TSV_LOG"] = str(run_dir / f"{benchmark}-{minimizer}.tsv")
 
   return run_minimizer(spec.command, run_dir, env)
 
