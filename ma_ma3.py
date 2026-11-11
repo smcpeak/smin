@@ -95,8 +95,8 @@ class MA3StartReport(TestStartReport):
   # L_NEC: len(necessary(N)) for that N.
   len_necessary: int
 
-  # G: The number of nodes in the candidate.
-  node_granularity: int
+  # Note: G: The number of nodes in the candidate, is stored in the
+  # `granularity` field inherited from `TestStartReport`.
 
 
   def extra_status_fields(self) -> list[str]:
@@ -116,10 +116,11 @@ class MA3StartReport(TestStartReport):
       for i, frame in enumerate(self.activation_records)
     ]
 
+    g = int(self.granularity)
     extra += [
       f"LVL={self.level:0{ed_width}d}",
       f"L_NEC={self.len_necessary:0{nec_width}d}",
-      f"G={self.node_granularity:03d}",
+      f"G={g:03d}",
     ]
 
     return extra
@@ -561,7 +562,6 @@ class MA3Minimizer(Minimizer):
       activation_records    = self.activation_records,
       level                 = self.cur_level,
       len_necessary         = self.cur_len_necessary,
-      node_granularity      = self.cur_node_granularity,
     )
 
 

@@ -138,6 +138,10 @@ class MA1Minimizer(Minimizer):
 
 
   def _get_cur_granularity(self) -> float:
+    """
+    G: Current granularity, in tokens.  The algorithm is (mainly) trying
+    to remove nodes of about this size.
+    """
     return len(self.tokens) / (1 << self.pass_index)
 
 

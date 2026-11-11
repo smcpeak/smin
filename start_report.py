@@ -34,10 +34,7 @@ class TestStartReport:
   # Pm: The total number of passes we expect to perform.
   total_num_passes: int
 
-  # G: Current granularity, in tokens.  The algorithm is (mainly) trying
-  # to remove nodes of about this size.
-  #
-  # TODO: Rename to "token_granularity".
+  # Current granularity, whose meaning varies by algorithm.
   granularity: float
 
   # F: Estimate of how far we are through the current pass, in [0,1].
