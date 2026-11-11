@@ -388,7 +388,7 @@ class MinimizerEnvTest(TempDirTestCase):
       ': > input'))
     fake = self.tmp / "fake-minimizer"
     write_script(fake, 'echo "min=$MY_VAR" > min.log')
-    spec = MinimizerSpec([str(fake)], env={"MY_VAR": "a b"})
+    spec = MinimizerSpec([str(fake)], [], env={"MY_VAR": "a b"})
 
     out = io.StringIO()
     with mock.patch.dict(MINIMIZERS, {"fake": spec}), \

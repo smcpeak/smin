@@ -44,31 +44,52 @@ INPUT = "input"
 class MinimizerSpec:
   """How to run one minimizer."""
 
-  # The command that runs it in a run directory.
-  command: list[str]
+  # The first part of the command that runs it in a run directory.
+  command_prefix: list[str]
+
+  # The second part of the command.  Between the two are inserted
+  # additional options specified on the `run_bm.py` command line.
+  #
+  # TODO: Design and implement an interface for providing those options.
+  command_suffix: list[str]
 
   # Additional environment variables to set while running the benchmark,
   # typically to enable experimental behavior.
   env: dict[str, str] = field(default_factory=dict)
 
 
+  def get_command(self) -> list[str]:
+    return self.command_prefix + self.command_suffix
+
+
 # Map from minimizer name to how to run it.
 _SMIN_PY: str = str(REPO_DIR / "smin.py")
 MINIMIZERS: dict[str, MinimizerSpec] = {
-  "smin":     MinimizerSpec([_SMIN_PY, TEST_SH, "--", INPUT]),
-  "smin-ma2": MinimizerSpec([_SMIN_PY, "--ma2", TEST_SH, "--", INPUT]),
-  "smin-hdd": MinimizerSpec([_SMIN_PY, "--hdd", TEST_SH, "--", INPUT]),
-  "smin-ma3": MinimizerSpec([_SMIN_PY, "--ma3", TEST_SH, "--", INPUT]),
+  "smin": MinimizerSpec(
+    [_SMIN_PY],
+    [TEST_SH, "--", INPUT]),
+
+  "smin-ma2": MinimizerSpec(
+    [_SMIN_PY, "--ma2"],
+    [TEST_SH, "--", INPUT]),
+
+  "smin-hdd": MinimizerSpec(
+    [_SMIN_PY, "--hdd"],
+    [TEST_SH, "--", INPUT]),
+
+  "smin-ma3": MinimizerSpec(
+    [_SMIN_PY, "--ma3"],
+    [TEST_SH, "--", INPUT]),
 
   "smin-ma2-bg": MinimizerSpec(
-    [_SMIN_PY, "--ma2", "--ma2-brace-groups", TEST_SH, "--", INPUT]),
+    [_SMIN_PY, "--ma2", "--ma2-brace-groups"],
+    [TEST_SH, "--", INPUT]),
 
-  "smin-ma2-bg-sp": MinimizerSpec([
-    _SMIN_PY,
-    "--skip-paragraphs",
-    "--ma2", "--ma2-brace-groups",
-    TEST_SH, "--", INPUT
-  ]),
+  "smin-ma2-bg-sp": MinimizerSpec(
+    [_SMIN_PY,
+     "--ma2", "--ma2-brace-groups",
+     "--skip-paragraphs"],
+    [TEST_SH, "--", INPUT]),
 
   # This is my own script (in github.com/smcpeak/scripts) that runs
   # `multidelta -level=N` for N in the sequence [0 1 0 1 2 0 1 2 3 0 1 2
@@ -76,11 +97,18 @@ MINIMIZERS: dict[str, MinimizerSpec] = {
   # topformflat call inside multidelta.  That schedule is one I
   # developed myself via ad-hoc experimentation over the years, and (for
   # the inputs I've worked with) gets the best delta performance.
-  "delta":    MinimizerSpec(["multimultidelta", TEST_SH, INPUT]),
+  "delta":    MinimizerSpec(
+    ["multimultidelta"],
+    [TEST_SH, INPUT]),
 
-  # --n 1 causes these to run sequentially.
-  "creduce":  MinimizerSpec(["creduce", "--n", "1", TEST_SH, INPUT]),
-  "cvise":    MinimizerSpec(["cvise", "--n", "1", TEST_SH, INPUT]),
+  # --n 1 causes creduce and cvise to run sequentially.
+  "creduce":  MinimizerSpec(
+    ["creduce", "--n", "1"],
+    [TEST_SH, INPUT]),
+
+  "cvise":    MinimizerSpec(
+    ["cvise", "--n", "1"],
+    [TEST_SH, INPUT]),
 }
 
 
@@ -257,7 +285,7 @@ def main(argv: list[str]) -> int:
   # Similarly, provide a name for --input-log.
   env["T_ACCEPT_INPUT_LOG"] = str(run_dir / f"input.log")
 
-  return run_minimizer(spec.command, run_dir, env)
+  return run_minimizer(spec.get_command(), run_dir, env)
 
 
 if __name__ == "__main__":
