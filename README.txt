@@ -71,7 +71,6 @@ not having an easy way to recover.
 
 Any prose that includes AI-generated text is disclosed as such at the
 top of the file (in addition to provenance in git commit messages).
-Currently, that only applies to doc/related-work.txt.
 
 The earliest versions of the structure deduction and minimization
 algorithms were informed in part by drafts created by Claude Code.
