@@ -87,33 +87,33 @@ class ValidationTest(TempDirTestCase):
 
   def test_usage(self) -> None:
     # Test passing the wrong number of arguments.
-    for argv in ([], ["smin"], ["smin", "bench", "extra"]):
+    for argv in ([], ["bench"], ["bench", "smin", "extra"]):
       status, out, err = self.run_main(argv)
       self.assertEqual(status, EXIT_CODE_ERROR)
       self.assertEqual(err, "")
-      self.assertIn("Usage: ./run_bm.py <minimizer> <benchmarkdir>", out)
+      self.assertIn("Usage: ./run_bm.py <benchmarkdir> <minimizer>", out)
 
   def test_unrecognized_minimizer(self) -> None:
     bench = self.make_benchmark()
-    self.check_error(["bogus", str(bench)], "Unrecognized minimizer: bogus")
+    self.check_error([str(bench), "bogus"], "Unrecognized minimizer: bogus")
 
   def test_not_a_directory(self) -> None:
     missing = str(self.tmp / "missing")
-    self.check_error(["smin", missing], f"Not a directory: {missing}")
+    self.check_error([missing, "smin"], f"Not a directory: {missing}")
 
   def test_missing_scripts(self) -> None:
     bench = self.make_benchmark()
     (bench / "test.sh").unlink()
-    self.check_error(["smin", str(bench)],
+    self.check_error([str(bench), "smin"],
                      f"Missing test script: {bench}/test.sh")
     (bench / "gen.sh").unlink()
-    self.check_error(["smin", str(bench)],
+    self.check_error([str(bench), "smin"],
                      f"Missing generator script: {bench}/gen.sh")
 
   def test_scripts_must_be_executable(self) -> None:
     bench = self.make_benchmark()
     (bench / "gen.sh").chmod(0o644)
-    self.check_error(["smin", str(bench)],
+    self.check_error([str(bench), "smin"],
                      f"Missing generator script: {bench}/gen.sh")
 
 
@@ -251,7 +251,7 @@ class ScriptTest(TempDirTestCase):
       'pwd >> delta.log\n'
       'test -e input && echo "have input" >> delta.log')
 
-    proc = self.run_script("delta", str(bench))
+    proc = self.run_script(str(bench), "delta")
     self.assertEqual(proc.returncode, 0, proc.stderr)
 
     # `pwd` reports the path with any symlinks resolved.
@@ -277,41 +277,41 @@ class ScriptTest(TempDirTestCase):
   def test_trailing_slashes(self) -> None:
     bench = self.make_benchmark()
     self.fake_delta("exit 0")
-    proc = self.run_script("delta", f"{bench}//")
+    proc = self.run_script(f"{bench}//", "delta")
     self.assertEqual(proc.returncode, 0, proc.stderr)
     self.assertTrue((self.run_dir() / "input").exists())
 
   def test_relative_benchmark_path(self) -> None:
     self.make_benchmark()
     self.fake_delta("exit 0")
-    proc = self.run_script("delta", "../bench")
+    proc = self.run_script("../bench", "delta")
     self.assertEqual(proc.returncode, 0, proc.stderr)
     self.assertTrue((self.run_dir() / "input").exists())
 
   def test_replaces_prior_run(self) -> None:
     bench = self.make_benchmark()
     self.fake_delta("exit 0")
-    self.assertEqual(self.run_script("delta", str(bench)).returncode, 0)
+    self.assertEqual(self.run_script(str(bench), "delta").returncode, 0)
     (self.run_dir() / "stale").write_text("")
-    self.assertEqual(self.run_script("delta", str(bench)).returncode, 0)
+    self.assertEqual(self.run_script(str(bench), "delta").returncode, 0)
     self.assertFalse((self.run_dir() / "stale").exists())
 
   def test_minimizer_status_forwarded(self) -> None:
     bench = self.make_benchmark()
     self.fake_delta("exit 7")
-    self.assertEqual(self.run_script("delta", str(bench)).returncode, 7)
+    self.assertEqual(self.run_script(str(bench), "delta").returncode, 7)
 
   def test_minimizer_not_installed(self) -> None:
     bench = self.make_benchmark()
     self.env["PATH"] = str(self.bin_dir)
-    proc = self.run_script("delta", str(bench))
+    proc = self.run_script(str(bench), "delta")
     self.assertEqual(proc.returncode, EXIT_CODE_ERROR)
     self.assertIn("Cannot run multimultidelta", proc.stderr)
 
   def test_gen_failure_stops(self) -> None:
     bench = self.make_benchmark(gen_body="exit 5")
     self.fake_delta(": > ran")
-    proc = self.run_script("delta", str(bench))
+    proc = self.run_script(str(bench), "delta")
     self.assertEqual(proc.returncode, EXIT_CODE_ERROR)
     self.assertIn("failed with status 5", proc.stderr)
     self.assertFalse((self.run_dir() / "ran").exists())
@@ -319,7 +319,7 @@ class ScriptTest(TempDirTestCase):
   def test_gen_killed_by_signal(self) -> None:
     bench = self.make_benchmark(gen_body="kill -9 $$")
     self.fake_delta(": > ran")
-    proc = self.run_script("delta", str(bench))
+    proc = self.run_script(str(bench), "delta")
     self.assertEqual(proc.returncode, 128 + 9)
     self.assertFalse((self.run_dir() / "ran").exists())
 
@@ -327,7 +327,7 @@ class ScriptTest(TempDirTestCase):
     # A file is in the way of the output directory.
     bench = self.make_benchmark()
     (self.cwd / "out").write_text("")
-    proc = self.run_script("delta", str(bench))
+    proc = self.run_script(str(bench), "delta")
     self.assertEqual(proc.returncode, EXIT_CODE_ERROR)
     self.assertIn("Cannot prepare", proc.stderr)
 
@@ -339,7 +339,7 @@ class ScriptTest(TempDirTestCase):
     bench = self.make_benchmark()
     self.fake_delta(": > started\nexec sleep 300")
     proc = subprocess.Popen(
-      [sys.executable, str(RUN_BM_PY), "delta", str(bench)],
+      [sys.executable, str(RUN_BM_PY), str(bench), "delta"],
       cwd=self.cwd, env=self.env, text=True, start_new_session=True,
       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -394,7 +394,7 @@ class MinimizerEnvTest(TempDirTestCase):
     with mock.patch.dict(MINIMIZERS, {"fake": spec}), \
          contextlib.chdir(self.tmp), \
          contextlib.redirect_stdout(out):
-      status = main(["fake", str(bench)])
+      status = main([str(bench), "fake"])
 
     self.assertEqual(status, 0)
     self.assertIn("export 'MY_VAR=a b'\n", out.getvalue())
@@ -410,7 +410,7 @@ class EndToEndTest(TempDirTestCase):
     # Use the real benchmark, but with the output under a temporary
     # directory, rather than bm/out.
     proc = subprocess.run(
-      [sys.executable, str(RUN_BM_PY), "smin", str(BM_DIR / "hello-cpp")],
+      [sys.executable, str(RUN_BM_PY), str(BM_DIR / "hello-cpp"), "smin"],
       cwd=self.tmp, capture_output=True, text=True, check=False)
     self.assertEqual(proc.returncode, 0, proc.stderr)
     self.assertEqual(proc.stderr, "")

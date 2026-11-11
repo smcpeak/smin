@@ -5,7 +5,7 @@ Run a minimizer on one of the benchmarks.
 
 Usage:
 
-  ./run_bm.py <minimizer> <benchmarkdir>
+  ./run_bm.py <benchmarkdir> <minimizer>
 
 The results go into out/<benchmark>/<minimizer>, relative to the current
 directory, replacing any prior run there.
@@ -87,7 +87,7 @@ MINIMIZERS: dict[str, MinimizerSpec] = {
 def usage_text() -> str:
   """Return the text to print when there are the wrong number of args."""
   lines = [
-    "Usage: ./run_bm.py <minimizer> <benchmarkdir>",
+    "Usage: ./run_bm.py <benchmarkdir> <minimizer>",
     "",
     "<minimizer> is one of:",
   ]
@@ -204,7 +204,7 @@ def main(argv: list[str]) -> int:
     print(usage_text())
     return EXIT_CODE_ERROR
 
-  minimizer, benchmark_arg = argv
+  benchmark_arg, minimizer = argv
 
   spec = MINIMIZERS.get(minimizer)
   if spec is None:
