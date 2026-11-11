@@ -64,9 +64,12 @@ class MinimizerSpec:
   env: dict[str, str] = field(default_factory=dict)
 
 
-  # TODO: Modify this method so it inserts <min-options>.
-  def get_command(self) -> list[str]:
-    return self.command_prefix + self.command_suffix
+  def get_command(self, min_options: list[str]) -> list[str]:
+    """
+    Return the command to run, with `min_options` (<min-options> from
+    the command line) inserted between the prefix and suffix.
+    """
+    return self.command_prefix + min_options + self.command_suffix
 
 
 # Map from minimizer name to how to run it.
@@ -125,7 +128,8 @@ MINIMIZERS: dict[str, MinimizerSpec] = {
 def usage_text() -> str:
   """Return the text to print when there are the wrong number of args."""
   lines = [
-    "Usage: ./run_bm.py <benchmarkdir> <minimizer>",
+    ("Usage: ./run_bm.py <benchmarkdir> <minimizer> "
+     "[<variant> [<min-options>]]"),
     "",
     "<minimizer> is one of:",
   ]
@@ -238,16 +242,28 @@ def main(argv: list[str]) -> int:
   name), and return its exit status.
   """
 
-  if len(argv) != 2:
+  if len(argv) < 2:
     print(usage_text())
     return EXIT_CODE_ERROR
 
-  benchmark_arg, minimizer = argv
+  benchmark_arg, minimizer = argv[0], argv[1]
+  variant: Optional[str] = argv[2] if len(argv) >= 3 else None
+  min_options: list[str] = argv[3:]
 
   spec = MINIMIZERS.get(minimizer)
   if spec is None:
     print(f"Unrecognized minimizer: {minimizer}", file=sys.stderr)
     return EXIT_CODE_ERROR
+
+  # Name of the results directory, which identifies this run.
+  run_name: str = minimizer
+  if variant is not None:
+    # Reject variants that would not name a sibling of the other runs'
+    # directories.
+    if variant == "" or "/" in variant:
+      print(f"Invalid variant: {variant!r}", file=sys.stderr)
+      return EXIT_CODE_ERROR
+    run_name += "-" + variant
 
   error = validate_benchmark_dir(benchmark_arg)
   if error is not None:
@@ -259,9 +275,9 @@ def main(argv: list[str]) -> int:
   benchmark_dir = Path(os.path.abspath(benchmark_arg))
   benchmark: str = benchmark_dir.name
 
-  print(f"Will run {minimizer} on benchmark: {benchmark}")
+  print(f"Will run {run_name} on benchmark: {benchmark}")
 
-  run_dir = Path(os.path.abspath(Path("out") / benchmark / minimizer))
+  run_dir = Path(os.path.abspath(Path("out") / benchmark / run_name))
 
   try:
     prepare_run_dir(benchmark_dir, run_dir)
@@ -290,12 +306,12 @@ def main(argv: list[str]) -> int:
 
   # Export the name of the log file so test.sh can log to it from
   # anywhere.  (creduce runs the program in a temporary directory.)
-  env["T_ACCEPT_TSV_LOG"] = str(run_dir / f"{benchmark}-{minimizer}.tsv")
+  env["T_ACCEPT_TSV_LOG"] = str(run_dir / f"{benchmark}-{run_name}.tsv")
 
   # Similarly, provide a name for --input-log.
   env["T_ACCEPT_INPUT_LOG"] = str(run_dir / f"input.log")
 
-  return run_minimizer(spec.get_command(), run_dir, env)
+  return run_minimizer(spec.get_command(min_options), run_dir, env)
 
 
 if __name__ == "__main__":

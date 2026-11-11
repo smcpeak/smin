@@ -87,15 +87,23 @@ class ValidationTest(TempDirTestCase):
 
   def test_usage(self) -> None:
     # Test passing the wrong number of arguments.
-    for argv in ([], ["bench"], ["bench", "smin", "extra"]):
+    for argv in ([], ["bench"]):
       status, out, err = self.run_main(argv)
       self.assertEqual(status, EXIT_CODE_ERROR)
       self.assertEqual(err, "")
-      self.assertIn("Usage: ./run_bm.py <benchmarkdir> <minimizer>", out)
+      self.assertIn(
+        "Usage: ./run_bm.py <benchmarkdir> <minimizer> "
+        "[<variant> [<min-options>]]",
+        out)
 
   def test_unrecognized_minimizer(self) -> None:
     bench = self.make_benchmark()
     self.check_error([str(bench), "bogus"], "Unrecognized minimizer: bogus")
+
+  def test_invalid_variant(self) -> None:
+    bench = self.make_benchmark()
+    self.check_error([str(bench), "smin", ""], "Invalid variant: ''")
+    self.check_error([str(bench), "smin", "a/b"], "Invalid variant: 'a/b'")
 
   def test_not_a_directory(self) -> None:
     missing = str(self.tmp / "missing")
@@ -115,6 +123,15 @@ class ValidationTest(TempDirTestCase):
     (bench / "gen.sh").chmod(0o644)
     self.check_error([str(bench), "smin"],
                      f"Missing generator script: {bench}/gen.sh")
+
+
+class MinimizerSpecTest(unittest.TestCase):
+  def test_get_command(self) -> None:
+    spec = MinimizerSpec(["prog", "-a"], ["test.sh", "input"])
+    self.assertEqual(spec.get_command([]),
+                     ["prog", "-a", "test.sh", "input"])
+    self.assertEqual(spec.get_command(["-b", "c d"]),
+                     ["prog", "-a", "-b", "c d", "test.sh", "input"])
 
 
 class RunChildTest(TempDirTestCase):
@@ -235,8 +252,18 @@ class ScriptTest(TempDirTestCase):
       cwd=self.cwd, env=self.env,
       capture_output=True, text=True, check=False)
 
-  def run_dir(self, benchmark: str = "bench") -> Path:
-    return self.cwd / "out" / benchmark / "delta"
+  def run_dir(
+    self,
+    benchmark: str = "bench",
+    run_name: str = "delta",
+  ) -> Path:
+    return self.cwd / "out" / benchmark / run_name
+
+  def fake_delta_logging_args(self) -> None:
+    """Install a "delta" that logs its arguments, one per line."""
+    self.fake_delta(
+      'echo "tsv=$T_ACCEPT_TSV_LOG" > delta.log\n'
+      'printf "arg=%s\\n" "$@" >> delta.log')
 
   def test_environment_and_arguments(self) -> None:
     bench = self.make_benchmark(gen_body=(
@@ -273,6 +300,48 @@ class ScriptTest(TempDirTestCase):
 
     self.assertIn("Will run delta on benchmark: bench\n", proc.stdout)
     self.assertRegex(proc.stdout, r"Minimizer time: real \S+s user \S+s sys")
+
+  def test_variant(self) -> None:
+    bench = self.make_benchmark()
+    self.fake_delta_logging_args()
+
+    proc = self.run_script(str(bench), "delta", "v1")
+    self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    # The variant names the results directory and TSV file, but adds no
+    # arguments.
+    run_dir = self.run_dir(run_name="delta-v1")
+    self.assertEqual((run_dir / "delta.log").read_text().splitlines(), [
+      f"tsv={run_dir}/bench-delta-v1.tsv",
+      "arg=./test.sh",
+      "arg=input",
+    ])
+    self.assertIn("Will run delta-v1 on benchmark: bench\n", proc.stdout)
+
+    # The run without a variant is a separate directory.
+    self.assertFalse(self.run_dir().exists())
+
+  def test_variant_and_options(self) -> None:
+    bench = self.make_benchmark()
+    self.fake_delta_logging_args()
+
+    proc = self.run_script(str(bench), "delta", "v2", "-x", "a b", "--y")
+    self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    # The options go between the command prefix and suffix, intact.
+    run_dir = self.run_dir(run_name="delta-v2")
+    self.assertEqual((run_dir / "delta.log").read_text().splitlines(), [
+      f"tsv={run_dir}/bench-delta-v2.tsv",
+      "arg=-x",
+      "arg=a b",
+      "arg=--y",
+      "arg=./test.sh",
+      "arg=input",
+    ])
+
+    # The command is echoed with quoting.
+    self.assertIn("multimultidelta -x 'a b' --y ./test.sh input\n",
+                  proc.stdout)
 
   def test_trailing_slashes(self) -> None:
     bench = self.make_benchmark()
