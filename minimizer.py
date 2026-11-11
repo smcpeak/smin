@@ -144,14 +144,6 @@ class Minimizer(ABC):
   # reports, and some algorithms use it internally as well.
   pass_index: int
 
-  # With MA2, the granularity, in nodes, of the candidate being tested.
-  #
-  # This is maintained as the algorithm makes granularity adjustments,
-  # then included in progress reports.
-  #
-  # TODO: This should not be here.
-  ma2_granularity: int
-
   # ---- Output data ----
   # True if minimization stopped early because `options.should_stop`
   # returned True.
@@ -192,7 +184,6 @@ class Minimizer(ABC):
 
     self.sequence_num = 0
     self.pass_index = 0
-    self.ma2_granularity = 0
 
     self.stop_requested = False
 

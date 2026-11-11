@@ -51,6 +51,12 @@ class MA2Minimizer(Minimizer):
   # only on the original tree, so it is computed once.
   orig_tree_max_depth: int
 
+  # The granularity, in nodes, of the candidate being tested.
+  #
+  # This is maintained as the algorithm makes granularity adjustments,
+  # then included in progress reports.
+  ma2_granularity: int
+
 
   def __init__(
     self,
@@ -68,6 +74,8 @@ class MA2Minimizer(Minimizer):
     self.orig_tree_max_depth = (
       self.tree.root.depth() if not self._use_brace_groups()
       else self._brace_depth(self.tree.root))
+
+    self.ma2_granularity = 0
 
 
   def _use_brace_groups(self) -> bool:
